@@ -17,6 +17,7 @@ set "BIN_DIR=%BUILD_DIR%\bin"
 set "BUILT_DIR=%CD%\BUILT"
 set "RELEASE_DIR=%CD%\.local\imports\release"
 set "SEAL_DIR=%CD%\.local\imports\sealhunter"
+set "ASSET_REZ=%CD%\.local\gameassets\rez"
 
 echo Build configuration: %CONFIG%
 echo Project directory:   %CD%
@@ -97,9 +98,17 @@ for %%F in (Lithtech.exe Engine.REZ LTMsg.dll SndDrv.dll server.dll) do (
 xcopy "%SEAL_DIR%\rez" "%BUILT_DIR%\rez\" /E /I /Y /Q >nul
 if errorlevel 1 goto :copyfail
 
+if exist "%ASSET_REZ%" (
+  echo Staging local Cabin Fever assets...
+  xcopy "%ASSET_REZ%" "%BUILT_DIR%\rez\" /E /I /Y /Q >nul
+  if errorlevel 1 goto :copyfail
+)
+
 copy /y "config\autoexec.cfg" "%BUILT_DIR%\autoexec.cfg" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\run-normal.cmd" "%BUILT_DIR%\run-normal.cmd" >nul
+if errorlevel 1 goto :copyfail
+copy /y "config\run-cabinfever.cmd" "%BUILT_DIR%\run-cabinfever.cmd" >nul
 if errorlevel 1 goto :copyfail
 
 echo.
@@ -116,7 +125,8 @@ if errorlevel 1 goto :copyfail
 echo.
 echo [5/5] BUILD COMPLETE
 echo Output: %BUILT_DIR%
-echo Test: BUILT\run-normal.cmd
+echo Stock test: BUILT\run-normal.cmd
+echo Cabin Fever test: BUILT\run-cabinfever.cmd
 echo.
 pause
 exit /b 0
