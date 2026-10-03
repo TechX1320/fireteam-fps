@@ -116,7 +116,7 @@ $newStart = 'g_pLTServer->FindNamedObjects("GameStartPoint00", pStartPt);' +
     [char]9 + '// SealHunter fallback.' + [Environment]::NewLine +
     [char]9 + 'if (pStartPt.NumObjects() == 0)' + [Environment]::NewLine +
     [char]9 + '{' + [Environment]::NewLine +
-    [char]9 + [char]9 + 'g_pLTServer->FindNamedObjects("GameStartPoint0", pStartPt);' + [Environment]::NewLine +
+    [string]([char]9) + [string]([char]9) + 'g_pLTServer->FindNamedObjects("GameStartPoint0", pStartPt);' + [Environment]::NewLine +
     [char]9 + '}'
 Replace-Required $serverShell $oldStart $newStart "GameStartPoint00 compatibility"
 
