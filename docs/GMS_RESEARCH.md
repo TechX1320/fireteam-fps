@@ -22,15 +22,17 @@ The mission files are not plain Bute text. They are encrypted or obfuscated, but
 | `NEMEXISHQ_CP.GMS` | 13921 | 1 | `5` | 363 |
 | `SANDHOG_CP.GMS` | 11411 | 3 | `6\r\n` | 330 |
 
-The repeated-block signal is strongest when the files are split at offset zero into 8-byte blocks. The final incomplete block is left readable in several files. Together, those facts strongly support an 8-byte ECB-style `CryBytes` transform over otherwise normal text rather than CBC encryption over the entire file.
+The repeated-block signal is strongest when the files are split at offset zero into 8-byte blocks. Archive-wide validation strengthens this substantially: **266 of the 305 GMS files are not divisible by 8, and all 266 of those files have a completely printable ASCII/control-character tail**. This is consistent with a transform that processes complete 8-byte blocks from offset zero and leaves the final 1-7 bytes untouched. Together with the repeated ciphertext blocks, this strongly supports an 8-byte ECB-style `CryBytes` transform over otherwise normal text rather than CBC encryption over the entire file.
 
 The Combat Arms reference `CShell.dll` and `Lithtech.exe` both contain a complete Blowfish implementation (including the standard Blowfish P-array constants). This makes **Blowfish ECB the leading GMS hypothesis**. The exact GMS key or key derivation is not yet recovered.
+
+A client-side Blowfish wrapper was traced far enough to recover its key-schedule behavior. In this build that wrapper passes a **fixed key length of 4 bytes** into the Blowfish key setup. Direct tests of `seungho`, and of its first four bytes `seun`, using both standard Blowfish block ordering and the native DWORD ordering seen in the CA implementation did **not** produce valid GMS plaintext. The reported `seungho` key may belong to another CA build/tool/server path, but it is not confirmed for these files.
 
 A reported alternative of Twofish-256/CBC with key `620C724A2FF22C975B5A2B9C21430820227B3D2800193AAA4CF3128803AC3ABD` matches known Combat Arms attribute-encryption research, but direct tests against these GMS files do not fit the observed repeated-block structure or produce valid plaintext. Do not reuse the attribute cipher for GMS without new evidence.
 
 ## Client vs. server loader
 
-The client reference binary contains `Attributes\\GMS.txt` and a `GMSButeMgr` initialization path. That manager handles the global GMS attribute/config table. It does not expose an obvious loader for map mission files such as `CABINFEVER_CP.GMS`.
+The client reference binary contains `Attributes\\GMS.txt` and a `GMSButeMgr` initialization path. The nearby byte-by-byte obfuscation was traced and resolves literally to the string **`GMSButeMgr`**; it is a manager/registration name, not a recovered encryption key. That manager handles the global GMS attribute/config table. It does not expose an obvious loader for map mission files such as `CABINFEVER_CP.GMS`.
 
 Current working conclusion: the `_CP.GMS` mission-file decrypt/load path is probably in the Combat Arms **DServer/server-side code or binary**, not in the two client reference binaries currently attached to this project.
 

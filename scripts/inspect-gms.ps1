@@ -25,6 +25,15 @@ function Convert-TailToText([byte[]]$Bytes) {
     return ($parts -join '')
 }
 
+function Test-TailPrintable([byte[]]$Bytes) {
+    foreach ($b in $Bytes) {
+        if ($b -eq 9 -or $b -eq 10 -or $b -eq 13) { continue }
+        if ($b -ge 32 -and $b -le 126) { continue }
+        return $false
+    }
+    return $true
+}
+
 function Get-GmsStats([string]$Name, [byte[]]$Bytes) {
     $fullBlockBytes = [int]($Bytes.Length - ($Bytes.Length % 8))
     $blockCount = [int]($fullBlockBytes / 8)
@@ -105,29 +114,75 @@ function Read-AllBytesFromStream([System.IO.Stream]$Stream) {
 
 $resolved = (Resolve-Path -LiteralPath $Path).Path
 $results = @()
+$archiveSummary = $null
 
 if (Test-Path -LiteralPath $resolved -PathType Container) {
-    $files = Get-ChildItem -LiteralPath $resolved -File | Where-Object { $_.Name -like $Pattern } | Sort-Object Name
-    foreach ($file in $files) {
-        $results += Get-GmsStats $file.Name ([IO.File]::ReadAllBytes($file.FullName))
+    $allFiles = Get-ChildItem -LiteralPath $resolved -File |
+        Where-Object { $_.Name -like '*.GMS' } |
+        Sort-Object Name
+
+    $nonAligned = 0
+    $printableTails = 0
+
+    foreach ($file in $allFiles) {
+        $bytes = [IO.File]::ReadAllBytes($file.FullName)
+        $tailLength = $bytes.Length % 8
+        if ($tailLength -gt 0) {
+            $nonAligned++
+            $tail = New-Object byte[] $tailLength
+            [Array]::Copy($bytes, $bytes.Length - $tailLength, $tail, 0, $tailLength)
+            if (Test-TailPrintable $tail) { $printableTails++ }
+        }
+
+        if ($file.Name -like $Pattern) {
+            $results += Get-GmsStats $file.Name $bytes
+        }
+    }
+
+    $archiveSummary = [pscustomobject]@{
+        TotalGms = $allFiles.Count
+        NonAligned = $nonAligned
+        PrintableTails = $printableTails
     }
 }
 elseif ([IO.Path]::GetExtension($resolved) -ieq '.zip') {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead($resolved)
     try {
-        $entries = $zip.Entries |
-            Where-Object { $_.Name -and $_.Name -like $Pattern } |
-            Sort-Object FullName
+        $allEntries = @(
+            $zip.Entries |
+                Where-Object { $_.Name -and $_.Name -like '*.GMS' } |
+                Sort-Object FullName
+        )
 
-        foreach ($entry in $entries) {
+        $nonAligned = 0
+        $printableTails = 0
+
+        foreach ($entry in $allEntries) {
             $stream = $entry.Open()
             try {
                 $bytes = Read-AllBytesFromStream $stream
-                $results += Get-GmsStats $entry.Name $bytes
             } finally {
                 $stream.Dispose()
             }
+
+            $tailLength = $bytes.Length % 8
+            if ($tailLength -gt 0) {
+                $nonAligned++
+                $tail = New-Object byte[] $tailLength
+                [Array]::Copy($bytes, $bytes.Length - $tailLength, $tail, 0, $tailLength)
+                if (Test-TailPrintable $tail) { $printableTails++ }
+            }
+
+            if ($entry.Name -like $Pattern) {
+                $results += Get-GmsStats $entry.Name $bytes
+            }
+        }
+
+        $archiveSummary = [pscustomobject]@{
+            TotalGms = $allEntries.Count
+            NonAligned = $nonAligned
+            PrintableTails = $printableTails
         }
     } finally {
         $zip.Dispose()
@@ -148,6 +203,11 @@ if ($results.Count -eq 0) {
 if ($Json) {
     $results | ConvertTo-Json -Depth 5
     exit 0
+}
+
+if ($archiveSummary) {
+    Write-Host ('Archive check: {0} GMS files; {1} have a 1-7 byte tail; {2}/{1} tails are printable ASCII/control text.' -f $archiveSummary.TotalGms, $archiveSummary.NonAligned, $archiveSummary.PrintableTails)
+    Write-Host ''
 }
 
 $results |
