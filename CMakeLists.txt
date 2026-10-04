@@ -75,42 +75,42 @@ set_target_properties(sres PROPERTIES OUTPUT_NAME "sres" PREFIX "")
 # Build Fireteam's ClientFX plugin from the original Jupiter 2006 source.
 # This keeps the runtime ABI matched to our SDK/source instead of dropping in
 # Combat Arms' prebuilt ClientFx.fxd.
-set(CLIENTFX_ROOT "\${ENGINE_ROOT}/clientfx")
+set(CLIENTFX_ROOT "${ENGINE_ROOT}/clientfx")
 set(CLIENTFX_PLUGIN_SOURCES
-    "\${CLIENTFX_ROOT}/BaseFx.cpp"
-    "\${CLIENTFX_ROOT}/bouncychunkfx.cpp"
-    "\${CLIENTFX_ROOT}/camjitterfx.cpp"
-    "\${CLIENTFX_ROOT}/camwobblefx.cpp"
-    "\${CLIENTFX_ROOT}/clientfx.cpp"
-    "\${CLIENTFX_ROOT}/CreateFX.cpp"
-    "\${CLIENTFX_ROOT}/cycletimer.cpp"
-    "\${CLIENTFX_ROOT}/dynalightfx.cpp"
-    "\${CLIENTFX_ROOT}/fallingstufffx.cpp"
-    "\${CLIENTFX_ROOT}/FlareSpriteFX.cpp"
-    "\${CLIENTFX_ROOT}/lightningfx.cpp"
-    "\${CLIENTFX_ROOT}/LTBbouncychunkfx.cpp"
-    "\${CLIENTFX_ROOT}/ltbmodelfx.cpp"
-    "\${CLIENTFX_ROOT}/nullfx.cpp"
-    "\${CLIENTFX_ROOT}/ParticleSystemFX.cpp"
-    "\${CLIENTFX_ROOT}/playrandomsoundfx.cpp"
-    "\${CLIENTFX_ROOT}/playsoundfx.cpp"
-    "\${CLIENTFX_ROOT}/polyfanfx.cpp"
-    "\${CLIENTFX_ROOT}/polytubefx.cpp"
-    "\${CLIENTFX_ROOT}/spritefx.cpp"
-    "\${CLIENTFX_ROOT}/spritesystemfx.cpp"
-    "\${CLIENTFX_ROOT}/stdafx.cpp"
-    "\${CLIENTFX_ROOT}/Shared/DebugNew.cpp"
-    "\${SDK_DIR}/ltmodule.cpp"
-    "\${SDK_DIR}/ltquatbase.cpp"
+    "${CLIENTFX_ROOT}/BaseFx.cpp"
+    "${CLIENTFX_ROOT}/bouncychunkfx.cpp"
+    "${CLIENTFX_ROOT}/camjitterfx.cpp"
+    "${CLIENTFX_ROOT}/camwobblefx.cpp"
+    "${CLIENTFX_ROOT}/clientfx.cpp"
+    "${CLIENTFX_ROOT}/CreateFX.cpp"
+    "${CLIENTFX_ROOT}/cycletimer.cpp"
+    "${CLIENTFX_ROOT}/dynalightfx.cpp"
+    "${CLIENTFX_ROOT}/fallingstufffx.cpp"
+    "${CLIENTFX_ROOT}/FlareSpriteFX.cpp"
+    "${CLIENTFX_ROOT}/lightningfx.cpp"
+    "${CLIENTFX_ROOT}/LTBbouncychunkfx.cpp"
+    "${CLIENTFX_ROOT}/ltbmodelfx.cpp"
+    "${CLIENTFX_ROOT}/nullfx.cpp"
+    "${CLIENTFX_ROOT}/ParticleSystemFX.cpp"
+    "${CLIENTFX_ROOT}/playrandomsoundfx.cpp"
+    "${CLIENTFX_ROOT}/playsoundfx.cpp"
+    "${CLIENTFX_ROOT}/polyfanfx.cpp"
+    "${CLIENTFX_ROOT}/polytubefx.cpp"
+    "${CLIENTFX_ROOT}/spritefx.cpp"
+    "${CLIENTFX_ROOT}/spritesystemfx.cpp"
+    "${CLIENTFX_ROOT}/stdafx.cpp"
+    "${CLIENTFX_ROOT}/Shared/DebugNew.cpp"
+    "${SDK_DIR}/ltmodule.cpp"
+    "${SDK_DIR}/ltquatbase.cpp"
 )
 
-if(EXISTS "\${CLIENTFX_ROOT}/clientfx.cpp")
-    add_library(clientfx_fxd SHARED \${CLIENTFX_PLUGIN_SOURCES})
+if(EXISTS "${CLIENTFX_ROOT}/clientfx.cpp")
+    add_library(clientfx_fxd SHARED ${CLIENTFX_PLUGIN_SOURCES})
     target_compile_definitions(clientfx_fxd PRIVATE NOPS2 MEMTRACK_CLIENTFX)
     target_include_directories(clientfx_fxd PRIVATE
-        "\${CLIENTFX_ROOT}"
-        "\${CLIENTFX_ROOT}/Shared"
-        "\${SDK_DIR}"
+        "${CLIENTFX_ROOT}"
+        "${CLIENTFX_ROOT}/Shared"
+        "${SDK_DIR}"
     )
     target_link_libraries(clientfx_fxd PRIVATE odbc32 odbccp32)
     set_target_properties(clientfx_fxd PROPERTIES
