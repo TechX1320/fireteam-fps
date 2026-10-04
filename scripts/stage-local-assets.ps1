@@ -10,12 +10,10 @@ $ErrorActionPreference = "Stop"
 
 $assetRoot = Join-Path $RepoRoot "assets-local"
 $rezRoot = Join-Path $LocalRoot "gameassets\rez"
-
-if (Test-Path -LiteralPath $rezRoot) {
-    Remove-Item -LiteralPath $rezRoot -Recurse -Force
-}
+$stampRoot = Join-Path $LocalRoot "gameassets\stamps"
 
 New-Item -ItemType Directory -Force -Path $rezRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $stampRoot | Out-Null
 
 function Expand-OptionalZip([string]$ZipName, [string]$RezSubdir) {
     $zipPath = Join-Path $assetRoot $ZipName
@@ -24,18 +22,41 @@ function Expand-OptionalZip([string]$ZipName, [string]$RezSubdir) {
         return
     }
 
+    $safeName = $ZipName.Replace(".", "_")
+    $stampPath = Join-Path $stampRoot ($safeName + ".stamp")
+    $zipInfo = Get-Item -LiteralPath $zipPath
+
+    if (Test-Path -LiteralPath $stampPath) {
+        $stampInfo = Get-Item -LiteralPath $stampPath
+        if ($stampInfo.LastWriteTimeUtc -ge $zipInfo.LastWriteTimeUtc) {
+            Write-Host "[OK] $ZipName unchanged"
+            return
+        }
+    }
+
     $dest = Join-Path $rezRoot $RezSubdir
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
+
+    Write-Host "[UPDATE] Expanding $ZipName..."
     Expand-Archive -LiteralPath $zipPath -DestinationPath $dest -Force
+    Set-Content -LiteralPath $stampPath -Value $zipInfo.LastWriteTimeUtc.Ticks
+    (Get-Item -LiteralPath $stampPath).LastWriteTimeUtc = $zipInfo.LastWriteTimeUtc
     Write-Host "[OK] $ZipName -> rez\$RezSubdir"
 }
 
 $mapPath = Join-Path $assetRoot "CABINFEVER.DAT"
 if (Test-Path -LiteralPath $mapPath) {
     $worlds = Join-Path $rezRoot "Worlds"
+    $destMap = Join-Path $worlds "CABINFEVER.DAT"
     New-Item -ItemType Directory -Force -Path $worlds | Out-Null
-    Copy-Item -LiteralPath $mapPath -Destination (Join-Path $worlds "CABINFEVER.DAT") -Force
-    Write-Host "[OK] CABINFEVER.DAT -> rez\Worlds"
+
+    if ((-not (Test-Path -LiteralPath $destMap)) -or
+        ((Get-Item -LiteralPath $destMap).LastWriteTimeUtc -lt (Get-Item -LiteralPath $mapPath).LastWriteTimeUtc)) {
+        Copy-Item -LiteralPath $mapPath -Destination $destMap -Force
+        Write-Host "[OK] CABINFEVER.DAT refreshed"
+    } else {
+        Write-Host "[OK] CABINFEVER.DAT unchanged"
+    }
 } else {
     Write-Host "[SKIP] CABINFEVER.DAT not present"
 }
