@@ -120,12 +120,12 @@ for %%F in (Lithtech.exe Engine.REZ LTMsg.dll SndDrv.dll server.dll) do (
   if errorlevel 1 goto :copyfail
 )
 
-xcopy "%SEAL_DIR%\rez" "%BUILT_DIR%\rez\" /E /I /Y /Q >nul
+xcopy "%SEAL_DIR%\rez" "%BUILT_DIR%\rez\" /D /E /I /Y /Q >nul
 if errorlevel 1 goto :copyfail
 
 if exist "%ASSET_REZ%" (
   echo Staging local Cabin Fever assets...
-  xcopy "%ASSET_REZ%" "%BUILT_DIR%\rez\" /E /I /Y /Q >nul
+  xcopy "%ASSET_REZ%" "%BUILT_DIR%\rez\" /D /E /I /Y /Q >nul
   if errorlevel 1 goto :copyfail
 )
 
