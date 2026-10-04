@@ -104,19 +104,19 @@ $gunsHHZip = Join-Path $assetRoot "GunsHH.zip"
 
 if (Test-Path -LiteralPath $gunsZip) {
     Write-Host "[UPDATE] Staging Combat Arms Bowie knife player-view assets..."
-    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" "Models\Weapons\Bowie\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" | Out-Null
-    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/ANI_G_BOWIEKNIFE_CH.LTB" "Models\Weapons\Bowie\ANI_G_BOWIEKNIFE_CH.LTB" | Out-Null
-    Extract-ZipEntry "Guns.zip" "GUNS_T_PV_MELEE/PV_ML_DF_BOWIEKNIFE_BC.DTX" "ModelTextures\Weapons\Bowie\PV_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
-    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/FIRE.WAV" "Sounds\Weapons\Bowie\FIRE.WAV" | Out-Null
-    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/SELECT.WAV" "Sounds\Weapons\Bowie\SELECT.WAV" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_pv\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/ANI_G_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_pv\ANI_G_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_T_PV_MELEE/PV_ML_DF_BOWIEKNIFE_BC.DTX" "Weapons\melee_t\PV_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/FIRE.WAV" "Weapons\melee_snd\BOWIE_KNIFE\FIRE.WAV" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/SELECT.WAV" "Weapons\melee_snd\BOWIE_KNIFE\SELECT.WAV" | Out-Null
 } else {
     Write-Host "[SKIP] Guns.zip not present - Bowie player-view model will be unavailable"
 }
 
 if (Test-Path -LiteralPath $gunsHHZip) {
     Write-Host "[UPDATE] Staging Combat Arms Bowie knife world assets..."
-    Extract-ZipEntry "GunsHH.zip" "GUNS_M_HH/HH_ML_DF_BOWIEKNIFE_CH.LTB" "Models\Weapons\Bowie\HH_ML_DF_BOWIEKNIFE_CH.LTB" | Out-Null
-    Extract-ZipEntry "GunsHH.zip" "GUNS_T_HH/HH_ML_DF_BOWIEKNIFE_BC.DTX" "ModelTextures\Weapons\Bowie\HH_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
+    Extract-ZipEntry "GunsHH.zip" "GUNS_M_HH/HH_ML_DF_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_hh\HH_ML_DF_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "GunsHH.zip" "GUNS_T_HH/HH_ML_DF_BOWIEKNIFE_BC.DTX" "Weapons\melee_t\HH_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
 } else {
     Write-Host "[SKIP] GunsHH.zip not present - Bowie world model will be unavailable"
 }
@@ -125,13 +125,13 @@ if (Test-Path -LiteralPath $gunsHHZip) {
 $bowieSoundZip = Join-Path $assetRoot "BOWIE_KNIFE.zip"
 if (Test-Path -LiteralPath $bowieSoundZip) {
     Write-Host "[UPDATE] Staging dedicated Bowie sound archive..."
-    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/FIRE.WAV" "Sounds\Weapons\Bowie\FIRE.WAV" | Out-Null
-    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/SELECT.WAV" "Sounds\Weapons\Bowie\SELECT.WAV" | Out-Null
+    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/FIRE.WAV" "Weapons\melee_snd\BOWIE_KNIFE\FIRE.WAV" | Out-Null
+    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/SELECT.WAV" "Weapons\melee_snd\BOWIE_KNIFE\SELECT.WAV" | Out-Null
 }
 
 # Combat Arms LTBs also carry bare texture names. Keep aliases at the resource
 # root and ModelTextures root in addition to our organized Bowie directory.
-$pvTex = Join-Path $rezRoot "ModelTextures\Weapons\Bowie\PV_ML_DF_BOWIEKNIFE_BC.DTX"
+$pvTex = Join-Path $rezRoot "Weapons\melee_t\PV_ML_DF_BOWIEKNIFE_BC.DTX"
 if (Test-Path -LiteralPath $pvTex) {
     Copy-Item -LiteralPath $pvTex -Destination (Join-Path $rezRoot "PV_ML_DF_BowieKnife_BC.dtx") -Force
     $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
@@ -139,7 +139,7 @@ if (Test-Path -LiteralPath $pvTex) {
     Copy-Item -LiteralPath $pvTex -Destination (Join-Path $modelTexturesRoot "PV_ML_DF_BowieKnife_BC.dtx") -Force
 }
 
-$hhTex = Join-Path $rezRoot "ModelTextures\Weapons\Bowie\HH_ML_DF_BOWIEKNIFE_BC.DTX"
+$hhTex = Join-Path $rezRoot "Weapons\melee_t\HH_ML_DF_BOWIEKNIFE_BC.DTX"
 if (Test-Path -LiteralPath $hhTex) {
     Copy-Item -LiteralPath $hhTex -Destination (Join-Path $rezRoot "HH_ML_DF_BowieKnife_BC.dtx") -Force
     $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
