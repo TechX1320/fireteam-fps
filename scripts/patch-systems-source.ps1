@@ -687,6 +687,12 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
             {
                 g_pLTSModel->SetCurAnim(m_hObject, MAIN_TRACKER, hAnim);
                 g_pLTSModel->SetLooping(m_hObject, MAIN_TRACKER, LTTRUE);
+
+                LTVector vDims;
+                if(g_pLTSCommon->GetModelAnimUserDims(m_hObject, &vDims, hAnim) == LT_OK)
+                {
+                    g_pLTSPhysics->SetObjectDims(m_hObject, &vDims, 0);
+                }
             }
 
             g_pLTServer->SetNextUpdate(m_hObject, 0.10f);
