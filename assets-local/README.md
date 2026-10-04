@@ -17,6 +17,7 @@ Also place the original archives here:
 
 - `Guns.zip`
 - `GunsHH.zip`
+- `BOWIE_KNIFE.zip` (optional dedicated FIRE/SELECT sound pack; preferred when present)
 
 The build does **not** unpack the entire weapon archives. It stages only the first Bowie test assets:
 
