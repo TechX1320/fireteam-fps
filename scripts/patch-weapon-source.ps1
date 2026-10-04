@@ -98,6 +98,15 @@ Insert-AfterLineContaining $playerH "m_hClubObject;" @(
 $playerCpp = Join-Path $sealRoot "cshell\src\playerclnt.cpp"
 $text = Read-Source $playerCpp
 
+# Canonical Fireteam weapon resource layout.
+$text = $text.Replace("Weapons\\melee_m_pv\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB", "Weapons\\melee_m_pv\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB")
+$text = $text.Replace("Weapons\\melee_m_pv\\ANI_G_BOWIEKNIFE_CH.LTB", "Weapons\\melee_m_pv\\ANI_G_BOWIEKNIFE_CH.LTB")
+$text = $text.Replace("Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX", "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX")
+$text = $text.Replace("ModelTextures\\Weapons\\Bowie\\PV_ML_DF_BOWIEKNIFE_BC.DTX", "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX")
+$text = $text.Replace("Weapons\\melee_snd\\BOWIE_KNIFE\\%s", "Weapons\\melee_snd\\BOWIE_KNIFE\\%s")
+Write-Source $playerCpp $text
+$text = Read-Source $playerCpp
+
 if (-not $text.Contains("#include <iltsoundmgr.h>")) {
     $needle = "#include <iltmodel.h>"
     if (-not $text.Contains($needle)) { throw "Could not locate player client includes for sound support." }
@@ -108,7 +117,7 @@ if (-not $text.Contains("#include <iltsoundmgr.h>")) {
 $text = $text.Replace("Fireteam FPS:", "Fireteam:")
 
 # Migrate previously staged Bowie texture paths to the bare names embedded in the LTBs.
-$text = $text.Replace("ModelTextures\\Weapons\\Bowie\\PV_ML_DF_BOWIEKNIFE_BC.DTX", "PV_ML_DF_BowieKnife_BC.dtx")
+$text = $text.Replace("ModelTextures\\Weapons\\Bowie\\PV_ML_DF_BOWIEKNIFE_BC.DTX", "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX")
 
 if (-not $text.Contains("m_hViewWeaponObject(NULL)")) {
     $needle = "m_hClubObject(NULL),"
@@ -208,7 +217,7 @@ void CPlayerClnt::PlayViewWeaponSound(const char* sFilename)
     PlaySoundInfo psi;
     PLAYSOUNDINFO_INIT(psi);
     psi.m_dwFlags = PLAYSOUND_LOCAL;
-    sprintf(psi.m_szSoundName, "Sounds\\Weapons\\Bowie\\%s", sFilename);
+    sprintf(psi.m_szSoundName, "Weapons\\melee_snd\\BOWIE_KNIFE\\%s", sFilename);
 
     HLTSOUND hSound = NULL;
     g_pLTCSoundMgr->PlaySound(&psi, hSound);
@@ -274,11 +283,18 @@ void CPlayerClnt::CreateViewWeapon()
     ocs.m_Flags2 = FLAG2_DYNAMICDIRLIGHT;
     ocs.m_Pos.Init(0.0f, 0.0f, 0.0f);
 
-    strcpy(ocs.m_Filenames[0], "Models\\Weapons\\Bowie\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB");
-    strcpy(ocs.m_Filenames[1], "Models\\Weapons\\Bowie\\ANI_G_BOWIEKNIFE_CH.LTB");
-    strcpy(ocs.m_SkinNames[0], "PV_ML_DF_BowieKnife_BC.dtx");
+    strcpy(ocs.m_Filenames[0], "Weapons\\melee_m_pv\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB");
+    strcpy(ocs.m_Filenames[1], "Weapons\\melee_m_pv\\ANI_G_BOWIEKNIFE_CH.LTB");
+    strcpy(ocs.m_SkinNames[0], "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX");
 
     m_hViewWeaponObject = g_pLTClient->CreateObject(&ocs);
+    if(m_hViewWeaponObject)
+    {
+        // NOLF2's ClientWeapon reapplies model/skin filenames through ILTCommon.
+        // Do the same here so the Combat Arms skin override is explicit.
+        g_pLTCCommon->SetObjectFilenames(m_hViewWeaponObject, &ocs);
+    }
+
     if(!m_hViewWeaponObject)
     {
         g_pLTClient->CPrint("Fireteam FPS: Bowie PV model failed to load.");
@@ -318,7 +334,7 @@ void CPlayerClnt::PlayViewWeaponSound(const char* sFilename)
     PlaySoundInfo psi;
     PLAYSOUNDINFO_INIT(psi);
     psi.m_dwFlags = PLAYSOUND_LOCAL;
-    sprintf(psi.m_szSoundName, "Sounds\\Weapons\\Bowie\\%s", sFilename);
+    sprintf(psi.m_szSoundName, "Weapons\\melee_snd\\BOWIE_KNIFE\\%s", sFilename);
 
     HLTSOUND hSound = NULL;
     g_pLTCSoundMgr->PlaySound(&psi, hSound);
@@ -389,18 +405,20 @@ Write-Host "[OK] Bowie first/third-person visibility hook"
 
 $serverPlayer = Join-Path $sealRoot "sshell\src\playersrvr.cpp"
 $serverText = Read-Source $serverPlayer
+$serverText = $serverText.Replace('"Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB"', '"Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
+$serverText = $serverText.Replace('"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
 
 # All three random SealHunter melee choices become the same Bowie world model.
 # Use direct replacements because Replace-Required cannot distinguish three old
 # strings that intentionally share one new destination.
-$serverText = $serverText.Replace('"Models/Mallet.ltb"', '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
-$serverText = $serverText.Replace('"Models/TelePole.ltb"', '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
-$serverText = $serverText.Replace('"Models/billyclub.ltb"', '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
+$serverText = $serverText.Replace('"Models/Mallet.ltb"', '"Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
+$serverText = $serverText.Replace('"Models/TelePole.ltb"', '"Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
+$serverText = $serverText.Replace('"Models/billyclub.ltb"', '"Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
 
-$serverText = $serverText.Replace('"ModelTextures/Mallet.dtx"', '"HH_ML_DF_BowieKnife_BC.dtx"')
-$serverText = $serverText.Replace('"ModelTextures/TelePole.dtx"', '"HH_ML_DF_BowieKnife_BC.dtx"')
-$serverText = $serverText.Replace('"ModelTextures/club.dtx"', '"HH_ML_DF_BowieKnife_BC.dtx"')
-$serverText = $serverText.Replace('"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"', '"HH_ML_DF_BowieKnife_BC.dtx"')
+$serverText = $serverText.Replace('"ModelTextures/Mallet.dtx"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
+$serverText = $serverText.Replace('"ModelTextures/TelePole.dtx"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
+$serverText = $serverText.Replace('"ModelTextures/club.dtx"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
+$serverText = $serverText.Replace('"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
 
 Write-Source $serverPlayer $serverText
 Write-Host "[OK] all SealHunter melee world models migrated to Bowie"
