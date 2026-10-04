@@ -96,6 +96,7 @@ $lightGroupCpp = @'
 #include <iltcommon.h>
 #include <iltmessage.h>
 #include <ltobjectcreate.h>
+#include <string.h>
 
 BEGIN_CLASS(LightGroup)
     ADD_BOOLPROP(StartOn, LTTRUE)
@@ -125,7 +126,8 @@ void LightGroup::ReadProps(ObjectCreateStruct *pOCS)
 
     if(g_pLTServer->GetPropGeneric("Name", &prop) == LT_OK)
     {
-        LTStrCpy(pOCS->m_Name, prop.m_String, sizeof(pOCS->m_Name));
+        strncpy(pOCS->m_Name, prop.m_String, sizeof(pOCS->m_Name) - 1);
+        pOCS->m_Name[sizeof(pOCS->m_Name) - 1] = '\0';
     }
 
     g_pLTServer->GetLightGroupID(pOCS->m_Name, &m_nID);
@@ -575,7 +577,7 @@ if (-not $text.Contains("Fireteam player melee damage.")) {
     }
 
     $replacement = @"
-                else if(g_pLTServer->IsKindOf(hClassPlayer, hTarget))
+                else if(iInfo.m_hObject != m_hObject && g_pLTServer->IsKindOf(hClassPlayer, hTarget))
                 {
                     // Fireteam player melee damage.
                     ILTMessage_Write *pMsg;
