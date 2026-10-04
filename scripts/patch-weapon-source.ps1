@@ -166,6 +166,42 @@ $text = $text.Replace(
     '    PlayViewWeaponAnimation("fire_0", false);' + [Environment]::NewLine + '    PlayViewWeaponSound("FIRE.WAV");'
 )
 
+
+# Existing local workspaces may already have the Bowie viewmodel implementation.
+# Add the new sound helper/select sound without forcing a clean setup.
+if ($text.Contains('PlayViewWeaponAnimation("select", false);') -and
+    -not $text.Contains('PlayViewWeaponSound("SELECT.WAV");')) {
+    $text = $text.Replace(
+        '    PlayViewWeaponAnimation("select", false);',
+        '    PlayViewWeaponAnimation("select", false);' + [Environment]::NewLine +
+        '    PlayViewWeaponSound("SELECT.WAV");')
+}
+
+if (-not $text.Contains("void CPlayerClnt::PlayViewWeaponSound(const char* sFilename)")) {
+    $needle = "void CPlayerClnt::UpdateViewWeaponAnimation()"
+    if ($text.Contains($needle)) {
+        $soundHelper = @"
+void CPlayerClnt::PlayViewWeaponSound(const char* sFilename)
+{
+    if(!sFilename || !sFilename[0])
+    {
+        return;
+    }
+
+    PlaySoundInfo psi;
+    PLAYSOUNDINFO_INIT(psi);
+    psi.m_dwFlags = PLAYSOUND_LOCAL;
+    sprintf(psi.m_szSoundName, "Sounds\\Weapons\\Bowie\\%s", sFilename);
+
+    HLTSOUND hSound = NULL;
+    g_pLTCSoundMgr->PlaySound(&psi, hSound);
+}
+
+"@
+        $text = $text.Replace($needle, $soundHelper + $needle)
+    }
+}
+
 if (-not $text.Contains("bool CPlayerClnt::AltAttack()")) {
     $attackMarker = "//----------------------------------------------------------------------------" + [Environment]::NewLine +
         "// void CPlayerClnt::UpdateAttacking()"
