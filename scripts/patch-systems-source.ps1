@@ -546,9 +546,9 @@ Write-Source (Join-Path $sealRoot "sshell\src\FireteamPoisonGas.cpp") $poisonCpp
 Write-Host "[OK] PoisonGas container compatibility"
 
 # ---------------------------------------------------------------------------
-# Controlled first zombie + Spawner bring-up.
-# Only Cabin Fever's Spawner_02_01 auto-spawns ONE placeholder zombie.
-# This deliberately prevents the old all-spawners-at-once crash.
+# Controlled outside-zombie + Spawner bring-up.
+# Only Cabin Fever's perimeter Spawner_01_01N is active for this validation step.
+# This keeps enemies out of the cabin and prevents the old all-spawners-at-once crash.
 # ---------------------------------------------------------------------------
 $zombieH = @'
 #ifndef __FIRETEAM_ZOMBIE_H__
@@ -801,7 +801,7 @@ protected:
 
 private:
     void ReadProps(ObjectCreateStruct *pOCS);
-    void SpawnTestSeals();
+    void SpawnTestZombies();
 
     char m_sName[64];
     bool m_bSpawned;
@@ -847,17 +847,17 @@ void Spawner::ReadProps(ObjectCreateStruct *pOCS)
     pOCS->m_ObjectType = OT_NORMAL;
 }
 
-void Spawner::SpawnTestSeals()
+void Spawner::SpawnTestZombies()
 {
     if(m_bSpawned)
     {
         return;
     }
 
-    HCLASS hSealClass = g_pLTServer->GetClass("Seal");
-    if(!hSealClass)
+    HCLASS hZombieClass = g_pLTServer->GetClass("FireteamZombie");
+    if(!hZombieClass)
     {
-        g_pLTServer->CPrint("Fireteam: Seal class not available.");
+        g_pLTServer->CPrint("Fireteam: FireteamZombie class not available.");
         return;
     }
 
@@ -868,21 +868,19 @@ void Spawner::SpawnTestSeals()
 
     uint32 nSpawned = 0;
 
-    for(uint32 nSeal = 0; nSeal < 3; ++nSeal)
+    for(uint32 nZombie = 0; nZombie < 3; ++nZombie)
     {
         ObjectCreateStruct ocs;
         ocs.Clear();
         ocs.m_ObjectType = OT_MODEL;
-        strcpy(ocs.m_Filename, "Models/seal.ltb");
-        strcpy(ocs.m_SkinName, "ModelTextures/seal.dtx");
 
         ocs.m_Pos = vBasePos;
-        ocs.m_Pos.x += ((float)nSeal - 1.0f) * 45.0f;
-        ocs.m_Pos.z += ((nSeal & 1) ? 35.0f : -35.0f);
+        ocs.m_Pos.x += ((float)nZombie - 1.0f) * 45.0f;
+        ocs.m_Pos.z += ((nZombie & 1) ? 35.0f : -35.0f);
         ocs.m_Pos.y += 100.0f;
         ocs.m_Rotation = rBaseRot;
 
-        if(g_pLTServer->CreateObject(hSealClass, &ocs))
+        if(g_pLTServer->CreateObject(hZombieClass, &ocs))
         {
             ++nSpawned;
         }
@@ -890,7 +888,7 @@ void Spawner::SpawnTestSeals()
 
     m_bSpawned = true;
     g_pLTServer->CPrint(
-        "Fireteam: spawned %u SealHunter seals from %s.",
+        "Fireteam: spawned %u placeholder zombies from %s.",
         nSpawned,
         m_sName);
 }
@@ -911,8 +909,8 @@ uint32 Spawner::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
 
         case MID_INITIALUPDATE:
         {
-            // Controlled bring-up: only one known Cabin Fever spawner is live.
-            if(_stricmp(m_sName, "Spawner_02_01") == 0)
+            // Controlled bring-up: only one known outside Cabin Fever perimeter spawner is live.
+            if(_stricmp(m_sName, "Spawner_01_01N") == 0)
             {
                 g_pLTServer->SetNextUpdate(m_hObject, 1.0f);
             }
@@ -926,7 +924,7 @@ uint32 Spawner::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
 
         case MID_UPDATE:
         {
-            SpawnTestSeals();
+            SpawnTestZombies();
             g_pLTServer->SetNextUpdate(m_hObject, 0.0f);
         }
         break;
@@ -941,7 +939,7 @@ uint32 Spawner::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
 
 Write-Source (Join-Path $sealRoot "sshell\src\FireteamSpawner.h") $spawnerH
 Write-Source (Join-Path $sealRoot "sshell\src\FireteamSpawner.cpp") $spawnerCpp
-Write-Host "[OK] controlled three-seal Spawner bring-up"
+Write-Host "[OK] controlled outside three-zombie Spawner bring-up"
 
 # ---------------------------------------------------------------------------
 # Client shell: health, respawn and LightGroups.
