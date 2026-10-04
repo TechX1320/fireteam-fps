@@ -420,6 +420,51 @@ $serverText = $serverText.Replace('"Models/billyclub.ltb"', '"Weapons/melee_m_hh
 $serverText = $serverText.Replace('"ModelTextures/Mallet.dtx"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
 $serverText = $serverText.Replace('"ModelTextures/TelePole.dtx"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
 $serverText = $serverText.Replace('"ModelTextures/club.dtx"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
+
+# Combat Arms weapons can contain multiple OBBs. SealHunter assumed exactly one,
+# which leaves its melee hit box uninitialized for the Bowie knife.
+$oldObb = @"
+        // We should only have one
+        if(iNumOBBS == 1)
+        {
+            g_pLTSModel->GetModelOBBCopy(m_hClub, &m_WeaponOBB);
+        }
+        else
+        {
+            g_pLTServer->CPrint("(PlayerSrvr) Error: too many OBBs on weapon! Expecting only one.");
+        }
+"@
+$newObb = @"
+        if(iNumOBBS > 0)
+        {
+            ModelOBB *pWeaponOBBs = new ModelOBB[iNumOBBS];
+            if(g_pLTSModel->GetModelOBBCopy(m_hClub, pWeaponOBBs) == LT_OK)
+            {
+                // Use the largest OBB as the simple melee volume for now.
+                uint32 nLargest = 0;
+                float fLargestVolume = -1.0f;
+
+                for(uint32 nOBB = 0; nOBB < iNumOBBS; ++nOBB)
+                {
+                    float fVolume = pWeaponOBBs[nOBB].m_Size.x *
+                                    pWeaponOBBs[nOBB].m_Size.y *
+                                    pWeaponOBBs[nOBB].m_Size.z;
+                    if(fVolume > fLargestVolume)
+                    {
+                        fLargestVolume = fVolume;
+                        nLargest = nOBB;
+                    }
+                }
+
+                m_WeaponOBB = pWeaponOBBs[nLargest];
+            }
+            delete [] pWeaponOBBs;
+        }
+"@
+if ($serverText.Contains($oldObb)) {
+    $serverText = $serverText.Replace($oldObb, $newObb)
+}
+
 $serverText = $serverText.Replace('"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
 
 Write-Source $serverPlayer $serverText
