@@ -108,6 +108,15 @@ $sealCpp = Join-Path $sealRoot "sshell\src\seal.cpp"
 Replace-Required $sealCpp '"AIVolume0"' '"ZombieSpawner0"' "legacy seal spawner lookup"
 Replace-Required $sealCpp "AIVolume *pAI = (AIVolume*)" "ZombieSpawner *pAI = (ZombieSpawner*)" "legacy seal spawner cast"
 
+# Cabin Fever also contains normal command/volume Trigger objects.  SealHunter's
+# sample Trigger incorrectly forces them to be world models, which can crash
+# while an imported map is being instantiated.  Keep the class name so the
+# objects load, but make the SealHunter implementation inert for now.
+$triggerCpp = Join-Path $sealRoot "sshell\src\trigger.cpp"
+Replace-Required $triggerCpp "END_CLASS_DEFAULT_FLAGS(Trigger, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD| CF_WORLDMODEL)" "END_CLASS_DEFAULT_FLAGS(Trigger, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)" "Trigger world-model class flag disabled"
+Replace-Required $triggerCpp "pStruct->m_ObjectType = OT_WORLDMODEL;" "pStruct->m_ObjectType = OT_NORMAL;" "Trigger object type made inert"
+Replace-Required $triggerCpp "pStruct->m_Flags |= FLAG_VISIBLE | FLAG_SOLID | FLAG_BOXPHYSICS;//FLAG_TOUCH_NOTIFY;" "pStruct->m_Flags = 0;" "Trigger collision/visibility disabled"
+
 # Cabin Fever uses GameStartPoint00 while SealHunter uses GameStartPoint0.
 $serverShell = Join-Path $sealRoot "sshell\src\ltservershell.cpp"
 $oldStart = 'g_pLTServer->FindNamedObjects("GameStartPoint0", pStartPt);'
@@ -119,5 +128,28 @@ $newStart = 'g_pLTServer->FindNamedObjects("GameStartPoint00", pStartPt);' +
     [string]([char]9) + [string]([char]9) + 'g_pLTServer->FindNamedObjects("GameStartPoint0", pStartPt);' + [Environment]::NewLine +
     [char]9 + '}'
 Replace-Required $serverShell $oldStart $newStart "GameStartPoint00 compatibility"
+
+# Launcher/command-line auto-start.  +runworld only chooses the map in the
+# original sample; it does not start a game.  +autostart 1 now starts NORMAL
+# mode after the client shell and GUI are fully initialized.
+$clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
+$oldAutoStart = @"
+    m_pChatGui->Init();
+
+    return result;
+"@
+$newAutoStart = @"
+    m_pChatGui->Init();
+
+    HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");
+    if(hAutoStart && g_pLTClient->GetVarValueFloat(hAutoStart) != 0.0f)
+    {
+        g_pLTClient->CPrint("Fireteam FPS: auto-starting selected world...");
+        result = StartNormalGame();
+    }
+
+    return result;
+"@
+Replace-Required $clientShell $oldAutoStart $newAutoStart "command-line normal-game auto-start"
 
 Write-Host "[OK] Fireteam FPS gameplay bring-up patch set complete."
