@@ -371,17 +371,22 @@ if (-not $text.Contains("UpdateWeaponView(m_pCamera->IsFirstPerson())")) {
 Write-Host "[OK] Bowie first/third-person visibility hook"
 
 $serverPlayer = Join-Path $sealRoot "sshell\src\playersrvr.cpp"
-Replace-Required $serverPlayer '"Models/Mallet.ltb"' '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"' "Mallet replaced with Bowie world model"
 $serverText = Read-Source $serverPlayer
+
+# All three random SealHunter melee choices become the same Bowie world model.
+# Use direct replacements because Replace-Required cannot distinguish three old
+# strings that intentionally share one new destination.
+$serverText = $serverText.Replace('"Models/Mallet.ltb"', '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
+$serverText = $serverText.Replace('"Models/TelePole.ltb"', '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
+$serverText = $serverText.Replace('"Models/billyclub.ltb"', '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
+
 $serverText = $serverText.Replace('"ModelTextures/Mallet.dtx"', '"HH_ML_DF_BowieKnife_BC.dtx"')
 $serverText = $serverText.Replace('"ModelTextures/TelePole.dtx"', '"HH_ML_DF_BowieKnife_BC.dtx"')
 $serverText = $serverText.Replace('"ModelTextures/club.dtx"', '"HH_ML_DF_BowieKnife_BC.dtx"')
 $serverText = $serverText.Replace('"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"', '"HH_ML_DF_BowieKnife_BC.dtx"')
-Write-Source $serverPlayer $serverText
-Write-Host "[OK] Bowie world texture aliases"
-Replace-Required $serverPlayer '"Models/TelePole.ltb"' '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"' "TelePole replaced with Bowie world model"
-Replace-Required $serverPlayer '"Models/billyclub.ltb"' '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"' "Billyclub replaced with Bowie world model"
 
+Write-Source $serverPlayer $serverText
+Write-Host "[OK] all SealHunter melee world models migrated to Bowie"
 
 $commandIds = Join-Path $sealRoot "shared\src\commandids.h"
 $text = Read-Source $commandIds
