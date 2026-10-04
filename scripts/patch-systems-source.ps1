@@ -324,6 +324,7 @@ $healthHudH = @'
 #include <ltbasedefs.h>
 
 void FT_SetHealth(uint8 nHealth, uint8 nMaxHealth);
+void FT_RenderPoisonOverlay(HLOCALOBJ hPlayer);
 void FT_RenderHealthHud();
 
 #endif
@@ -368,6 +369,52 @@ void FT_SetHealth(uint8 nHealth, uint8 nMaxHealth)
 {
     s_nMaxHealth = nMaxHealth ? nMaxHealth : 1;
     s_nHealth = (nHealth > s_nMaxHealth) ? s_nMaxHealth : nHealth;
+}
+
+void FT_RenderPoisonOverlay(HLOCALOBJ hPlayer)
+{
+    if(!hPlayer || !g_pLTClient || !g_pLTCDrawPrim)
+    {
+        return;
+    }
+
+    HOBJECT aContainers[16];
+    uint32 nContainers = g_pLTClient->GetObjectContainers(hPlayer, aContainers, 16);
+    bool bInPoisonGas = false;
+
+    for(uint32 i = 0; i < nContainers; ++i)
+    {
+        uint16 nCode = 0;
+        if(g_pLTClient->GetContainerCode(aContainers[i], &nCode) && nCode == 240)
+        {
+            bInPoisonGas = true;
+            break;
+        }
+    }
+
+    if(!bInPoisonGas)
+    {
+        return;
+    }
+
+    uint32 nScreenW = 0;
+    uint32 nScreenH = 0;
+    g_pLTClient->GetSurfaceDims(g_pLTClient->GetScreenSurface(), &nScreenW, &nScreenH);
+
+    LT_POLYF4 poison;
+    SetupQuad(poison, 0.0f, 0.0f, (float)nScreenW, (float)nScreenH, 150, 165, 45, 45);
+
+    g_pLTCDrawPrim->SetTexture(LTNULL);
+    g_pLTCDrawPrim->SetTransformType(DRAWPRIM_TRANSFORM_SCREEN);
+    g_pLTCDrawPrim->SetColorOp(DRAWPRIM_NOCOLOROP);
+    g_pLTCDrawPrim->SetAlphaBlendMode(DRAWPRIM_BLEND_MOD_SRCALPHA);
+    g_pLTCDrawPrim->SetZBufferMode(DRAWPRIM_NOZ);
+    g_pLTCDrawPrim->SetAlphaTestMode(DRAWPRIM_NOALPHATEST);
+    g_pLTCDrawPrim->SetClipMode(DRAWPRIM_FASTCLIP);
+    g_pLTCDrawPrim->SetFillMode(DRAWPRIM_FILL);
+    g_pLTCDrawPrim->SetCullMode(DRAWPRIM_CULL_NONE);
+    g_pLTCDrawPrim->SetCamera(LTNULL);
+    g_pLTCDrawPrim->DrawPrim(&poison, 1);
 }
 
 void FT_RenderHealthHud()
@@ -991,6 +1038,10 @@ Insert-BeforeLineContaining $clientShell "// Stop all the client FX" @(
 Insert-BeforeLineContaining $clientShell "// Render the gui." @(
     "    if(IsInWorld())",
     "    {",
+    "        if(m_pPlayer)",
+    "        {",
+    "            FT_RenderPoisonOverlay(m_pPlayer->GetPlayerObject());",
+    "        }",
     "        FT_RenderHealthHud();",
     "    }",
     ""
