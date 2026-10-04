@@ -172,6 +172,15 @@ void LightGroup::ReadProps(ObjectCreateStruct *pOCS)
 
     g_pLTServer->GetLightGroupID(pOCS->m_Name, &m_nID);
     pOCS->m_Flags |= FLAG_FORCECLIENTUPDATE;
+
+    g_pLTServer->CPrint(
+        "Fireteam lighting: group %s id=%u StartOn=%u StartColor=%.2f %.2f %.2f",
+        pOCS->m_Name,
+        m_nID,
+        m_bOn ? 1 : 0,
+        m_vColor.x,
+        m_vColor.y,
+        m_vColor.z);
 }
 
 void LightGroup::SendUpdate()
@@ -256,6 +265,7 @@ $lightClientCpp = @'
 
 static std::map<uint32, LTVector> s_BaseColors;
 static std::map<uint32, LTVector> s_PendingAdjustments;
+static bool s_bPrintedGlobalLightScale = false;
 
 void FT_QueueLightGroup(uint32 nID, const LTVector &vAdjustment)
 {
@@ -265,6 +275,18 @@ void FT_QueueLightGroup(uint32 nID, const LTVector &vAdjustment)
 
 void FT_UpdateLightGroups()
 {
+    if(!s_bPrintedGlobalLightScale)
+    {
+        LTVector vGlobalScale;
+        g_pLTClient->GetGlobalLightScale(&vGlobalScale);
+        g_pLTClient->CPrint(
+            "Fireteam lighting: global scale %.2f %.2f %.2f",
+            vGlobalScale.x,
+            vGlobalScale.y,
+            vGlobalScale.z);
+        s_bPrintedGlobalLightScale = true;
+    }
+
     std::map<uint32, LTVector>::iterator it = s_PendingAdjustments.begin();
 
     while(it != s_PendingAdjustments.end())
@@ -283,6 +305,15 @@ void FT_UpdateLightGroups()
             }
 
             s_BaseColors[nID] = vBaseColor;
+            g_pLTClient->CPrint(
+                "Fireteam lighting: group %u base %.2f %.2f %.2f adjustment %.2f %.2f %.2f",
+                nID,
+                vBaseColor.x,
+                vBaseColor.y,
+                vBaseColor.z,
+                vAdjustment.x,
+                vAdjustment.y,
+                vAdjustment.z);
         }
         else
         {
@@ -307,6 +338,7 @@ void FT_ClearLightGroups()
 
     s_BaseColors.clear();
     s_PendingAdjustments.clear();
+    s_bPrintedGlobalLightScale = false;
 }
 '@
 
@@ -940,6 +972,242 @@ uint32 Spawner::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
 Write-Source (Join-Path $sealRoot "sshell\src\FireteamSpawner.h") $spawnerH
 Write-Source (Join-Path $sealRoot "sshell\src\FireteamSpawner.cpp") $spawnerCpp
 Write-Host "[OK] controlled outside three-zombie Spawner bring-up"
+
+# ---------------------------------------------------------------------------
+# NOLF2/Combat Arms map-authored navigation compatibility.
+#
+# These classes intentionally preserve Cabin Fever's navigation metadata
+# without attempting to port the entire NOLF2 CAIHuman/brain stack. The next
+# movement step can consume the map-authored AIRegion/AIVolume/node graph.
+# ---------------------------------------------------------------------------
+$navigationH = @'
+#ifndef __FIRETEAM_NAVIGATION_H__
+#define __FIRETEAM_NAVIGATION_H__
+
+#include <ltengineobjects.h>
+
+class AIRegion : public BaseClass
+{
+public:
+    AIRegion();
+
+protected:
+    uint32 EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData);
+
+private:
+    void ReadProps(ObjectCreateStruct *pOCS);
+
+    char     m_sName[64];
+    LTVector m_vDims;
+};
+
+class AINodePatrol : public BaseClass
+{
+public:
+    AINodePatrol();
+
+protected:
+    uint32 EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData);
+
+private:
+    void ReadProps(ObjectCreateStruct *pOCS);
+
+    char m_sName[64];
+    char m_sNext[64];
+    bool m_bStartDisabled;
+};
+
+#endif
+'@
+
+$navigationCpp = @'
+#include "FireteamNavigation.h"
+
+#include "serverinterfaces.h"
+
+#include <ltobjectcreate.h>
+#include <string.h>
+
+BEGIN_CLASS(AIRegion)
+    ADD_VECTORPROP_VAL_FLAG(Dims, 16.0f, 16.0f, 16.0f, PF_DIMS)
+    ADD_BOOLPROP(Key1, LTFALSE)
+    ADD_BOOLPROP(Key2, LTFALSE)
+    ADD_BOOLPROP(Key3, LTFALSE)
+    ADD_BOOLPROP(Key4, LTFALSE)
+    ADD_BOOLPROP(Key5, LTFALSE)
+    ADD_BOOLPROP(Key6, LTFALSE)
+    ADD_BOOLPROP(Key7, LTFALSE)
+    ADD_BOOLPROP(Key8, LTFALSE)
+END_CLASS_DEFAULT_FLAGS(AIRegion, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
+
+BEGIN_CLASS(AINodePatrol)
+    ADD_VECTORPROP_VAL_FLAG(Dims, 16.0f, 16.0f, 16.0f, PF_DIMS)
+    ADD_BOOLPROP(Face, LTTRUE)
+    ADD_STRINGPROP(Alignment, "None")
+    ADD_BOOLPROP(StartDisabled, LTFALSE)
+    ADD_STRINGPROP_FLAG(Next, "", PF_OBJECTLINK)
+    ADD_STRINGPROP(Action, "")
+    ADD_STRINGPROP(Command, "")
+END_CLASS_DEFAULT_FLAGS(AINodePatrol, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
+
+AIRegion::AIRegion()
+{
+    m_sName[0] = '\0';
+    m_vDims.Init(0.0f, 0.0f, 0.0f);
+}
+
+void AIRegion::ReadProps(ObjectCreateStruct *pOCS)
+{
+    GenericProp prop;
+
+    if(g_pLTServer->GetPropGeneric("Name", &prop) == LT_OK)
+    {
+        strncpy(m_sName, prop.m_String, sizeof(m_sName) - 1);
+        m_sName[sizeof(m_sName) - 1] = '\0';
+        strncpy(pOCS->m_Name, m_sName, sizeof(pOCS->m_Name) - 1);
+        pOCS->m_Name[sizeof(pOCS->m_Name) - 1] = '\0';
+    }
+
+    if(g_pLTServer->GetPropGeneric("Dims", &prop) == LT_OK)
+    {
+        m_vDims = prop.m_Vec;
+    }
+
+    pOCS->m_ObjectType = OT_NORMAL;
+}
+
+uint32 AIRegion::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
+{
+    switch(messageID)
+    {
+        case MID_PRECREATE:
+        {
+            ObjectCreateStruct *pOCS = (ObjectCreateStruct*)pData;
+            if(pOCS && fData == PRECREATE_WORLDFILE)
+            {
+                ReadProps(pOCS);
+            }
+        }
+        break;
+
+        case MID_INITIALUPDATE:
+        {
+            uint32 nVolumes = 0;
+            uint32 nPatrolNodes = 0;
+
+            HCLASS hVolumeClass = g_pLTServer->GetClass("AIVolume");
+            HCLASS hPatrolClass = g_pLTServer->GetClass("AINodePatrol");
+
+            for(HOBJECT hObj = g_pLTServer->GetNextObject(LTNULL);
+                hObj;
+                hObj = g_pLTServer->GetNextObject(hObj))
+            {
+                HCLASS hClass = g_pLTServer->GetObjectClass(hObj);
+                if(hVolumeClass && hClass && g_pLTServer->IsKindOf(hClass, hVolumeClass))
+                {
+                    ++nVolumes;
+                }
+                if(hPatrolClass && hClass && g_pLTServer->IsKindOf(hClass, hPatrolClass))
+                {
+                    ++nPatrolNodes;
+                }
+            }
+
+            LTVector vPos;
+            g_pLTServer->GetObjectPos(m_hObject, &vPos);
+            g_pLTServer->CPrint(
+                "Fireteam nav: region %s pos %.1f %.1f %.1f dims %.1f %.1f %.1f; %u AIVolumes, %u patrol nodes",
+                m_sName,
+                vPos.x, vPos.y, vPos.z,
+                m_vDims.x, m_vDims.y, m_vDims.z,
+                nVolumes,
+                nPatrolNodes);
+
+            g_pLTServer->SetNextUpdate(m_hObject, 0.0f);
+        }
+        break;
+
+        default:
+            break;
+    }
+
+    return BaseClass::EngineMessageFn(messageID, pData, fData);
+}
+
+AINodePatrol::AINodePatrol() :
+    m_bStartDisabled(false)
+{
+    m_sName[0] = '\0';
+    m_sNext[0] = '\0';
+}
+
+void AINodePatrol::ReadProps(ObjectCreateStruct *pOCS)
+{
+    GenericProp prop;
+
+    if(g_pLTServer->GetPropGeneric("Name", &prop) == LT_OK)
+    {
+        strncpy(m_sName, prop.m_String, sizeof(m_sName) - 1);
+        m_sName[sizeof(m_sName) - 1] = '\0';
+        strncpy(pOCS->m_Name, m_sName, sizeof(pOCS->m_Name) - 1);
+        pOCS->m_Name[sizeof(pOCS->m_Name) - 1] = '\0';
+    }
+
+    if(g_pLTServer->GetPropGeneric("Next", &prop) == LT_OK)
+    {
+        strncpy(m_sNext, prop.m_String, sizeof(m_sNext) - 1);
+        m_sNext[sizeof(m_sNext) - 1] = '\0';
+    }
+
+    if(g_pLTServer->GetPropGeneric("StartDisabled", &prop) == LT_OK)
+    {
+        m_bStartDisabled = (prop.m_Bool != LTFALSE);
+    }
+
+    pOCS->m_ObjectType = OT_NORMAL;
+}
+
+uint32 AINodePatrol::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
+{
+    switch(messageID)
+    {
+        case MID_PRECREATE:
+        {
+            ObjectCreateStruct *pOCS = (ObjectCreateStruct*)pData;
+            if(pOCS && fData == PRECREATE_WORLDFILE)
+            {
+                ReadProps(pOCS);
+            }
+        }
+        break;
+
+        case MID_INITIALUPDATE:
+        {
+            LTVector vPos;
+            g_pLTServer->GetObjectPos(m_hObject, &vPos);
+
+            g_pLTServer->CPrint(
+                "Fireteam nav node: %s -> %s at %.1f %.1f %.1f disabled=%u",
+                m_sName,
+                m_sNext[0] ? m_sNext : "<none>",
+                vPos.x, vPos.y, vPos.z,
+                m_bStartDisabled ? 1 : 0);
+
+            g_pLTServer->SetNextUpdate(m_hObject, 0.0f);
+        }
+        break;
+
+        default:
+            break;
+    }
+
+    return BaseClass::EngineMessageFn(messageID, pData, fData);
+}
+'@
+
+Write-Source (Join-Path $sealRoot "sshell\src\FireteamNavigation.h") $navigationH
+Write-Source (Join-Path $sealRoot "sshell\src\FireteamNavigation.cpp") $navigationCpp
+Write-Host "[OK] Cabin Fever AIRegion/AINodePatrol navigation metadata compatibility"
 
 # ---------------------------------------------------------------------------
 # Client shell: health, respawn and LightGroups.
