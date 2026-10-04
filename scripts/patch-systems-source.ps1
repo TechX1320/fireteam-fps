@@ -473,7 +473,7 @@ $poisonH = @'
 
 #include <ltengineobjects.h>
 
-class PoisonGas : public BaseClass
+class PoisonGas : public Container
 {
 public:
     PoisonGas();
@@ -519,7 +519,7 @@ BEGIN_CLASS(PoisonGas)
     ADD_STRINGPROP(SurfaceOverride, "Unknown")
     ADD_BOOLPROP(RayHit, LTFALSE)
     ADD_STRINGPROP(PhysicsModel, "Normal")
-END_CLASS_DEFAULT_FLAGS(PoisonGas, BaseClass, LTNULL, LTNULL, CF_WORLDMODEL)
+END_CLASS_DEFAULT_FLAGS(PoisonGas, Container, LTNULL, LTNULL, CF_WORLDMODEL)
 
 PoisonGas::PoisonGas() :
     m_fDamage(5.0f),
@@ -547,13 +547,11 @@ void PoisonGas::ReadProps(ObjectCreateStruct *pOCS)
         pOCS->m_Name[sizeof(pOCS->m_Name) - 1] = '\0';
     }
 
-    pOCS->m_ObjectType = OT_CONTAINER;
-    pOCS->m_Flags |= FLAG_CONTAINER | FLAG_TOUCH_NOTIFY | FLAG_GOTHRUWORLD | FLAG_FORCECLIENTUPDATE;
+    // Container::EngineMessageFn already set OT_CONTAINER, FLAG_CONTAINER,
+    // and the compiled brush filename from Name. Use a private Fireteam code
+    // so both server and client can identify Cabin Fever poison volumes.
+    pOCS->m_Flags |= FLAG_TOUCH_NOTIFY | FLAG_GOTHRUWORLD | FLAG_FORCECLIENTUPDATE;
     pOCS->m_ContainerCode = 240;
-
-    // World-model containers use their object name as the compiled brush filename.
-    strncpy(pOCS->m_Filename, pOCS->m_Name, MAX_CS_FILENAME_LEN - 1);
-    pOCS->m_Filename[MAX_CS_FILENAME_LEN - 1] = '\0';
 
     if(m_bHidden)
     {
@@ -563,6 +561,9 @@ void PoisonGas::ReadProps(ObjectCreateStruct *pOCS)
 
 uint32 PoisonGas::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
 {
+    // Let Jupiter's built-in Container class establish the BSP/container object first.
+    uint32 nResult = Container::EngineMessageFn(messageID, pData, fData);
+
     if(messageID == MID_PRECREATE)
     {
         ObjectCreateStruct *pOCS = (ObjectCreateStruct*)pData;
@@ -572,7 +573,7 @@ uint32 PoisonGas::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
         }
     }
 
-    return BaseClass::EngineMessageFn(messageID, pData, fData);
+    return nResult;
 }
 '@
 
