@@ -294,18 +294,32 @@ if (-not $text.Contains('FTTraceLog("CFXDB", "Init begin")')) {
     $text = $text.Insert($brace + 1, [Environment]::NewLine + '    FTTraceLog("CFXDB", "Init begin");')
 }
 
-$text = $text.Replace(
-    "if( !LoadFxDll() )",
-    'FTTraceLog("CFXDB", "LoadFxDll begin");' + [Environment]::NewLine +
-    "    if( !LoadFxDll() )")
-$text = $text.Replace(
-    "FileEntry *pFiles = pLTClient->GetFileList(\"ClientFX\");",
-    'FTTraceLog("CFXDB", "LoadFxDll success; enumerating ClientFX directory");' + [Environment]::NewLine +
-    '    FileEntry *pFiles = pLTClient->GetFileList("ClientFX");')
-$text = $text.Replace(
-    "if( !LoadFxGroups( pLTClient, pEntry->m_pFullFilename ) )",
-    'FTTraceLog("CFXDB", "Loading FXF: %s", pEntry->m_pFullFilename);' + [Environment]::NewLine +
-    "                if( !LoadFxGroups( pLTClient, pEntry->m_pFullFilename ) )")
+if (-not $text.Contains('FTTraceLog("CFXDB", "LoadFxDll begin")')) {
+    $needle = "if( !LoadFxDll() )"
+    if(-not $text.Contains($needle)){ throw "Could not locate LoadFxDll call." }
+    $text = $text.Replace(
+        $needle,
+        'FTTraceLog("CFXDB", "LoadFxDll begin");' + [Environment]::NewLine +
+        "    " + $needle)
+}
+
+if (-not $text.Contains('FTTraceLog("CFXDB", "LoadFxDll success; enumerating ClientFX directory")')) {
+    $needle = 'FileEntry *pFiles = pLTClient->GetFileList("ClientFX");'
+    if(-not $text.Contains($needle)){ throw "Could not locate ClientFX file enumeration." }
+    $text = $text.Replace(
+        $needle,
+        'FTTraceLog("CFXDB", "LoadFxDll success; enumerating ClientFX directory");' + [Environment]::NewLine +
+        "    " + $needle)
+}
+
+if (-not $text.Contains('FTTraceLog("CFXDB", "Loading FXF: %s", pEntry->m_pFullFilename)')) {
+    $needle = "if( !LoadFxGroups( pLTClient, pEntry->m_pFullFilename ) )"
+    if(-not $text.Contains($needle)){ throw "Could not locate LoadFxGroups call." }
+    $text = $text.Replace(
+        $needle,
+        'FTTraceLog("CFXDB", "Loading FXF: %s", pEntry->m_pFullFilename);' + [Environment]::NewLine +
+        "                " + $needle)
+}
 
 # DLL load checkpoints.
 if (-not $text.Contains('FTTraceLog("CFXDB", "LoadFxDll entered")')) {
@@ -316,34 +330,55 @@ if (-not $text.Contains('FTTraceLog("CFXDB", "LoadFxDll entered")')) {
     $text = $text.Insert($brace + 1, [Environment]::NewLine + '    FTTraceLog("CFXDB", "LoadFxDll entered");')
 }
 
-$text = $text.Replace(
-    "m_hDLLInst = ::LoadLibrary(sTmp);",
-    'FTTraceLog("CFXDB", "LoadLibrary local: %s", sTmp);' + [Environment]::NewLine +
-    "        m_hDLLInst = ::LoadLibrary(sTmp);" + [Environment]::NewLine +
-    '        FTTraceLog("CFXDB", "LoadLibrary local result=%p", m_hDLLInst);')
-$text = $text.Replace(
-    "m_hDLLInst = ::LoadLibrary(sDLLTmpFile);",
-    'FTTraceLog("CFXDB", "LoadLibrary temp: %s", sDLLTmpFile);' + [Environment]::NewLine +
-    "        m_hDLLInst = ::LoadLibrary(sDLLTmpFile);" + [Environment]::NewLine +
-    '        FTTraceLog("CFXDB", "LoadLibrary temp result=%p", m_hDLLInst);')
+if (-not $text.Contains('FTTraceLog("CFXDB", "LoadLibrary local: %s", sTmp)')) {
+    $needle = "m_hDLLInst = ::LoadLibrary(sTmp);"
+    if(-not $text.Contains($needle)){ throw "Could not locate local ClientFX LoadLibrary." }
+    $text = $text.Replace(
+        $needle,
+        'FTTraceLog("CFXDB", "LoadLibrary local: %s", sTmp);' + [Environment]::NewLine +
+        "        " + $needle + [Environment]::NewLine +
+        '        FTTraceLog("CFXDB", "LoadLibrary local result=%p", m_hDLLInst);')
+}
 
-$text = $text.Replace(
-    "pSetMasterFn(GetMasterDatabase());",
-    'FTTraceLog("CFXDB", "SetMasterDatabase begin");' + [Environment]::NewLine +
-    "        pSetMasterFn(GetMasterDatabase());" + [Environment]::NewLine +
-    '        FTTraceLog("CFXDB", "SetMasterDatabase complete");')
+if (-not $text.Contains('FTTraceLog("CFXDB", "LoadLibrary temp: %s", sDLLTmpFile)')) {
+    $needle = "m_hDLLInst = ::LoadLibrary(sDLLTmpFile);"
+    if(-not $text.Contains($needle)){ throw "Could not locate temp ClientFX LoadLibrary." }
+    $text = $text.Replace(
+        $needle,
+        'FTTraceLog("CFXDB", "LoadLibrary temp: %s", sDLLTmpFile);' + [Environment]::NewLine +
+        "        " + $needle + [Environment]::NewLine +
+        '        FTTraceLog("CFXDB", "LoadLibrary temp result=%p", m_hDLLInst);')
+}
 
-$text = $text.Replace(
-    "m_nNumEffectTypes = pfnNum();",
-    'FTTraceLog("CFXDB", "fxGetNum begin");' + [Environment]::NewLine +
-    "    m_nNumEffectTypes = pfnNum();" + [Environment]::NewLine +
-    '    FTTraceLog("CFXDB", "fxGetNum returned %u", m_nNumEffectTypes);')
+if (-not $text.Contains('FTTraceLog("CFXDB", "SetMasterDatabase begin")')) {
+    $needle = "pSetMasterFn(GetMasterDatabase());"
+    if(-not $text.Contains($needle)){ throw "Could not locate SetMasterDatabase call." }
+    $text = $text.Replace(
+        $needle,
+        'FTTraceLog("CFXDB", "SetMasterDatabase begin");' + [Environment]::NewLine +
+        "        " + $needle + [Environment]::NewLine +
+        '        FTTraceLog("CFXDB", "SetMasterDatabase complete");')
+}
 
-$text = $text.Replace(
-    "m_pEffectTypes[nCurrEffect] = pfnRef(nCurrEffect);",
-    'FTTraceLog("CFXDB", "fxGetRef(%u) begin", nCurrEffect);' + [Environment]::NewLine +
-    "            m_pEffectTypes[nCurrEffect] = pfnRef(nCurrEffect);" + [Environment]::NewLine +
-    '            FTTraceLog("CFXDB", "fxGetRef(%u) = %s", nCurrEffect, m_pEffectTypes[nCurrEffect].m_sName);')
+if (-not $text.Contains('FTTraceLog("CFXDB", "fxGetNum begin")')) {
+    $needle = "m_nNumEffectTypes = pfnNum();"
+    if(-not $text.Contains($needle)){ throw "Could not locate fxGetNum call." }
+    $text = $text.Replace(
+        $needle,
+        'FTTraceLog("CFXDB", "fxGetNum begin");' + [Environment]::NewLine +
+        "    " + $needle + [Environment]::NewLine +
+        '    FTTraceLog("CFXDB", "fxGetNum returned %u", m_nNumEffectTypes);')
+}
+
+if (-not $text.Contains('FTTraceLog("CFXDB", "fxGetRef(%u) begin", nCurrEffect)')) {
+    $needle = "m_pEffectTypes[nCurrEffect] = pfnRef(nCurrEffect);"
+    if(-not $text.Contains($needle)){ throw "Could not locate fxGetRef call." }
+    $text = $text.Replace(
+        $needle,
+        'FTTraceLog("CFXDB", "fxGetRef(%u) begin", nCurrEffect);' + [Environment]::NewLine +
+        "            " + $needle + [Environment]::NewLine +
+        '            FTTraceLog("CFXDB", "fxGetRef(%u) = %s", nCurrEffect, m_pEffectTypes[nCurrEffect].m_sName);')
+}
 
 Write-Source $fxDb $text
 Write-Host "[OK] deep ClientFXDB tracing"
