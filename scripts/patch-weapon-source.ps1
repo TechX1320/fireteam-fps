@@ -148,23 +148,37 @@ if (-not $text.Contains("CreateViewWeapon();")) {
     $text = $text.Replace($needle, $needle + [Environment]::NewLine + [Environment]::NewLine + "    CreateViewWeapon();")
 }
 
-if (-not $text.Contains("m_nViewAttackVariant++")) {
-    $needle = "    m_bAttacking = true;"
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate player attack state."
-    }
-    $replacement = $needle + [Environment]::NewLine +
-        '    PlayViewWeaponAnimation((m_nViewAttackVariant++ & 1) ? "fire_1" : "fire_0", false);' + [Environment]::NewLine +
-        "    m_bViewWeaponAction = true;"
-    $text = $text.Replace($needle, $replacement)
-}
-
-
-# Left mouse is primary fire_0. Right mouse gets a dedicated fire_1 path.
+# Migrate the original alternating test behavior, if an older local workspace has it.
 $text = $text.Replace(
     '    PlayViewWeaponAnimation((m_nViewAttackVariant++ & 1) ? "fire_1" : "fire_0", false);',
-    '    PlayViewWeaponAnimation("fire_0", false);' + [Environment]::NewLine + '    PlayViewWeaponSound("FIRE.WAV");'
+    '    PlayViewWeaponAnimation("fire_0", false);' + [Environment]::NewLine +
+    '    PlayViewWeaponSound("FIRE.WAV");'
 )
+
+# Primary knife attack is always fire_0. Keep this idempotent by patching only
+# the CPlayerClnt::Attack() function and guarding on the actual fire_0 call.
+if (-not $text.Contains('PlayViewWeaponAnimation("fire_0", false);')) {
+    $attackStart = $text.IndexOf("bool CPlayerClnt::Attack()")
+    $attackEnd = $text.IndexOf("// void CPlayerClnt::UpdateAttacking()", $attackStart)
+    if ($attackStart -lt 0 -or $attackEnd -lt 0) {
+        throw "Could not locate CPlayerClnt::Attack for primary Bowie attack."
+    }
+
+    $attackBody = $text.Substring($attackStart, $attackEnd - $attackStart)
+    $needle = "m_bAttacking = true;"
+    $relative = $attackBody.IndexOf($needle)
+    if ($relative -lt 0) {
+        throw "Could not locate attack state inside CPlayerClnt::Attack."
+    }
+
+    $insertAt = $attackStart + $relative + $needle.Length
+    $primary = [Environment]::NewLine +
+        '    PlayViewWeaponAnimation("fire_0", false);' + [Environment]::NewLine +
+        '    PlayViewWeaponSound("FIRE.WAV");' + [Environment]::NewLine +
+        "    m_bViewWeaponAction = true;"
+
+    $text = $text.Insert($insertAt, $primary)
+}
 
 
 # Existing local workspaces may already have the Bowie viewmodel implementation.
