@@ -99,11 +99,12 @@ $playerCpp = Join-Path $sealRoot "cshell\src\playerclnt.cpp"
 $text = Read-Source $playerCpp
 
 # Canonical Fireteam weapon resource layout.
-$text = $text.Replace("Weapons\\melee_m_pv\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB", "Weapons\\melee_m_pv\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB")
-$text = $text.Replace("Weapons\\melee_m_pv\\ANI_G_BOWIEKNIFE_CH.LTB", "Weapons\\melee_m_pv\\ANI_G_BOWIEKNIFE_CH.LTB")
-$text = $text.Replace("Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX", "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX")
+# Migrate both the original Bowie test paths and the short-lived root aliases.
+$text = $text.Replace("Models\\Weapons\\Bowie\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB", "Weapons\\melee_m_pv\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB")
+$text = $text.Replace("Models\\Weapons\\Bowie\\ANI_G_BOWIEKNIFE_CH.LTB", "Weapons\\melee_m_pv\\ANI_G_BOWIEKNIFE_CH.LTB")
+$text = $text.Replace("PV_ML_DF_BowieKnife_BC.dtx", "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX")
 $text = $text.Replace("ModelTextures\\Weapons\\Bowie\\PV_ML_DF_BOWIEKNIFE_BC.DTX", "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX")
-$text = $text.Replace("Weapons\\melee_snd\\BOWIE_KNIFE\\%s", "Weapons\\melee_snd\\BOWIE_KNIFE\\%s")
+$text = $text.Replace("Sounds\\Weapons\\Bowie\\%s", "Weapons\\melee_snd\\BOWIE_KNIFE\\%s")
 Write-Source $playerCpp $text
 $text = Read-Source $playerCpp
 
@@ -405,8 +406,9 @@ Write-Host "[OK] Bowie first/third-person visibility hook"
 
 $serverPlayer = Join-Path $sealRoot "sshell\src\playersrvr.cpp"
 $serverText = Read-Source $serverPlayer
-$serverText = $serverText.Replace('"Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB"', '"Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
-$serverText = $serverText.Replace('"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
+$serverText = $serverText.Replace('"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"', '"Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB"')
+$serverText = $serverText.Replace('"HH_ML_DF_BowieKnife_BC.dtx"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
+$serverText = $serverText.Replace('"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
 
 # All three random SealHunter melee choices become the same Bowie world model.
 # Use direct replacements because Replace-Required cannot distinguish three old
