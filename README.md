@@ -76,8 +76,8 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - Health is server-authoritative at 100 HP with a simple HUD bar.
 - Death currently respawns the player at the map start after 2 seconds.
 - Cabin Fever `PoisonGas` volumes are registered as damaging containers and apply a simple client poison tint while the player is inside.
-- Cabin Fever `Spawner` objects are recognized, but bring-up is deliberately capped: only `Spawner_02_01` is active so testing cannot reproduce the old mass-spawn crash.
-- That single active spawner now creates three original SealHunter `Seal` objects as an AI/melee validation step. All other imported spawners remain inert.
+- Cabin Fever `Spawner` objects are recognized, but bring-up is deliberately capped: only outside perimeter `Spawner_01_01N` is active so testing cannot reproduce the old mass-spawn crash.
+- That single outside spawner creates three human-scale `FireteamZombie` placeholders as an AI/melee validation step. They use temporary HARM-guard visuals while Combat Arms infected assets are brought online. All other imported spawners remain inert.
 - Player damage is real again. The earlier respawn loop was caused by stale PoisonGas hazard code surviving in the local generated source; the build now replaces that function body explicitly. Environmental PoisonGas damage remains disabled until Combat Arms safe/outside volume semantics are reproduced.
 
 ## Combat Arms compatibility work
