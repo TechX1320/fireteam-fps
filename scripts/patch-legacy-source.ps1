@@ -58,4 +58,22 @@ $oldMgr = "for(float fCurrTime = 0.0f; fCurrTime + fTimeInc <= fOffsetAmount; fC
 $newMgr = "float fCurrTime = 0.0f;" + [Environment]::NewLine + [char]9 + "for(; fCurrTime + fTimeInc <= fOffsetAmount; fCurrTime += fTimeInc)"
 Replace-Required (Join-Path $shared "ClientFXMgr.cpp") $oldMgr $newMgr "ClientFXMgr loop scope"
 
+
+$clientFxRoot = Join-Path $LocalRoot "imports\engine\clientfx"
+$clientFxStdafx = Join-Path $clientFxRoot "stdafx.h"
+if (Test-Path -LiteralPath $clientFxStdafx) {
+    $text = Read-LegacyFile $clientFxStdafx
+    if ($text.Contains('#include "mfcstub.h"')) {
+        $text = $text.Replace(
+            '#include "mfcstub.h"',
+            '#include <ltassert.h>' + [Environment]::NewLine + '#include <string.h>' + [Environment]::NewLine + '#include <stdlib.h>')
+        Write-LegacyFile $clientFxStdafx $text
+        Write-Host "[OK] ClientFX stdafx MFCStub removal"
+    } elseif ($text.Contains("#include <ltassert.h>")) {
+        Write-Host "[OK] ClientFX stdafx MFCStub removal already patched"
+    } else {
+        throw "Could not locate ClientFX MFCStub include."
+    }
+}
+
 Write-Host "[OK] Legacy Jupiter compatibility patch set complete."
