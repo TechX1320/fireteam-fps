@@ -67,3 +67,12 @@ The checkout folder can be renamed to `BUILD-GAME` (or anything else). `build.cm
 ## Camera
 
 Gameplay now defaults to first person. Press `C` while in-game to toggle back to SealHunter-style third person for testing.
+
+## Current gameplay bring-up
+
+- Friendly fire is disabled. Player melee attacks never damage other players.
+- Health is server-authoritative at 100 HP with a simple HUD bar.
+- Death currently respawns the player at the map start after 2 seconds.
+- Cabin Fever `PoisonGas` volumes are registered as damaging containers.
+- Cabin Fever `Spawner` objects are now recognized, but bring-up is deliberately capped: only `Spawner_02_01` creates one placeholder `FireteamZombie` so testing cannot reproduce the old mass-spawn crash.
+- The placeholder zombie uses the existing HARM guard model temporarily, follows the nearest living player, deals 10 damage per hit, has 40 HP, and can be killed by the Bowie knife.
