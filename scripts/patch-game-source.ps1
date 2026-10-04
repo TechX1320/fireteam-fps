@@ -159,6 +159,7 @@ Write-Host "[OK] command-line normal-game auto-start"
 $clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
 Replace-Required $clientShell "m_Gui.Init(15, 18);" "// Fireteam FPS: legacy SealHunter frontend disabled." "legacy frontend initialization disabled"
 Replace-Required $clientShell "m_Gui.Render();" "// Fireteam FPS: legacy SealHunter frontend render disabled." "legacy frontend rendering disabled"
+Replace-Required $clientShell "m_Gui.HandleInput(command);" "// Fireteam FPS: launcher owns frontend/menu input." "legacy frontend input disabled"
 
 $text = Read-Source $clientShell
 $oldMenuInput = "if (m_nGameMode == LOCAL_GAMEMODE_NONE)" + [Environment]::NewLine + "    {" + [Environment]::NewLine + "        m_Gui.HandleInput(command);" + [Environment]::NewLine + "    }"
