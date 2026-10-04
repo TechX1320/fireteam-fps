@@ -2,44 +2,54 @@
 
 Standalone co-op FPS experiment built from the 2006 LithTech Jupiter Enterprise **SealHunter** networking sample, targeting a FireTeam-style zombie survival game.
 
-## v0.0.1 - build baseline
+## Development workflow
 
-The original SealHunter gameplay now compiles locally with Visual Studio 2022 x86 and produces a runnable `BUILT\` folder.
+This project now uses **main as the single working branch** for iterative development.
 
-`setup-local.cmd` automatically applies the small modern-C++ compatibility fixes required by current MSVC.
+The local Jupiter workspace is persistent:
 
-## v0.0.2 - Cabin Fever bring-up
+1. Run `setup-local.cmd` once to extract the original engine/sample archives.
+2. After that, pull/update the repo and normally just run `build.cmd`.
+3. `build.cmd` reapplies current source patches and refreshes optional local assets automatically.
+4. The existing `BUILT\` folder is preserved so extra test files you add there are not wiped.
+5. Use `setup-local.cmd --reset` only when you intentionally want a clean re-extraction.
 
-This milestone starts modifying gameplay:
+## Local imports
 
-- Listen-server capacity raised from 12 to 24 connections for testing.
-- SealHunter's enemy-spawning `AIVolume` is renamed internally to `ZombieSpawner`.
-- Imported `AIVolume` objects are registered as inert navigation placeholders so Cabin Fever cannot turn them into seal spawners.
-- `GameStartPoint00` is supported with the original `GameStartPoint0` as fallback.
-- Cabin Fever resources can be staged locally without committing commercial assets.
+Put these original archives in `imports\`:
 
-## Build locally
+- `release.zip`
+- `sealhunter.zip`
+- `EngineMissing.zip`
 
-Requirements: Windows + Visual Studio 2022 with **Desktop development with C++** and CMake tools.
+Commercial/extracted game assets remain local and are ignored by Git.
 
-1. Clone/check out the branch.
-2. Put these original archives in `imports\`:
-   - `release.zip`
-   - `sealhunter.zip`
-   - `EngineMissing.zip`
-3. For Cabin Fever testing, put these in `assets-local\`:
-   - `CABINFEVER.DAT`
-   - `TEXTURES.zip`
-   - `FX.zip`
-   - `RS.zip`
-4. Run `setup-local.cmd`.
-5. Run `build.cmd`.
-6. Test:
-   - `BUILT\run-normal.cmd` - stock SealHunter world
-   - `BUILT\run-cabinfever.cmd` - Cabin Fever
+For Cabin Fever testing, put these in `assets-local\`:
 
-The original engine files and extracted commercial assets remain local and are ignored by Git.
+- `CABINFEVER.DAT`
+- `TEXTURES.zip`
+- `FX.zip`
+- `RS.zip`
 
-## Next
+## Current bring-up changes
 
-Once Cabin Fever reliably loads and spawns a player, the next milestone is player-model/weapon import followed by the first real zombie actor and wave director.
+- Modern Visual Studio 2022 x86 build path.
+- Hosted connection target raised from 12 to 24 for testing.
+- SealHunter's enemy-spawning `AIVolume` separated from imported navigation `AIVolume` objects.
+- Cabin Fever `GameStartPoint00` support.
+- Imported `Trigger` objects are made inert instead of being incorrectly created as SealHunter world models.
+- `run-cabinfever.cmd` directly auto-starts the selected map.
+- Cabin Fever runs with an always-flushed `cabinfever-error.log` for crash diagnosis.
+
+## Test
+
+Run:
+
+`build.cmd`
+
+Then:
+
+- `BUILT\run-normal.cmd` - stock sample
+- `BUILT\run-cabinfever.cmd` - Cabin Fever
+
+If Cabin Fever crashes, send `BUILT\cabinfever-error.log`.
