@@ -70,6 +70,16 @@ echo [OK] CMake found:
 echo %CMAKE_EXE%
 
 echo.
+echo [CHECK] Verifying CMake cache matches this folder...
+if exist "%BUILD_DIR%\CMakeCache.txt" (
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "$cache = Get-Content -LiteralPath '%BUILD_DIR%\CMakeCache.txt' -ErrorAction SilentlyContinue | Where-Object { $_ -like 'CMAKE_HOME_DIRECTORY:INTERNAL=*' } | Select-Object -First 1; if ($cache) { $old = $cache.Substring($cache.IndexOf('=') + 1); $now = (Resolve-Path -LiteralPath '%CD%').Path; if ([System.IO.Path]::GetFullPath($old).TrimEnd('\') -ne [System.IO.Path]::GetFullPath($now).TrimEnd('\')) { exit 10 } }"
+  if errorlevel 10 (
+    echo [INFO] Project folder moved or renamed. Resetting generated CMake files only...
+    if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
+  )
+)
+
+echo.
 echo [1/5] Configuring Visual Studio 2022 Win32 build...
 "%CMAKE_EXE%" -S . -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A Win32
 if errorlevel 1 (
