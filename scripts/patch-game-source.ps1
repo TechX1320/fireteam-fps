@@ -130,30 +130,76 @@ Replace-Required $serverShell $oldStart $newStart "GameStartPoint00 compatibilit
 # +autostart 1 directly starts normal/local mode after initialization.
 $clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
 $text = Read-Source $clientShell
-if (-not $text.Contains("Fireteam FPS: auto-starting selected world...")) {
-    $needle = "    m_pChatGui->Init();"
-    if (-not $text.Contains($needle)) {
+
+# Migrate old branding first so repeated builds remain idempotent.
+$text = $text.Replace("Fireteam FPS:", "Fireteam:")
+
+if (-not $text.Contains("Fireteam: auto-starting selected world...")) {
+    $needle = "m_pChatGui->Init();"
+    $idx = $text.IndexOf($needle)
+    if ($idx -lt 0) {
         throw "Could not locate client-shell auto-start insertion point."
     }
 
-    $insert = $needle +
-        [Environment]::NewLine + [Environment]::NewLine +
-        '    HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");' + [Environment]::NewLine +
-        '    if(hAutoStart && g_pLTClient->GetVarValueFloat(hAutoStart) != 0.0f)' + [Environment]::NewLine +
-        '    {' + [Environment]::NewLine +
-        '        g_pLTClient->CPrint("Fireteam FPS: auto-starting selected world...");' + [Environment]::NewLine +
-        '        result = StartNormalGame();' + [Environment]::NewLine +
-        '    }'
+    $lineStart = $text.LastIndexOf([Environment]::NewLine, $idx)
+    if ($lineStart -lt 0) { $lineStart = 0 } else { $lineStart += [Environment]::NewLine.Length }
+    $lineEnd = $text.IndexOf([Environment]::NewLine, $idx)
+    if ($lineEnd -lt 0) { $lineEnd = $text.Length }
 
-    $text = $text.Replace($needle, $insert)
-    Write-Source $clientShell $text
+    $originalLine = $text.Substring($lineStart, $lineEnd - $lineStart)
+    $indent = $originalLine.Substring(0, $originalLine.IndexOf("m_pChatGui->Init();"))
+
+    $insert = $originalLine +
+        [Environment]::NewLine + [Environment]::NewLine +
+        $indent + 'HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");' + [Environment]::NewLine +
+        $indent + 'if(hAutoStart && g_pLTClient->GetVarValueFloat(hAutoStart) != 0.0f)' + [Environment]::NewLine +
+        $indent + '{' + [Environment]::NewLine +
+        $indent + '    g_pLTClient->CPrint("Fireteam: auto-starting selected world...");' + [Environment]::NewLine +
+        $indent + '    result = StartNormalGame();' + [Environment]::NewLine +
+        $indent + '}'
+
+    $text = $text.Remove($lineStart, $lineEnd - $lineStart).Insert($lineStart, $insert)
 }
+Write-Source $clientShell $text
 Write-Host "[OK] command-line normal-game auto-start"
 
 # Launcher-first project: disable SealHunter's splash/menu frontend.
-Replace-Required $clientShell "m_Gui.Init(15, 18);" "// Fireteam FPS: legacy SealHunter frontend disabled." "legacy frontend initialization disabled"
-Replace-Required $clientShell "m_Gui.Render();" "// Fireteam FPS: legacy SealHunter frontend render disabled." "legacy frontend rendering disabled"
-Replace-Required $clientShell "m_Gui.HandleInput(command);" "// Fireteam FPS: launcher owns frontend/menu input." "legacy frontend input disabled"
+# Be tolerant of both pristine SealHunter source and already-patched local trees.
+$text = Read-Source $clientShell
+
+$frontendPatches = @(
+    @("m_Gui.Init(15, 18);", "// Fireteam: legacy SealHunter frontend disabled.", "legacy frontend initialization disabled"),
+    @("m_Gui.Render();", "// Fireteam: legacy SealHunter frontend render disabled.", "legacy frontend rendering disabled"),
+    @("m_Gui.HandleInput(command);", "// Fireteam: launcher owns frontend/menu input.", "legacy frontend input disabled")
+)
+
+foreach($patch in $frontendPatches) {
+    $old = $patch[0]
+    $new = $patch[1]
+    $label = $patch[2]
+
+    if ($text.Contains($new)) {
+        Write-Host "[OK] $label already patched"
+        continue
+    }
+
+    $oldBranded = $new.Replace("Fireteam:", "Fireteam FPS:")
+    if ($text.Contains($oldBranded)) {
+        $text = $text.Replace($oldBranded, $new)
+        Write-Host "[OK] $label branding migrated"
+        continue
+    }
+
+    if ($text.Contains($old)) {
+        $text = $text.Replace($old, $new)
+        Write-Host "[OK] $label"
+        continue
+    }
+
+    throw "Could not locate expected code for $label in $clientShell"
+}
+
+Write-Source $clientShell $text
 Write-Host "[OK] legacy frontend disabled"
 
 # First-person camera bring-up. NOLF2 uses the same basic concept: first-person
