@@ -31,6 +31,8 @@ For Cabin Fever testing, put these in `assets-local\`:
 - `FX.zip`
 - `RS.zip`
 
+For Fireteam data research, local-only inputs may also include `GMS.zip`, `Decrypted Attributes_mpgh.net.rar`, and the CA reference binaries documented in `assets-local\README.md`. Current GMS format findings are tracked in `docs\GMS_RESEARCH.md`; run `scripts\inspect-gms.ps1` to reproduce the block/tail analysis.
+
 ## Current bring-up changes
 
 - Modern Visual Studio 2022 x86 build path.

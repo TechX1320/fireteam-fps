@@ -1,6 +1,6 @@
 # Local game assets
 
-This folder is intentionally ignored by Git because the test assets are extracted from commercial game data.
+This folder is intentionally ignored by Git because the test/research assets are extracted from commercial game data.
 
 ## Cabin Fever
 
@@ -12,6 +12,25 @@ Place these files here:
 - `RS.zip`
 
 The staging script now reads the texture paths embedded in `CABINFEVER.DAT`. When the DAT expects a flattened path such as `Textures\Objects\roof01.dtx` but the extracted archive stores that file deeper (for example `Textures\OBJECTS\CLOTHINGS\ROOF01.DTX`), it creates a local alias automatically. Ambiguous non-identical matches are reported instead of guessed.
+
+## Fireteam data research
+
+Keep the original Combat Arms research data local as well:
+
+- `GMS.zip` - encrypted mission/game-mode files, including `CABINFEVER_CP.GMS`
+- `Decrypted Attributes_mpgh.net.rar` - decrypted Combat Arms attributes used as a primary behavioral/data cross-check
+- `CAR-CShell.zip` - client `CShell.dll` reversing reference
+- `CAR-Lithtech.zip` - client `Lithtech.exe` reversing reference
+
+These files are research inputs only; they are not staged into the built game unless a build script explicitly needs them.
+
+To inspect the GMS archive without extracting it:
+
+```bat
+powershell -ExecutionPolicy Bypass -File scripts\inspect-gms.ps1
+```
+
+See `docs\GMS_RESEARCH.md` for the current format/encryption findings. A matching Combat Arms DServer binary/server source is the preferred next reference for recovering the exact `_CP.GMS` decryptor/key derivation.
 
 ## Combat Arms ClientFX
 
