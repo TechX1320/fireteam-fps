@@ -324,7 +324,14 @@ $healthHudH = @'
 #include <ltbasedefs.h>
 
 void FT_SetHealth(uint8 nHealth, uint8 nMaxHealth);
-void FT_RenderPoisonOverlay(HLOCALOBJ hPlayer);
+void FT_RenderPoisonOverlay(HLOCALOBJ hPlayer)
+{
+    // Temporarily disabled. Cabin Fever currently reports the spawn interior as
+    // inside PoisonGas, so applying the CA-style tint here washes the whole map.
+    // Keep the function for the later accurate volume/ClientFX implementation.
+    (void)hPlayer;
+}
+
 void FT_RenderHealthHud();
 
 #endif
@@ -452,11 +459,13 @@ void FT_RenderHealthHud()
     g_pLTCDrawPrim->SetCullMode(DRAWPRIM_CULL_NONE);
     g_pLTCDrawPrim->SetCamera(LTNULL);
 
+    g_pLTCDrawPrim->BeginDrawPrim();
     g_pLTCDrawPrim->DrawPrim(&background, 1);
     if(s_nHealth > 0)
     {
         g_pLTCDrawPrim->DrawPrim(&health, 1);
     }
+    g_pLTCDrawPrim->EndDrawPrim();
 }
 '@
 
@@ -1059,6 +1068,36 @@ Insert-BeforeLineContaining $clientShell "// Render the gui." @(
 
 Write-Host "[OK] client health/respawn/lightgroup hooks"
 
+# Fireteam player collision dimensions.
+# Do not inherit the larger HARM/NOLF-style animation user dims; Cabin Fever's
+# tight interiors were authored around Combat Arms player dimensions.
+$playerClient = Join-Path $sealRoot "cshell\src\playerclnt.cpp"
+$text = Read-Source $playerClient
+$oldDims = @"
+    LTVector vDims;
+    HMODELANIM hCurAnim;
+    g_pLTCModel->GetCurAnim(m_hObject, m_idLowerBodyTracker, hCurAnim);
+    g_pLTCCommon->GetModelAnimUserDims(m_hObject, &vDims, hCurAnim);
+    g_pLTCPhysics->SetObjectDims(m_hObject, &vDims, 0);
+"@
+$newDims = @"
+    // Fireteam fixed player collision dimensions.
+    // LithTech dims are half-extents: ~32 wide x 76 tall overall.
+    LTVector vDims(16.0f, 38.0f, 16.0f);
+    g_pLTCPhysics->SetObjectDims(m_hObject, &vDims, 0);
+"@
+if ($text.Contains($oldDims)) {
+    $text = $text.Replace($oldDims, $newDims)
+    Write-Source $playerClient $text
+    Write-Host "[OK] Fireteam fixed player collision dimensions"
+} elseif ($text.Contains("LTVector vDims(16.0f, 38.0f, 16.0f);")) {
+    Write-Host "[OK] Fireteam fixed player collision dimensions already patched"
+} else {
+    throw "Could not locate SealHunter player bounding-box update."
+}
+
+
+
 # ---------------------------------------------------------------------------
 # Server-authoritative health, poison damage, death/respawn.
 # Friendly fire is explicitly disabled.
@@ -1370,42 +1409,10 @@ void CPlayerSrvr::ApplyDamage(uint8 nDamage)
 
 void CPlayerSrvr::UpdateHazards()
 {
-    HOBJECT aContainers[16];
-    uint32 nContainers = g_pLTServer->GetObjectContainers(m_hObject, aContainers, 16);
-    HCLASS hPoisonClass = g_pLTServer->GetClass("PoisonGas");
-
-    bool bInPoison = false;
-
-    for(uint32 i = 0; i < nContainers; ++i)
-    {
-        HCLASS hClass = g_pLTServer->GetObjectClass(aContainers[i]);
-        if(!hPoisonClass || !hClass || !g_pLTServer->IsKindOf(hPoisonClass, hClass))
-        {
-            continue;
-        }
-
-        PoisonGas *pGas = (PoisonGas*)g_pLTServer->HandleToObject(aContainers[i]);
-        if(!pGas)
-        {
-            continue;
-        }
-
-        bInPoison = true;
-        m_fPoisonCarry += pGas->GetDamage() * 0.25f;
-    }
-
-    if(!bInPoison)
-    {
-        m_fPoisonCarry = 0.0f;
-        return;
-    }
-
-    if(m_fPoisonCarry >= 1.0f)
-    {
-        uint8 nDamage = (uint8)m_fPoisonCarry;
-        m_fPoisonCarry -= (float)nDamage;
-        ApplyDamage(nDamage);
-    }
+    // PoisonGas is registered so the imported world loads correctly, but damage
+    // is intentionally disabled until we reproduce Combat Arms' actual safe/outside
+    // volume behavior. The current approximation includes the indoor spawn volume.
+    m_fPoisonCarry = 0.0f;
 }
 
 void CPlayerSrvr::Respawn()
