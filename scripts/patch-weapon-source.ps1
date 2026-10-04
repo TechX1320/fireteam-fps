@@ -74,12 +74,20 @@ Insert-AfterLineContaining $playerH "UpdateRotation(float yaw, float pitch, floa
     "    bool                AltAttack();"
 ) "UpdateWeaponView(bool bFirstPerson)" "Bowie public update declaration"
 
+Insert-AfterLineContaining $playerH "UpdateWeaponView(bool bFirstPerson);" @(
+    "    bool                AltAttack();"
+) "AltAttack();" "Bowie secondary declaration"
+
 Insert-AfterLineContaining $playerH "PlayAttackAnimation(const char* sAnimName, uint8 nTracker);" @(
     "    void                CreateViewWeapon();",
     "    void                PlayViewWeaponAnimation(const char* sAnimName, bool bLooping);",
     "    void                UpdateViewWeaponAnimation();",
     "    void                PlayViewWeaponSound(const char* sFilename);"
 ) "CreateViewWeapon();" "Bowie private method declarations"
+
+Insert-AfterLineContaining $playerH "UpdateViewWeaponAnimation();" @(
+    "    void                PlayViewWeaponSound(const char* sFilename);"
+) "PlayViewWeaponSound(const char* sFilename);" "Bowie sound declaration"
 
 Insert-AfterLineContaining $playerH "m_hClubObject;" @(
     "    HLOCALOBJ           m_hViewWeaponObject;",
@@ -95,6 +103,9 @@ if (-not $text.Contains("#include <iltsoundmgr.h>")) {
     if (-not $text.Contains($needle)) { throw "Could not locate player client includes for sound support." }
     $text = $text.Replace($needle, $needle + [Environment]::NewLine + "#include <iltsoundmgr.h>")
 }
+
+# Migrate previously staged Bowie texture paths to the bare names embedded in the LTBs.
+$text = $text.Replace("ModelTextures\\Weapons\\Bowie\\PV_ML_DF_BOWIEKNIFE_BC.DTX", "PV_ML_DF_BowieKnife_BC.dtx")
 
 if (-not $text.Contains("m_hViewWeaponObject(NULL)")) {
     $needle = "m_hClubObject(NULL),"
@@ -325,11 +336,15 @@ Write-Host "[OK] Bowie first/third-person visibility hook"
 
 $serverPlayer = Join-Path $sealRoot "sshell\src\playersrvr.cpp"
 Replace-Required $serverPlayer '"Models/Mallet.ltb"' '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"' "Mallet replaced with Bowie world model"
-Replace-Required $serverPlayer '"ModelTextures/Mallet.dtx"' '"HH_ML_DF_BowieKnife_BC.dtx"' "Mallet skin replaced with Bowie"
+$serverText = Read-Source $serverPlayer
+$serverText = $serverText.Replace('"ModelTextures/Mallet.dtx"', '"HH_ML_DF_BowieKnife_BC.dtx"')
+$serverText = $serverText.Replace('"ModelTextures/TelePole.dtx"', '"HH_ML_DF_BowieKnife_BC.dtx"')
+$serverText = $serverText.Replace('"ModelTextures/club.dtx"', '"HH_ML_DF_BowieKnife_BC.dtx"')
+$serverText = $serverText.Replace('"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"', '"HH_ML_DF_BowieKnife_BC.dtx"')
+Write-Source $serverPlayer $serverText
+Write-Host "[OK] Bowie world texture aliases"
 Replace-Required $serverPlayer '"Models/TelePole.ltb"' '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"' "TelePole replaced with Bowie world model"
-Replace-Required $serverPlayer '"ModelTextures/TelePole.dtx"' '"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"' "TelePole skin replaced with Bowie"
 Replace-Required $serverPlayer '"Models/billyclub.ltb"' '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"' "Billyclub replaced with Bowie world model"
-Replace-Required $serverPlayer '"ModelTextures/club.dtx"' '"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"' "Billyclub skin replaced with Bowie"
 
 
 $commandIds = Join-Path $sealRoot "shared\src\commandids.h"
