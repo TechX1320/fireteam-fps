@@ -761,6 +761,9 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
 
         case MID_INITIALUPDATE:
         {
+            // Make the temporary HARM-guard zombie visually distinct from players.
+            g_pLTServer->SetObjectColor(m_hObject, 0.45f, 0.90f, 0.45f, 1.0f);
+
             HMODELANIM hAnim = g_pLTServer->GetAnimIndex(m_hObject, "LRF");
             if(hAnim != INVALID_MODEL_ANIM)
             {
