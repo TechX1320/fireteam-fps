@@ -34,6 +34,12 @@ For Cabin Fever testing, put these in `assets-local\`:
 ## Current bring-up changes
 
 - Modern Visual Studio 2022 x86 build path.
+- Game name is now **Fireteam**.
+- Combat Arms Bowie knife player-view/world models are staged from local archives.
+- Left click uses `fire_0`; right click uses `fire_1`.
+- Bowie `SELECT.WAV` and `FIRE.WAV` are supported.
+- LightGroup compatibility follows the NOLF2 baked-light multiplier approach.
+- Server-authoritative player health starts at 100 HP with a simple texture-free health bar.
 - Hosted connection target raised from 12 to 24 for testing.
 - SealHunter's enemy-spawning `AIVolume` separated from imported navigation `AIVolume` objects.
 - Cabin Fever `GameStartPoint00` support.
