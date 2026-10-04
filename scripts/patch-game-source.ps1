@@ -35,8 +35,7 @@ function Replace-Required([string]$Path, [string]$Old, [string]$New, [string]$La
     Write-Host "[OK] $Label"
 }
 
-# Raise listen-server capacity.  This remains experimental until validated with
-# real clients, but the SealHunter game code itself does not need to stay at 12.
+# Raise listen-server capacity toward the desired 24-player target.
 Replace-Required (Join-Path $sealRoot "cshell\src\ltclientshell.cpp") "request.m_HostInfo.m_dwMaxConnections = 12;" "request.m_HostInfo.m_dwMaxConnections = 24;" "listen server max connections = 24"
 
 $dedicated = Join-Path $sealRoot "ServerApp\Shared\DedicatedServerBase.cpp"
@@ -44,8 +43,8 @@ if (Test-Path -LiteralPath $dedicated) {
     Replace-Required $dedicated "m_nMaxPlayers(12)" "m_nMaxPlayers(24)" "dedicated server default max players = 24"
 }
 
-# SealHunter used the generic Jupiter/NOLF2 class name AIVolume for its enemy
-# spawner.  Cabin Fever contains many real navigation AIVolume objects.
+# SealHunter used AIVolume as an enemy spawner. Imported Jupiter maps use
+# AIVolume as navigation data, so keep those meanings separate.
 $aiHeader = Join-Path $sealRoot "sshell\src\AIVolume.h"
 $text = Read-Source $aiHeader
 if (-not $text.Contains("class ZombieSpawner : public BaseClass")) {
@@ -60,7 +59,7 @@ if (-not $text.Contains("class ZombieSpawner : public BaseClass")) {
     $marker = "#endif // __AIVolume_H__"
     $stub = @"
 // Imported Jupiter/NOLF2-style AI navigation volume.
-// Intentionally inert during the Cabin Fever bring-up milestone.
+// Intentionally inert during map bring-up.
 class AIVolume : public BaseClass
 {
 public:
@@ -93,7 +92,7 @@ if (-not $text.Contains("BEGIN_CLASS(ZombieSpawner)")) {
     $compatRegistration = @"
 END_CLASS_DEFAULT_FLAGS(ZombieSpawner, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
 
-// Imported maps use AIVolume for navigation data.  Do not spawn enemies here.
+// Imported maps use AIVolume for navigation data. Do not spawn enemies here.
 BEGIN_CLASS(AIVolume)
 ADD_STRINGPROP_FLAG(Target, "", PF_OBJECTLINK)
 ADD_VECTORPROP_FLAG(Dims, PF_DIMS)
@@ -108,10 +107,8 @@ $sealCpp = Join-Path $sealRoot "sshell\src\seal.cpp"
 Replace-Required $sealCpp '"AIVolume0"' '"ZombieSpawner0"' "legacy seal spawner lookup"
 Replace-Required $sealCpp "AIVolume *pAI = (AIVolume*)" "ZombieSpawner *pAI = (ZombieSpawner*)" "legacy seal spawner cast"
 
-# Cabin Fever also contains normal command/volume Trigger objects.  SealHunter's
-# sample Trigger incorrectly forces them to be world models, which can crash
-# while an imported map is being instantiated.  Keep the class name so the
-# objects load, but make the SealHunter implementation inert for now.
+# Cabin Fever contains command/volume Trigger objects. SealHunter's sample
+# Trigger forced them to be world models, so make imported Trigger objects inert.
 $triggerCpp = Join-Path $sealRoot "sshell\src\trigger.cpp"
 Replace-Required $triggerCpp "END_CLASS_DEFAULT_FLAGS(Trigger, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD| CF_WORLDMODEL)" "END_CLASS_DEFAULT_FLAGS(Trigger, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)" "Trigger world-model class flag disabled"
 Replace-Required $triggerCpp "pStruct->m_ObjectType = OT_WORLDMODEL;" "pStruct->m_ObjectType = OT_NORMAL;" "Trigger object type made inert"
@@ -129,13 +126,12 @@ $newStart = 'g_pLTServer->FindNamedObjects("GameStartPoint00", pStartPt);' +
     [char]9 + '}'
 Replace-Required $serverShell $oldStart $newStart "GameStartPoint00 compatibility"
 
-# Launcher/command-line auto-start.  +runworld only chooses the map in the
-# original sample; it does not start a game.  +autostart 1 now starts NORMAL
-# mode after the client shell and GUI are fully initialized.
+# +runworld chooses the world but the original sample still waits at its menu.
+# +autostart 1 directly starts normal/local mode after initialization.
 $clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
 $text = Read-Source $clientShell
 if (-not $text.Contains("Fireteam FPS: auto-starting selected world...")) {
-    $needle = "    m_pChatGui->Init();" 
+    $needle = "    m_pChatGui->Init();"
     if (-not $text.Contains($needle)) {
         throw "Could not locate client-shell auto-start insertion point."
     }
@@ -153,57 +149,88 @@ if (-not $text.Contains("Fireteam FPS: auto-starting selected world...")) {
     Write-Source $clientShell $text
 }
 Write-Host "[OK] command-line normal-game auto-start"
-# Fireteam FPS is launcher-first. Disable the SealHunter frontend entirely.
-# Keep CGui compiled for now, but do not initialize, render, or feed input
-# to the old splash/menu/HUD path.
-$clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
+
+# Launcher-first project: disable SealHunter's splash/menu frontend.
 Replace-Required $clientShell "m_Gui.Init(15, 18);" "// Fireteam FPS: legacy SealHunter frontend disabled." "legacy frontend initialization disabled"
 Replace-Required $clientShell "m_Gui.Render();" "// Fireteam FPS: legacy SealHunter frontend render disabled." "legacy frontend rendering disabled"
 Replace-Required $clientShell "m_Gui.HandleInput(command);" "// Fireteam FPS: launcher owns frontend/menu input." "legacy frontend input disabled"
+Write-Host "[OK] legacy frontend disabled"
 
-$text = Read-Source $clientShell
-$oldMenuInput = "if (m_nGameMode == LOCAL_GAMEMODE_NONE)" + [Environment]::NewLine + "    {" + [Environment]::NewLine + "        m_Gui.HandleInput(command);" + [Environment]::NewLine + "    }"
-if ($text.Contains($oldMenuInput)) {
-    $text = $text.Replace($oldMenuInput, "// Fireteam FPS: launcher owns frontend/menu input.")
-    Write-Source $clientShell $text
-}
-Write-Host "[OK] legacy frontend input disabled"
-# First-person camera bring-up. NOLF2 uses the same basic model: a chase
-# camera mode plus a first-person mode attached near the player head. Keep
-# SealHunter third-person available, but default to first person and toggle
-# views with C.
+# First-person camera bring-up. NOLF2 uses the same basic concept: first-person
+# at the player/head offset and chase mode for third-person. Default to FPS and
+# keep SealHunter third-person available on C.
 $cameraH = Join-Path $sealRoot "cshell\src\camera.h"
 $text = Read-Source $cameraH
 if (-not $text.Contains("ToggleView()")) {
-    $updated = [regex]::Replace($text, '(?m)^(\s*void\s+UpdateZoom\(float zoom\);\s*)
-, '$1' + [Environment]::NewLine + "    void            ToggleView();" + [Environment]::NewLine + "    bool            IsFirstPerson() const { return m_bFirstPerson; }", 1)
-    if ($updated -eq $text) { throw "Could not add camera toggle declarations." }
-    $text = $updated
+    $lines = $text -split "\r\n|\n|\r"
 
-    $updated = [regex]::Replace($text, '(?m)^(\s*float\s+m_fZoom;\s*)
-, '$1' + [Environment]::NewLine + "    bool            m_bFirstPerson;", 1)
-    if ($updated -eq $text) { throw "Could not add first-person camera state." }
-    $text = $updated
+    $zoomIndex = -1
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if ($lines[$i].Contains("UpdateZoom(float zoom);")) {
+            $zoomIndex = $i
+            break
+        }
+    }
+    if ($zoomIndex -lt 0) {
+        throw "Could not add camera toggle declarations."
+    }
+
+    $lines = @(
+        $lines[0..$zoomIndex]
+        "    void            ToggleView();"
+        "    bool            IsFirstPerson() const { return m_bFirstPerson; }"
+        $lines[($zoomIndex + 1)..($lines.Length - 1)]
+    )
+
+    $zoomMemberIndex = -1
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if ($lines[$i].Contains("m_fZoom;")) {
+            $zoomMemberIndex = $i
+            break
+        }
+    }
+    if ($zoomMemberIndex -lt 0) {
+        throw "Could not add first-person camera state."
+    }
+
+    $lines = @(
+        $lines[0..$zoomMemberIndex]
+        "    bool            m_bFirstPerson;"
+        $lines[($zoomMemberIndex + 1)..($lines.Length - 1)]
+    )
+
+    $text = [string]::Join([Environment]::NewLine, $lines)
     Write-Source $cameraH $text
 }
 Write-Host "[OK] camera first-person declarations"
 
 $cameraCpp = Join-Path $sealRoot "cshell\src\camera.cpp"
 $text = Read-Source $cameraCpp
+
 if (-not $text.Contains('#include "clientinterfaces.h"')) {
     $needle = '#include <ltobjectcreate.h>'
-    if (-not $text.Contains($needle)) { throw "Could not locate camera include insertion point." }
+    if (-not $text.Contains($needle)) {
+        throw "Could not locate camera include insertion point."
+    }
     $text = $text.Replace($needle, $needle + [Environment]::NewLine + '#include "clientinterfaces.h"')
 }
+
 $text = $text.Replace("#define MAX_PITCH   30.0f", "#define MAX_PITCH   85.0f")
+
 if (-not $text.Contains("m_bFirstPerson(true)")) {
     $needle = "m_fZoom(MIN_ZOOM)"
-    if (-not $text.Contains($needle)) { throw "Could not locate camera constructor." }
+    if (-not $text.Contains($needle)) {
+        throw "Could not locate camera constructor."
+    }
     $text = $text.Replace($needle, $needle + "," + [Environment]::NewLine + "m_bFirstPerson(true)")
 }
+
 if (-not $text.Contains("Fireteam FPS first-person camera")) {
     $needle = "    rRot.Rotate(rRot.Right(), (m_fPitch * 0.0174533f));"
-    if (-not $text.Contains($needle)) { throw "Could not locate camera pitch update." }
+    if (-not $text.Contains($needle)) {
+        throw "Could not locate camera pitch update."
+    }
+
     $insert = "    LTVector vEyeUp = rRot.Up();" + [Environment]::NewLine +
         "    rRot.Rotate(rRot.Right(), (m_fPitch * 0.0174533f));" + [Environment]::NewLine + [Environment]::NewLine +
         "    // Fireteam FPS first-person camera." + [Environment]::NewLine +
@@ -216,8 +243,10 @@ if (-not $text.Contains("Fireteam FPS first-person camera")) {
         "        return;" + [Environment]::NewLine +
         "    }" + [Environment]::NewLine + [Environment]::NewLine +
         "    g_pLTCCommon->SetObjectFlags(hObject, OFT_Flags, FLAG_VISIBLE, FLAG_VISIBLE);"
+
     $text = $text.Replace($needle, $insert)
 }
+
 if (-not $text.Contains("void CCamera::ToggleView()")) {
     $text += [Environment]::NewLine + [Environment]::NewLine +
         "//----------------------------------------------------------------------------" + [Environment]::NewLine +
@@ -229,23 +258,25 @@ if (-not $text.Contains("void CCamera::ToggleView()")) {
         '    g_pLTClient->CPrint("Camera: %s", m_bFirstPerson ? "First Person" : "Third Person");' + [Environment]::NewLine +
         "}" + [Environment]::NewLine
 }
+
 Write-Source $cameraCpp $text
 Write-Host "[OK] first-person camera implementation"
 
 $clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
 $text = Read-Source $clientShell
+
 if (-not $text.Contains("m_pCamera->ToggleView();")) {
-    $needle = "           if(VK_ESCAPE == key)"
+    $needle = "if(VK_ESCAPE == key)"
     if (-not $text.Contains($needle)) {
-        $needle = "            if(VK_ESCAPE == key)"
+        throw "Could not locate in-game key handler."
     }
-    if (-not $text.Contains($needle)) { throw "Could not locate in-game key handler." }
-    $indent = $needle.Substring(0, $needle.IndexOf("if("))
-    $insert = $indent + "if('C' == key)" + [Environment]::NewLine +
-        $indent + "{" + [Environment]::NewLine +
-        $indent + "    m_pCamera->ToggleView();" + [Environment]::NewLine +
-        $indent + "}" + [Environment]::NewLine +
-        $indent + "else if(VK_ESCAPE == key)"
+
+    $insert = "if('C' == key)" + [Environment]::NewLine +
+        "           {" + [Environment]::NewLine +
+        "               m_pCamera->ToggleView();" + [Environment]::NewLine +
+        "           }" + [Environment]::NewLine +
+        "           else if(VK_ESCAPE == key)"
+
     $text = $text.Replace($needle, $insert)
     Write-Source $clientShell $text
 }
