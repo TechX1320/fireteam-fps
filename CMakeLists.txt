@@ -39,6 +39,7 @@ file(GLOB CSHELL_GAME_SOURCES CONFIGURE_DEPENDS "${SEAL_ROOT}/cshell/src/*.cpp" 
 set(CSHELL_ENGINE_SOURCES
     "${SDK_DIR}/iltbaseclass.cpp"
     "${SDK_DIR}/ltmodule.cpp"
+    "${SDK_DIR}/ltcrashhandler.cpp"
     "${CLIENTFX_SHARED_DIR}/ClientFXDB.cpp"
     "${CLIENTFX_SHARED_DIR}/ClientFXMgr.cpp"
     "${CLIENTFX_SHARED_DIR}/CommonUtilities.cpp"
