@@ -1183,6 +1183,15 @@ if ($text.Contains($oldPartialDamage)) {
     $text = $text.Replace($oldPartialDamage, @"
         case OBJ_MID_DAMAGE:
             {
+                HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
+                HCLASS hSenderClass = hSender ? g_pLTServer->GetObjectClass(hSender) : LTNULL;
+
+                // Co-op invariant: damage sent directly by another player is ignored.
+                if(hPlayerClass && hSenderClass && g_pLTServer->IsKindOf(hPlayerClass, hSenderClass))
+                {
+                    break;
+                }
+
                 uint8 nDamage = pMsg->Readuint8();
                 ApplyDamage(nDamage);
             }
@@ -1196,6 +1205,15 @@ if (-not $text.Contains("case OBJ_MID_DAMAGE:")) {
     $damageCase = @(
         "        case OBJ_MID_DAMAGE:",
         "            {",
+        '                HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");',
+        "                HCLASS hSenderClass = hSender ? g_pLTServer->GetObjectClass(hSender) : LTNULL;",
+        "",
+        "                // Co-op invariant: damage sent directly by another player is ignored.",
+        "                if(hPlayerClass && hSenderClass && g_pLTServer->IsKindOf(hPlayerClass, hSenderClass))",
+        "                {",
+        "                    break;",
+        "                }",
+        "",
         "                uint8 nDamage = pMsg->Readuint8();",
         "                ApplyDamage(nDamage);",
         "            }",
