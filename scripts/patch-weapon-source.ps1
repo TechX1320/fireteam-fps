@@ -517,19 +517,17 @@ $serverText = $serverText.Replace('"ModelTextures/TelePole.dtx"', '"Weapons/mele
 $serverText = $serverText.Replace('"ModelTextures/club.dtx"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
 
 # Combat Arms weapons can contain multiple OBBs. SealHunter assumed exactly one,
-# which leaves its melee hit box uninitialized for the Bowie knife.
-$oldObb = @"
-        // We should only have one
-        if(iNumOBBS == 1)
-        {
-            g_pLTSModel->GetModelOBBCopy(m_hClub, &m_WeaponOBB);
-        }
-        else
-        {
-            g_pLTServer->CPrint("(PlayerSrvr) Error: too many OBBs on weapon! Expecting only one.");
-        }
-"@
-$newObb = @"
+# which leaves its melee hit box uninitialized for the Bowie knife. Match the
+# original block structurally because the historical source snapshots use
+# different tab/space indentation.
+if ($serverText.Contains("too many OBBs on weapon! Expecting only one.")) {
+    $obbPattern = '(?s)[ \t]*// We should only have one\s*if\s*\(\s*iNumOBBS\s*==\s*1\s*\)\s*\{\s*g_pLTSModel->GetModelOBBCopy\s*\(\s*m_hClub\s*,\s*&m_WeaponOBB\s*\)\s*;\s*\}\s*else\s*\{\s*g_pLTServer->CPrint\s*\(\s*"\(PlayerSrvr\) Error: too many OBBs on weapon! Expecting only one\."\s*\)\s*;\s*\}'
+    $obbMatch = [regex]::Match($serverText, $obbPattern)
+    if (-not $obbMatch.Success) {
+        throw "Could not locate SealHunter single-OBB weapon block."
+    }
+
+    $newObb = @"
         if(iNumOBBS > 0)
         {
             ModelOBB *pWeaponOBBs = new ModelOBB[iNumOBBS];
@@ -556,9 +554,18 @@ $newObb = @"
             delete [] pWeaponOBBs;
         }
 "@
-if ($serverText.Contains($oldObb)) {
-    $serverText = $serverText.Replace($oldObb, $newObb)
+
+    $serverText = $serverText.Substring(0, $obbMatch.Index) +
+        $newObb +
+        $serverText.Substring($obbMatch.Index + $obbMatch.Length)
 }
+
+# Combat Arms Bowie attributes report a 135-unit melee range. Keep this
+# explicit until the weapon system consumes the decrypted attribute data.
+$serverText = [regex]::Replace(
+    $serverText,
+    'qInfo\.m_To\s*=\s*vPos\s*\+\s*\(vForward\s*\*\s*35\.0f\)\s*;',
+    'qInfo.m_To   = vPos + (vForward * 135.0f);')
 
 $serverText = $serverText.Replace('"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"', '"Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX"')
 
