@@ -52,6 +52,37 @@ function Insert-AfterLineContaining([string]$Path, [string]$Needle, [string[]]$N
     Write-Host "[OK] $Label"
 }
 
+
+function Insert-BeforeLineContaining([string]$Path, [string]$Needle, [string[]]$NewLines, [string]$Guard, [string]$Label) {
+    $text = Read-Source $Path
+    if ($text.Contains($Guard)) {
+        Write-Host "[OK] $Label already patched"
+        return
+    }
+
+    $lines = $text -split "\r\n|\n|\r"
+    $index = -1
+    for ($i = 0; $i -lt $lines.Length; $i++) {
+        if ($lines[$i].Contains($Needle)) {
+            $index = $i
+            break
+        }
+    }
+
+    if ($index -lt 0) {
+        throw "Could not locate $Needle for $Label in $Path"
+    }
+
+    $before = @()
+    if ($index -gt 0) {
+        $before = $lines[0..($index - 1)]
+    }
+
+    $after = $lines[$index..($lines.Length - 1)]
+    Write-Source $Path ([string]::Join([Environment]::NewLine, @($before + $NewLines + $after)))
+    Write-Host "[OK] $Label"
+}
+
 # ---------------------------------------------------------------------------
 # Shared Fireteam network messages.
 # ---------------------------------------------------------------------------
@@ -875,133 +906,96 @@ Write-Host "[OK] controlled one-zombie Spawner bring-up"
 # Client shell: health, respawn and LightGroups.
 # ---------------------------------------------------------------------------
 $clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
+
+Insert-AfterLineContaining $clientShell '#include "chatgui.h"' @(
+    '#include "FireteamLightGroupClient.h"',
+    '#include "FireteamHealthHud.h"'
+) '#include "FireteamLightGroupClient.h"' "Fireteam client includes"
+
+$healthCases = @(
+    "    case MSG_SC_HEALTH:",
+    "        {",
+    "            uint8 nHealth = pMessage->Readuint8();",
+    "            uint8 nMaxHealth = pMessage->Readuint8();",
+    "            FT_SetHealth(nHealth, nMaxHealth);",
+    "        }",
+    "        break;",
+    "    case MSG_SC_RESPAWN:",
+    "        {",
+    "            LTVector vRespawn = pMessage->ReadLTVector();",
+    "            LTRotation rRespawn = pMessage->ReadLTRotation();",
+    "",
+    "            m_vPlayerStartPos = vRespawn;",
+    "            m_rPlayerStartRot = rRespawn;",
+    "",
+    "            if(m_pPlayer && m_pPlayer->GetPlayerObject())",
+    "            {",
+    "                g_pLTClient->SetObjectPos(m_pPlayer->GetPlayerObject(), &vRespawn);",
+    "                g_pLTClient->SetObjectRotation(m_pPlayer->GetPlayerObject(), &rRespawn);",
+    "",
+    "                LTVector vZero(0.0f, 0.0f, 0.0f);",
+    "                g_pLTCPhysics->SetVelocity(m_pPlayer->GetPlayerObject(), &vZero);",
+    "            }",
+    "        }",
+    "        break;",
+    "    case MSG_SC_LIGHTGROUP:",
+    "        {",
+    "            uint32 nLightGroupID = pMessage->Readuint32();",
+    "            LTVector vAdjustment = pMessage->ReadLTVector();",
+    "            FT_QueueLightGroup(nLightGroupID, vAdjustment);",
+    "        }",
+    "        break;"
+)
+Insert-BeforeLineContaining $clientShell "case MSG_WORLD_PROPS:" $healthCases "case MSG_SC_HEALTH:" "health/respawn/lightgroup client messages"
+
+# Existing partial workspaces may already have health/lightgroup but not respawn.
+$respawnCase = @(
+    "    case MSG_SC_RESPAWN:",
+    "        {",
+    "            LTVector vRespawn = pMessage->ReadLTVector();",
+    "            LTRotation rRespawn = pMessage->ReadLTRotation();",
+    "",
+    "            m_vPlayerStartPos = vRespawn;",
+    "            m_rPlayerStartRot = rRespawn;",
+    "",
+    "            if(m_pPlayer && m_pPlayer->GetPlayerObject())",
+    "            {",
+    "                g_pLTClient->SetObjectPos(m_pPlayer->GetPlayerObject(), &vRespawn);",
+    "                g_pLTClient->SetObjectRotation(m_pPlayer->GetPlayerObject(), &rRespawn);",
+    "",
+    "                LTVector vZero(0.0f, 0.0f, 0.0f);",
+    "                g_pLTCPhysics->SetVelocity(m_pPlayer->GetPlayerObject(), &vZero);",
+    "            }",
+    "        }",
+    "        break;"
+)
 $text = Read-Source $clientShell
-
-if (-not $text.Contains('#include "FireteamLightGroupClient.h"')) {
-    $needle = '#include "chatgui.h"'
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate client shell include insertion point."
+if (-not $text.Contains("case MSG_SC_RESPAWN:")) {
+    if ($text.Contains("case MSG_SC_LIGHTGROUP:")) {
+        Insert-BeforeLineContaining $clientShell "case MSG_SC_LIGHTGROUP:" $respawnCase "case MSG_SC_RESPAWN:" "respawn client message"
+    } else {
+        Insert-BeforeLineContaining $clientShell "case MSG_WORLD_PROPS:" $respawnCase "case MSG_SC_RESPAWN:" "respawn client message"
     }
-
-    $text = $text.Replace(
-        $needle,
-        $needle + [Environment]::NewLine +
-        '#include "FireteamLightGroupClient.h"' + [Environment]::NewLine +
-        '#include "FireteamHealthHud.h"')
 }
 
-if (-not $text.Contains("case MSG_SC_HEALTH:")) {
-    $needle = "    case MSG_WORLD_PROPS:"
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate client message insertion point."
-    }
+Insert-BeforeLineContaining $clientShell "// Update the world properties class" @(
+    "    FT_UpdateLightGroups();",
+    ""
+) "FT_UpdateLightGroups();" "LightGroup client update"
 
-    $cases = @"
-    case MSG_SC_HEALTH:
-        {
-            uint8 nHealth = pMessage->Readuint8();
-            uint8 nMaxHealth = pMessage->Readuint8();
-            FT_SetHealth(nHealth, nMaxHealth);
-        }
-        break;
-    case MSG_SC_RESPAWN:
-        {
-            LTVector vRespawn = pMessage->ReadLTVector();
-            LTRotation rRespawn = pMessage->ReadLTRotation();
+Insert-BeforeLineContaining $clientShell "// Stop all the client FX" @(
+    "    FT_ClearLightGroups();",
+    ""
+) "FT_ClearLightGroups();" "LightGroup client cleanup"
 
-            m_vPlayerStartPos = vRespawn;
-            m_rPlayerStartRot = rRespawn;
+Insert-BeforeLineContaining $clientShell "// Render the gui." @(
+    "    if(IsInWorld())",
+    "    {",
+    "        FT_RenderHealthHud();",
+    "    }",
+    ""
+) "FT_RenderHealthHud();" "health HUD render"
 
-            if(m_pPlayer && m_pPlayer->GetPlayerObject())
-            {
-                g_pLTClient->SetObjectPos(m_pPlayer->GetPlayerObject(), &vRespawn);
-                g_pLTClient->SetObjectRotation(m_pPlayer->GetPlayerObject(), &rRespawn);
-
-                LTVector vZero(0.0f, 0.0f, 0.0f);
-                g_pLTCPhysics->SetVelocity(m_pPlayer->GetPlayerObject(), &vZero);
-            }
-        }
-        break;
-    case MSG_SC_LIGHTGROUP:
-        {
-            uint32 nLightGroupID = pMessage->Readuint32();
-            LTVector vAdjustment = pMessage->ReadLTVector();
-            FT_QueueLightGroup(nLightGroupID, vAdjustment);
-        }
-        break;
-"@
-
-    $text = $text.Replace($needle, $cases + $needle)
-}
-
-# Existing partial system patch: add respawn case if health exists already.
-if ($text.Contains("case MSG_SC_HEALTH:") -and -not $text.Contains("case MSG_SC_RESPAWN:")) {
-    $needle = "    case MSG_SC_LIGHTGROUP:"
-    if (-not $text.Contains($needle)) {
-        $needle = "    case MSG_WORLD_PROPS:"
-    }
-
-    $respawnCase = @"
-    case MSG_SC_RESPAWN:
-        {
-            LTVector vRespawn = pMessage->ReadLTVector();
-            LTRotation rRespawn = pMessage->ReadLTRotation();
-
-            m_vPlayerStartPos = vRespawn;
-            m_rPlayerStartRot = rRespawn;
-
-            if(m_pPlayer && m_pPlayer->GetPlayerObject())
-            {
-                g_pLTClient->SetObjectPos(m_pPlayer->GetPlayerObject(), &vRespawn);
-                g_pLTClient->SetObjectRotation(m_pPlayer->GetPlayerObject(), &rRespawn);
-
-                LTVector vZero(0.0f, 0.0f, 0.0f);
-                g_pLTCPhysics->SetVelocity(m_pPlayer->GetPlayerObject(), &vZero);
-            }
-        }
-        break;
-"@
-
-    $text = $text.Replace($needle, $respawnCase + $needle)
-}
-
-if (-not $text.Contains("FT_UpdateLightGroups();")) {
-    $needle = "    // Update the world properties class"
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate client update tail."
-    }
-
-    $text = $text.Replace(
-        $needle,
-        "    FT_UpdateLightGroups();" + [Environment]::NewLine + [Environment]::NewLine + $needle)
-}
-
-if (-not $text.Contains("FT_ClearLightGroups();")) {
-    $needle = "    // Stop all the client FX"
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate OnExitWorld cleanup point."
-    }
-
-    $text = $text.Replace(
-        $needle,
-        "    FT_ClearLightGroups();" + [Environment]::NewLine + [Environment]::NewLine + $needle)
-}
-
-if (-not $text.Contains("FT_RenderHealthHud();")) {
-    $needle = "    // Render the gui."
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate HUD render insertion point."
-    }
-
-    $hud = "    if(IsInWorld())" + [Environment]::NewLine +
-        "    {" + [Environment]::NewLine +
-        "        FT_RenderHealthHud();" + [Environment]::NewLine +
-        "    }" + [Environment]::NewLine + [Environment]::NewLine
-
-    $text = $text.Replace($needle, $hud + $needle)
-}
-
-Write-Source $clientShell $text
 Write-Host "[OK] client health/respawn/lightgroup hooks"
 
 # ---------------------------------------------------------------------------
