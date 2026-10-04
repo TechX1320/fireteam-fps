@@ -2,11 +2,11 @@
 setlocal EnableExtensions
 cd /d "%~dp0"
 
-title Fireteam FPS - Local Build
+title Fireteam - Local Build
 
 echo.
 echo ========================================
-echo   Fireteam FPS - Local Build
+echo   Fireteam - Local Build
 echo ========================================
 echo.
 
