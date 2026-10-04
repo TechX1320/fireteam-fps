@@ -104,6 +104,9 @@ if (-not $text.Contains("#include <iltsoundmgr.h>")) {
     $text = $text.Replace($needle, $needle + [Environment]::NewLine + "#include <iltsoundmgr.h>")
 }
 
+# Keep runtime branding consistent with the current game name.
+$text = $text.Replace("Fireteam FPS:", "Fireteam:")
+
 # Migrate previously staged Bowie texture paths to the bare names embedded in the LTBs.
 $text = $text.Replace("ModelTextures\\Weapons\\Bowie\\PV_ML_DF_BOWIEKNIFE_BC.DTX", "PV_ML_DF_BowieKnife_BC.dtx")
 
