@@ -261,15 +261,17 @@ if (Test-Path -LiteralPath $hhTex) {
 
 
 $clientFxDll = Join-Path $assetRoot "ClientFx.fxd"
+$stagedClientFxDll = Join-Path $rezRoot "ClientFx.fxd"
+
+# Combat Arms' ClientFx.fxd is NOT ABI-safe to drop into the SealHunter/Jupiter
+# runtime. Keep it in assets-local as reverse-engineering/reference material only.
+if (Test-Path -LiteralPath $stagedClientFxDll) {
+    Remove-Item -LiteralPath $stagedClientFxDll -Force
+    Write-Host "[CLEAN] Removed previously staged Combat Arms ClientFx.fxd"
+}
+
 if (Test-Path -LiteralPath $clientFxDll) {
-    $destClientFxDll = Join-Path $rezRoot "ClientFx.fxd"
-    if ((-not (Test-Path -LiteralPath $destClientFxDll)) -or
-        ((Get-Item -LiteralPath $destClientFxDll).LastWriteTimeUtc -lt (Get-Item -LiteralPath $clientFxDll).LastWriteTimeUtc)) {
-        Copy-Item -LiteralPath $clientFxDll -Destination $destClientFxDll -Force
-        Write-Host "[OK] Combat Arms ClientFx.fxd refreshed"
-    } else {
-        Write-Host "[OK] Combat Arms ClientFx.fxd unchanged"
-    }
+    Write-Host "[INFO] ClientFx.fxd found - reference only; using Fireteam/Jupiter ClientFX code"
 }
 
 Write-Host "[OK] Local game asset staging complete."
