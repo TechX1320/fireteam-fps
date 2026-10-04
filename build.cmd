@@ -31,6 +31,11 @@ if not exist "%SEAL_DIR%\cshell\src\ltclientshell.cpp" (
 echo [OK] SealHunter source found.
 
 echo.
+echo [UPDATE] Checking expanded Jupiter engine source...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\refresh-engine-import.ps1" -RepoRoot "%CD%" -LocalRoot "%CD%\.local"
+if errorlevel 1 goto :fail
+
+echo.
 echo [UPDATE] Applying current source patches...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-legacy-source.ps1" -LocalRoot "%CD%\.local"
 if errorlevel 1 goto :fail
