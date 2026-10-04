@@ -45,7 +45,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-weapon-s
 if errorlevel 1 goto :fail
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-systems-source.ps1" -LocalRoot "%CD%\.local"
 if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-diagnostics-source.ps1" -LocalRoot "%CD%\.local"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-diagnostics-v2.ps1" -LocalRoot "%CD%\.local"
 if errorlevel 1 goto :fail
 
 echo.
