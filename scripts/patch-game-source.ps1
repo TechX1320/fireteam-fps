@@ -282,4 +282,12 @@ if (-not $text.Contains("m_pCamera->ToggleView();")) {
 }
 Write-Host "[OK] C toggles first/third person"
 
-Write-Host "[OK] Fireteam FPS gameplay bring-up patch set complete."
+
+# Project branding.
+$clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
+$text = Read-Source $clientShell
+$text = $text.Replace('"Seal Hunter Server"', '"Fireteam Server"')
+$text = $text.Replace('Fireteam FPS:', 'Fireteam:')
+Write-Source $clientShell $text
+
+Write-Host "[OK] Fireteam gameplay bring-up patch set complete."
