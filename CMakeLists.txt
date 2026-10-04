@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
-project(FireteamFPS LANGUAGES CXX)
+project(Fireteam LANGUAGES CXX)
 
 if(NOT WIN32 OR NOT MSVC)
-    message(FATAL_ERROR "Fireteam FPS currently builds with Visual Studio/MSVC on Windows only.")
+    message(FATAL_ERROR "Fireteam currently builds with Visual Studio/MSVC on Windows only.")
 endif()
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
