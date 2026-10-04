@@ -860,7 +860,7 @@ BEGIN_CLASS(Spawner)
     ADD_STRINGPROP(SpawnSound, "")
     ADD_REALPROP(SoundRadius, 500.0f)
     ADD_STRINGPROP(InitialCommand, "")
-END_CLASS_DEFAULT_FLAGS(Spawner, BaseClass, LTNULL, LTNULL, 0)
+END_CLASS_DEFAULT_FLAGS(Spawner, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
 
 Spawner::Spawner() :
     m_bSpawned(false)
