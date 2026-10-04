@@ -1,6 +1,6 @@
-# Fireteam FPS
+# Fireteam
 
-Standalone co-op FPS experiment built from the 2006 LithTech Jupiter Enterprise **SealHunter** networking sample, targeting a FireTeam-style zombie survival game.
+Standalone co-op FPS built from the 2006 LithTech Jupiter Enterprise **SealHunter** networking sample, targeting a FireTeam-style zombie survival game.
 
 ## Development workflow
 
