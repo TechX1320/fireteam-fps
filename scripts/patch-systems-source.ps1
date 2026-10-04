@@ -801,7 +801,7 @@ protected:
 
 private:
     void ReadProps(ObjectCreateStruct *pOCS);
-    void SpawnTestZombie();
+    void SpawnTestSeals();
 
     char m_sName[64];
     bool m_bSpawned;
@@ -812,7 +812,6 @@ private:
 
 $spawnerCpp = @'
 #include "FireteamSpawner.h"
-#include "FireteamZombie.h"
 
 #include "serverinterfaces.h"
 
@@ -848,31 +847,52 @@ void Spawner::ReadProps(ObjectCreateStruct *pOCS)
     pOCS->m_ObjectType = OT_NORMAL;
 }
 
-void Spawner::SpawnTestZombie()
+void Spawner::SpawnTestSeals()
 {
     if(m_bSpawned)
     {
         return;
     }
 
-    HCLASS hZombieClass = g_pLTServer->GetClass("FireteamZombie");
-    if(!hZombieClass)
+    HCLASS hSealClass = g_pLTServer->GetClass("Seal");
+    if(!hSealClass)
     {
-        g_pLTServer->CPrint("Fireteam: FireteamZombie class not available.");
+        g_pLTServer->CPrint("Fireteam: Seal class not available.");
         return;
     }
 
-    ObjectCreateStruct ocs;
-    ocs.Clear();
-    g_pLTServer->GetObjectPos(m_hObject, &ocs.m_Pos);
-    g_pLTServer->GetObjectRotation(m_hObject, &ocs.m_Rotation);
+    LTVector vBasePos;
+    LTRotation rBaseRot;
+    g_pLTServer->GetObjectPos(m_hObject, &vBasePos);
+    g_pLTServer->GetObjectRotation(m_hObject, &rBaseRot);
 
-    BaseClass *pZombie = (BaseClass*)g_pLTServer->CreateObject(hZombieClass, &ocs);
-    if(pZombie)
+    uint32 nSpawned = 0;
+
+    for(uint32 nSeal = 0; nSeal < 3; ++nSeal)
     {
-        m_bSpawned = true;
-        g_pLTServer->CPrint("Fireteam: spawned ONE placeholder zombie from %s.", m_sName);
+        ObjectCreateStruct ocs;
+        ocs.Clear();
+        ocs.m_ObjectType = OT_MODEL;
+        strcpy(ocs.m_Filename, "Models/seal.ltb");
+        strcpy(ocs.m_SkinName, "ModelTextures/seal.dtx");
+
+        ocs.m_Pos = vBasePos;
+        ocs.m_Pos.x += ((float)nSeal - 1.0f) * 45.0f;
+        ocs.m_Pos.z += ((nSeal & 1) ? 35.0f : -35.0f);
+        ocs.m_Pos.y += 100.0f;
+        ocs.m_Rotation = rBaseRot;
+
+        if(g_pLTServer->CreateObject(hSealClass, &ocs))
+        {
+            ++nSpawned;
+        }
     }
+
+    m_bSpawned = true;
+    g_pLTServer->CPrint(
+        "Fireteam: spawned %u SealHunter seals from %s.",
+        nSpawned,
+        m_sName);
 }
 
 uint32 Spawner::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
@@ -898,7 +918,7 @@ uint32 Spawner::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
             }
             else
             {
-                // Every other imported Cabin Fever spawner stays inert for now.
+                // Every other imported Cabin Fever spawner remains inert.
                 g_pLTServer->SetNextUpdate(m_hObject, 0.0f);
             }
         }
@@ -906,7 +926,7 @@ uint32 Spawner::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
 
         case MID_UPDATE:
         {
-            SpawnTestZombie();
+            SpawnTestSeals();
             g_pLTServer->SetNextUpdate(m_hObject, 0.0f);
         }
         break;
@@ -921,7 +941,7 @@ uint32 Spawner::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
 
 Write-Source (Join-Path $sealRoot "sshell\src\FireteamSpawner.h") $spawnerH
 Write-Source (Join-Path $sealRoot "sshell\src\FireteamSpawner.cpp") $spawnerCpp
-Write-Host "[OK] controlled one-zombie Spawner bring-up"
+Write-Host "[OK] controlled three-seal Spawner bring-up"
 
 # ---------------------------------------------------------------------------
 # Client shell: health, respawn and LightGroups.
@@ -1468,55 +1488,92 @@ if ($firstSend -ge 0) {
 }
 
 
-# Temporary bring-up invulnerability.
-# Replace ApplyDamage directly in the existing local source so no stale damage
-# path can put the player into the 2-second respawn loop while systems are tested.
+# Canonicalize player damage/hazard functions in the existing local source.
+# Earlier patch iterations changed the template but did not replace an already-
+# generated UpdateHazards(), leaving stale PoisonGas damage active. This is the
+# actual fix for the immediate two-second respawn loop.
 $text = Read-Source $playerCpp
-$damageMarker = "void CPlayerSrvr::ApplyDamage(uint8 nDamage)"
-$damageStart = $text.IndexOf($damageMarker)
-if ($damageStart -lt 0) {
-    throw "Could not locate CPlayerSrvr::ApplyDamage()."
-}
 
-$damageBraceStart = $text.IndexOf("{", $damageStart)
-if ($damageBraceStart -lt 0) {
-    throw "Could not locate ApplyDamage opening brace."
-}
-
-$damageDepth = 0
-$damageBraceEnd = -1
-for($i = $damageBraceStart; $i -lt $text.Length; $i++) {
-    if($text[$i] -eq '{') {
-        $damageDepth++
+function Replace-CppFunctionBody(
+    [string]$Source,
+    [string]$FunctionMarker,
+    [string]$NewBody
+) {
+    $funcStart = $Source.IndexOf($FunctionMarker)
+    if ($funcStart -lt 0) {
+        throw "Could not locate $FunctionMarker"
     }
-    elseif($text[$i] -eq '}') {
-        $damageDepth--
-        if($damageDepth -eq 0) {
-            $damageBraceEnd = $i
-            break
+
+    $braceStart = $Source.IndexOf("{", $funcStart)
+    if ($braceStart -lt 0) {
+        throw "Could not locate opening brace for $FunctionMarker"
+    }
+
+    $depth = 0
+    $braceEnd = -1
+    for($i = $braceStart; $i -lt $Source.Length; $i++) {
+        if($Source[$i] -eq '{') {
+            $depth++
+        }
+        elseif($Source[$i] -eq '}') {
+            $depth--
+            if($depth -eq 0) {
+                $braceEnd = $i
+                break
+            }
         }
     }
+
+    if ($braceEnd -lt 0) {
+        throw "Could not locate closing brace for $FunctionMarker"
+    }
+
+    return $Source.Substring(0, $braceStart) + $NewBody + $Source.Substring($braceEnd + 1)
 }
 
-if ($damageBraceEnd -lt 0) {
-    throw "Could not locate ApplyDamage closing brace."
-}
-
-$godBody = @"
+$damageBody = @"
 {
-    // Temporary Fireteam bring-up god mode.
-    // Keep the health/death architecture compiled, but suppress all incoming
-    // player damage until its sources are validated one at a time.
-    (void)nDamage;
-    m_bAlive = true;
-    m_fRespawnTimer = 0.0f;
-    m_nHealth = m_nMaxHealth;
+    if(!m_bAlive || nDamage == 0)
+    {
+        return;
+    }
+
+    m_nHealth = (nDamage >= m_nHealth) ? 0 : (uint8)(m_nHealth - nDamage);
+    g_pLTServer->CPrint(
+        "Fireteam: %s took %u damage (%u/%u HP).",
+        m_sName,
+        (uint32)nDamage,
+        (uint32)m_nHealth,
+        (uint32)m_nMaxHealth);
+    SendHealth();
+
+    if(m_nHealth == 0)
+    {
+        m_bAlive = false;
+        m_fRespawnTimer = 2.0f;
+
+        LTVector vZero(0.0f, 0.0f, 0.0f);
+        g_pLTSPhysics->SetVelocity(m_hObject, &vZero);
+
+        g_pLTServer->CPrint("Fireteam: %s died. Respawning in 2 seconds.", m_sName);
+    }
 }
 "@
 
-$text = $text.Substring(0, $damageBraceStart) + $godBody + $text.Substring($damageBraceEnd + 1)
+$hazardBody = @"
+{
+    // PoisonGas world objects stay registered for map compatibility, but
+    // environmental damage remains OFF until CA's actual safe/outside volume
+    // semantics are reproduced. This prevents indoor spawn from being poisoned.
+    m_fPoisonCarry = 0.0f;
+}
+"@
+
+$text = Replace-CppFunctionBody $text "void CPlayerSrvr::ApplyDamage(uint8 nDamage)" $damageBody
+$text = Replace-CppFunctionBody $text "void CPlayerSrvr::UpdateHazards()" $hazardBody
+
 Write-Source $playerCpp $text
-Write-Host "[OK] temporary player god mode - respawn loop disabled"
+Write-Host "[OK] real player damage restored; stale PoisonGas death loop removed"
 
 Write-Source $playerCpp $text
 Write-Host "[OK] health, poison, respawn and no-friendly-fire server logic"
