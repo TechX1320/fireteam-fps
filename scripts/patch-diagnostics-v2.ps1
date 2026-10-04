@@ -214,7 +214,7 @@ if (-not $text.Contains('FTTraceLog("CFXDB", "LoadFxDll entered")')) {
     $text = $text.Insert($brace + 1, [Environment]::NewLine + '    FTTraceLog("CFXDB", "LoadFxDll entered");')
 }
 
-if (-not $text.Contains('FTTraceLog("CFXDB", "LoadLibrary temp"))') {
+if ($text.IndexOf('FTTraceLog("CFXDB", "LoadLibrary temp') -lt 0) {
     $needle = "m_hDLLInst = ::LoadLibrary(sDLLTmpFile);"
     $replacement = 'FTTraceLog("CFXDB", "LoadLibrary temp: %s", sDLLTmpFile);' +
         [Environment]::NewLine + "        " + $needle +
