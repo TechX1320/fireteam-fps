@@ -44,7 +44,7 @@ if not exist "%LOCAL%\imports\engine\sdk\inc\iltclient.h" (
 )
 
 :patch
-echo [3/4] Applying current Fireteam FPS patches...
+echo [3/4] Applying current Fireteam patches...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-legacy-source.ps1" -LocalRoot "%LOCAL%"
 if errorlevel 1 goto :fail
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-game-source.ps1" -LocalRoot "%LOCAL%"
