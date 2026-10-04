@@ -31,6 +31,18 @@ if not exist "%SEAL_DIR%\cshell\src\ltclientshell.cpp" (
 echo [OK] SealHunter source found.
 
 echo.
+echo [UPDATE] Applying current source patches...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-legacy-source.ps1" -LocalRoot "%CD%\.local"
+if errorlevel 1 goto :fail
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-game-source.ps1" -LocalRoot "%CD%\.local"
+if errorlevel 1 goto :fail
+
+echo.
+echo [UPDATE] Refreshing local optional game assets...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-local-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%CD%\.local"
+if errorlevel 1 goto :fail
+
+echo.
 echo [CHECK] Looking for CMake...
 set "CMAKE_EXE="
 
@@ -82,9 +94,8 @@ for %%F in (cshell.dll object.lto cres.dll sres.dll) do (
 
 echo.
 echo [3/5] Staging runtime...
-if exist "%BUILT_DIR%" rmdir /s /q "%BUILT_DIR%"
-mkdir "%BUILT_DIR%" >nul
-mkdir "%BUILT_DIR%\rez" >nul
+if not exist "%BUILT_DIR%" mkdir "%BUILT_DIR%" >nul
+if not exist "%BUILT_DIR%\rez" mkdir "%BUILT_DIR%\rez" >nul
 
 for %%F in (Lithtech.exe Engine.REZ LTMsg.dll SndDrv.dll server.dll) do (
   if not exist "%RELEASE_DIR%\%%F" (
@@ -125,6 +136,7 @@ if errorlevel 1 goto :copyfail
 echo.
 echo [5/5] BUILD COMPLETE
 echo Output: %BUILT_DIR%
+echo Existing extra files in BUILT were preserved.
 echo Stock test: BUILT\run-normal.cmd
 echo Cabin Fever test: BUILT\run-cabinfever.cmd
 echo.
