@@ -1134,74 +1134,37 @@ if (-not $text.Contains("m_fRespawnTimer;")) {
 Write-Source $playerH $text
 
 $playerCpp = Join-Path $sealRoot "sshell\src\playersrvr.cpp"
+
+Insert-AfterLineContaining $playerCpp '#include "statsmanager.h"' @(
+    '#include "FireteamPoisonGas.h"'
+) '#include "FireteamPoisonGas.h"' "PoisonGas player include"
+
+Insert-BeforeLineContaining $playerCpp "// Set up animation trackers" @(
+    "    g_pLTServer->GetObjectPos(m_hObject, &m_vSpawnPos);",
+    "    g_pLTServer->GetObjectRotation(m_hObject, &m_rSpawnRot);",
+    ""
+) "GetObjectPos(m_hObject, &m_vSpawnPos);" "player spawn transform storage"
+
+$healthUpdate = @(
+    "            if(!m_bAlive)",
+    "            {",
+    "                m_fRespawnTimer -= 0.25f;",
+    "                if(m_fRespawnTimer <= 0.0f)",
+    "                {",
+    "                    Respawn();",
+    "                }",
+    "            }",
+    "            else",
+    "            {",
+    "                UpdateHazards();",
+    "            }",
+    ""
+)
+Insert-BeforeLineContaining $playerCpp "//Do we need to send score stats?" $healthUpdate "UpdateHazards();" "player health/death update"
+
 $text = Read-Source $playerCpp
 
-if (-not $text.Contains('#include "FireteamPoisonGas.h"')) {
-    $needle = '#include "statsmanager.h"'
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate player server include insertion point."
-    }
-    $text = $text.Replace($needle, $needle + [Environment]::NewLine + '#include "FireteamPoisonGas.h"')
-}
-
-# Store the original spawn transform.
-if (-not $text.Contains("m_vSpawnPos")) {
-    $needle = "    // Set up animation trackers"
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate InitialUpdate spawn storage point."
-    }
-
-    $spawnSave = "    g_pLTServer->GetObjectPos(m_hObject, &m_vSpawnPos);" + [Environment]::NewLine +
-        "    g_pLTServer->GetObjectRotation(m_hObject, &m_rSpawnRot);" + [Environment]::NewLine + [Environment]::NewLine
-
-    $text = $text.Replace($needle, $spawnSave + $needle)
-}
-
-# Update health/death/hazards from the existing 0.25 second player update.
-if (-not $text.Contains("UpdateHazards();")) {
-    $needle = "            //Do we need to send score stats?"
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate player MID_UPDATE body."
-    }
-
-    $healthUpdate = @"
-            if(!m_bAlive)
-            {
-                m_fRespawnTimer -= 0.25f;
-                if(m_fRespawnTimer <= 0.0f)
-                {
-                    Respawn();
-                }
-            }
-            else
-            {
-                UpdateHazards();
-            }
-
-"@
-    $text = $text.Replace($needle, $healthUpdate + $needle)
-}
-
-# Route generic damage messages through ApplyDamage.
-if (-not $text.Contains("ApplyDamage(nDamage);")) {
-    $needle = "        case OBJ_MID_PICKUP:"
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate player object-message switch."
-    }
-
-    $damageCase = @"
-        case OBJ_MID_DAMAGE:
-            {
-                uint8 nDamage = pMsg->Readuint8();
-                ApplyDamage(nDamage);
-            }
-            break;
-"@
-
-    $text = $text.Replace($needle, $damageCase + $needle)
-}
-
-# If an earlier partial patch directly modified health in ObjectMessageFn, remove it.
+# Migrate the earlier experimental direct-health handler if it exists.
 $oldPartialDamage = @"
         case OBJ_MID_DAMAGE:
             {
@@ -1225,61 +1188,78 @@ if ($text.Contains($oldPartialDamage)) {
             }
             break;
 "@)
+    Write-Source $playerCpp $text
 }
 
-# Knife can hit the placeholder zombie, but NEVER another player.
-if (-not $text.Contains('GetClass("FireteamZombie")')) {
-    $needle = '                HCLASS hClassSnowman = g_pLTServer->GetClass("Snowman");'
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate melee class list."
-    }
-    $text = $text.Replace(
-        $needle,
-        $needle + [Environment]::NewLine +
-        '                HCLASS hClassZombie = g_pLTServer->GetClass("FireteamZombie");')
+$text = Read-Source $playerCpp
+if (-not $text.Contains("case OBJ_MID_DAMAGE:")) {
+    $damageCase = @(
+        "        case OBJ_MID_DAMAGE:",
+        "            {",
+        "                uint8 nDamage = pMsg->Readuint8();",
+        "                ApplyDamage(nDamage);",
+        "            }",
+        "            break;"
+    )
+    Insert-BeforeLineContaining $playerCpp "case OBJ_MID_PICKUP:" $damageCase "case OBJ_MID_DAMAGE:" "player damage handler"
 }
 
-if (-not $text.Contains("Fireteam placeholder zombie melee damage.")) {
-    $needle = "                else" + [Environment]::NewLine +
-        "                {" + [Environment]::NewLine +
-        "                    PlaySound(3);" + [Environment]::NewLine +
-        "                }"
-
-    if (-not $text.Contains($needle)) {
-        throw "Could not locate generic melee impact block."
-    }
-
-    $replacement = @"
-                else if(hClassZombie && g_pLTServer->IsKindOf(hClassZombie, hTarget))
+# If an old PvP experiment exists, remove it before enforcing co-op-only damage.
+$text = Read-Source $playerCpp
+$oldPvp = @"
+                else if(iInfo.m_hObject != m_hObject && g_pLTServer->IsKindOf(hClassPlayer, hTarget))
                 {
-                    // Fireteam placeholder zombie melee damage.
+                    // Fireteam player melee damage.
                     ILTMessage_Write *pMsg;
                     g_pLTSCommon->CreateMessage(pMsg);
                     pMsg->IncRef();
                     pMsg->Writeuint32(OBJ_MID_DAMAGE);
-                    pMsg->Writeuint8(20);
+                    pMsg->Writeuint8(15);
                     g_pLTServer->SendToObject(pMsg->Read(), m_hObject, iInfo.m_hObject, 0);
                     pMsg->DecRef();
                 }
-                else
-                {
-                    // Friendly fire is intentionally disabled.
-                    // Unknown objects and other players receive no damage.
-                }
 "@
-
-    $text = $text.Replace($needle, $replacement)
+if ($text.Contains($oldPvp)) {
+    $text = $text.Replace($oldPvp, "")
 }
+$text = [regex]::Replace(
+    $text,
+    '(?m)^[ \t]*HCLASS hClassPlayer = g_pLTServer->GetClass\("CPlayerSrvr"\);[ \t]*\r?\n?',
+    '')
+Write-Source $playerCpp $text
 
-# Remove any earlier experimental PvP-damage block.
-$pvpStart = $text.IndexOf("                else if(iInfo.m_hObject != m_hObject && g_pLTServer->IsKindOf(hClassPlayer, hTarget))")
-if ($pvpStart -ge 0) {
-    $pvpEndMarker = "                else" + [Environment]::NewLine + "                {"
-    $pvpEnd = $text.IndexOf($pvpEndMarker, $pvpStart + 1)
-    if ($pvpEnd -gt $pvpStart) {
-        $text = $text.Remove($pvpStart, $pvpEnd - $pvpStart)
+Insert-AfterLineContaining $playerCpp 'HCLASS hClassSnowman = g_pLTServer->GetClass("Snowman");' @(
+    '                HCLASS hClassZombie = g_pLTServer->GetClass("FireteamZombie");'
+) 'GetClass("FireteamZombie")' "zombie melee target class"
+
+$text = Read-Source $playerCpp
+if (-not $text.Contains("Fireteam placeholder zombie melee damage.")) {
+    if (-not $text.Contains("PlaySound(3);")) {
+        throw "Could not locate the generic SealHunter melee fallback."
     }
+
+    $zombieDamage = 'if(hClassZombie && g_pLTServer->IsKindOf(hClassZombie, hTarget))' + [Environment]::NewLine +
+        '                    {' + [Environment]::NewLine +
+        '                        // Fireteam placeholder zombie melee damage.' + [Environment]::NewLine +
+        '                        ILTMessage_Write *pMsg;' + [Environment]::NewLine +
+        '                        g_pLTSCommon->CreateMessage(pMsg);' + [Environment]::NewLine +
+        '                        pMsg->IncRef();' + [Environment]::NewLine +
+        '                        pMsg->Writeuint32(OBJ_MID_DAMAGE);' + [Environment]::NewLine +
+        '                        pMsg->Writeuint8(20);' + [Environment]::NewLine +
+        '                        g_pLTServer->SendToObject(pMsg->Read(), m_hObject, iInfo.m_hObject, 0);' + [Environment]::NewLine +
+        '                        pMsg->DecRef();' + [Environment]::NewLine +
+        '                    }' + [Environment]::NewLine +
+        '                    else' + [Environment]::NewLine +
+        '                    {' + [Environment]::NewLine +
+        '                        // Co-op mode: friendly fire is permanently disabled.' + [Environment]::NewLine +
+        '                    }'
+
+    $text = $text.Replace("PlaySound(3);", $zombieDamage)
+    Write-Source $playerCpp $text
 }
+Write-Host "[OK] Bowie damages zombies only; friendly fire disabled"
+
+$text = Read-Source $playerCpp
 
 if (-not $text.Contains("void CPlayerSrvr::ApplyDamage(uint8 nDamage)")) {
     $text += @"
