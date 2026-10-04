@@ -413,6 +413,77 @@ void CPlayerClnt::UpdateWeaponView(bool bFirstPerson)
     $text += $append
 }
 
+
+# Fireteam canonical Bowie CreateViewWeapon body.
+# Combat Arms uses a separate hands skin plus weapon skin, and weapon models
+# expect an explicit render style from the resource database.
+$funcMarker = "void CPlayerClnt::CreateViewWeapon()"
+$funcStart = $text.IndexOf($funcMarker)
+if ($funcStart -lt 0) {
+    throw "Could not locate CPlayerClnt::CreateViewWeapon()."
+}
+
+$braceStart = $text.IndexOf("{", $funcStart)
+$depth = 0
+$braceEnd = -1
+for($i = $braceStart; $i -lt $text.Length; $i++) {
+    if($text[$i] -eq '{') { $depth++ }
+    elseif($text[$i] -eq '}') {
+        $depth--
+        if($depth -eq 0) {
+            $braceEnd = $i
+            break
+        }
+    }
+}
+if ($braceEnd -lt 0) {
+    throw "Could not locate CreateViewWeapon closing brace."
+}
+
+$canonicalBody = @"
+{
+    if(m_hViewWeaponObject)
+    {
+        g_pLTClient->RemoveObject(m_hViewWeaponObject);
+        m_hViewWeaponObject = NULL;
+    }
+
+    ObjectCreateStruct ocs;
+    ocs.Clear();
+    ocs.m_ObjectType = OT_MODEL;
+    ocs.m_Flags = FLAG_VISIBLE | FLAG_REALLYCLOSE;
+    ocs.m_Flags2 = FLAG2_DYNAMICDIRLIGHT;
+    ocs.m_Pos.Init(0.0f, 0.0f, 0.0f);
+
+    strcpy(ocs.m_Filenames[0], "Weapons\\melee_m_pv\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB");
+    strcpy(ocs.m_Filenames[1], "Weapons\\melee_m_pv\\ANI_G_BOWIEKNIFE_CH.LTB");
+
+    // CA/NOLF-style player-view weapons use a character hands skin plus
+    // weapon skins. Keep slot 0 for hands and fill remaining slots with
+    // the Bowie skin until Fireteam has attribute-driven texture bindings.
+    strcpy(ocs.m_SkinNames[0], "Characters\\male\\hands\\CM_HND_NM_SPECIAL_BC.DTX");
+    for(uint32 nSkin = 1; nSkin < MAX_MODEL_TEXTURES; ++nSkin)
+    {
+        strcpy(ocs.m_SkinNames[nSkin], "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX");
+    }
+
+    strcpy(ocs.m_RenderStyleNames[0], "RenderStyles\\DEFAULT.LTB");
+
+    m_hViewWeaponObject = g_pLTClient->CreateObject(&ocs);
+    if(!m_hViewWeaponObject)
+    {
+        g_pLTClient->CPrint("Fireteam: Bowie PV model failed to load.");
+        return;
+    }
+
+    PlayViewWeaponAnimation("select", false);
+    PlayViewWeaponSound("SELECT.WAV");
+    m_bViewWeaponAction = true;
+}
+"@
+
+$text = $text.Substring(0, $braceStart) + $canonicalBody + $text.Substring($braceEnd + 1)
+
 Write-Source $playerCpp $text
 Write-Host "[OK] Bowie player-view implementation"
 
