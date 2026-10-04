@@ -1467,6 +1467,57 @@ if ($firstSend -ge 0) {
     }
 }
 
+
+# Temporary bring-up invulnerability.
+# Replace ApplyDamage directly in the existing local source so no stale damage
+# path can put the player into the 2-second respawn loop while systems are tested.
+$text = Read-Source $playerCpp
+$damageMarker = "void CPlayerSrvr::ApplyDamage(uint8 nDamage)"
+$damageStart = $text.IndexOf($damageMarker)
+if ($damageStart -lt 0) {
+    throw "Could not locate CPlayerSrvr::ApplyDamage()."
+}
+
+$damageBraceStart = $text.IndexOf("{", $damageStart)
+if ($damageBraceStart -lt 0) {
+    throw "Could not locate ApplyDamage opening brace."
+}
+
+$damageDepth = 0
+$damageBraceEnd = -1
+for($i = $damageBraceStart; $i -lt $text.Length; $i++) {
+    if($text[$i] -eq '{') {
+        $damageDepth++
+    }
+    elseif($text[$i] -eq '}') {
+        $damageDepth--
+        if($damageDepth -eq 0) {
+            $damageBraceEnd = $i
+            break
+        }
+    }
+}
+
+if ($damageBraceEnd -lt 0) {
+    throw "Could not locate ApplyDamage closing brace."
+}
+
+$godBody = @"
+{
+    // Temporary Fireteam bring-up god mode.
+    // Keep the health/death architecture compiled, but suppress all incoming
+    // player damage until its sources are validated one at a time.
+    (void)nDamage;
+    m_bAlive = true;
+    m_fRespawnTimer = 0.0f;
+    m_nHealth = m_nMaxHealth;
+}
+"@
+
+$text = $text.Substring(0, $damageBraceStart) + $godBody + $text.Substring($damageBraceEnd + 1)
+Write-Source $playerCpp $text
+Write-Host "[OK] temporary player god mode - respawn loop disabled"
+
 Write-Source $playerCpp $text
 Write-Host "[OK] health, poison, respawn and no-friendly-fire server logic"
 
