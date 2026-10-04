@@ -133,23 +133,24 @@ Replace-Required $serverShell $oldStart $newStart "GameStartPoint00 compatibilit
 # original sample; it does not start a game.  +autostart 1 now starts NORMAL
 # mode after the client shell and GUI are fully initialized.
 $clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
-$oldAutoStart = @"
-    m_pChatGui->Init();
-
-    return result;
-"@
-$newAutoStart = @"
-    m_pChatGui->Init();
-
-    HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");
-    if(hAutoStart && g_pLTClient->GetVarValueFloat(hAutoStart) != 0.0f)
-    {
-        g_pLTClient->CPrint("Fireteam FPS: auto-starting selected world...");
-        result = StartNormalGame();
+$text = Read-Source $clientShell
+if (-not $text.Contains("Fireteam FPS: auto-starting selected world...")) {
+    $needle = "    m_pChatGui->Init();" 
+    if (-not $text.Contains($needle)) {
+        throw "Could not locate client-shell auto-start insertion point."
     }
 
-    return result;
-"@
-Replace-Required $clientShell $oldAutoStart $newAutoStart "command-line normal-game auto-start"
+    $insert = $needle +
+        [Environment]::NewLine + [Environment]::NewLine +
+        '    HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");' + [Environment]::NewLine +
+        '    if(hAutoStart && g_pLTClient->GetVarValueFloat(hAutoStart) != 0.0f)' + [Environment]::NewLine +
+        '    {' + [Environment]::NewLine +
+        '        g_pLTClient->CPrint("Fireteam FPS: auto-starting selected world...");' + [Environment]::NewLine +
+        '        result = StartNormalGame();' + [Environment]::NewLine +
+        '    }'
 
+    $text = $text.Replace($needle, $insert)
+    Write-Source $clientShell $text
+}
+Write-Host "[OK] command-line normal-game auto-start"
 Write-Host "[OK] Fireteam FPS gameplay bring-up patch set complete."
