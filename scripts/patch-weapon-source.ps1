@@ -70,13 +70,15 @@ function Insert-AfterLineContaining([string]$Path, [string]$Needle, [string[]]$N
 $playerH = Join-Path $sealRoot "cshell\src\playerclnt.h"
 
 Insert-AfterLineContaining $playerH "UpdateRotation(float yaw, float pitch, float roll);" @(
-    "    void                UpdateWeaponView(bool bFirstPerson);"
+    "    void                UpdateWeaponView(bool bFirstPerson);",
+    "    bool                AltAttack();"
 ) "UpdateWeaponView(bool bFirstPerson)" "Bowie public update declaration"
 
 Insert-AfterLineContaining $playerH "PlayAttackAnimation(const char* sAnimName, uint8 nTracker);" @(
     "    void                CreateViewWeapon();",
     "    void                PlayViewWeaponAnimation(const char* sAnimName, bool bLooping);",
-    "    void                UpdateViewWeaponAnimation();"
+    "    void                UpdateViewWeaponAnimation();",
+    "    void                PlayViewWeaponSound(const char* sFilename);"
 ) "CreateViewWeapon();" "Bowie private method declarations"
 
 Insert-AfterLineContaining $playerH "m_hClubObject;" @(
@@ -87,6 +89,12 @@ Insert-AfterLineContaining $playerH "m_hClubObject;" @(
 
 $playerCpp = Join-Path $sealRoot "cshell\src\playerclnt.cpp"
 $text = Read-Source $playerCpp
+
+if (-not $text.Contains("#include <iltsoundmgr.h>")) {
+    $needle = "#include <iltmodel.h>"
+    if (-not $text.Contains($needle)) { throw "Could not locate player client includes for sound support." }
+    $text = $text.Replace($needle, $needle + [Environment]::NewLine + "#include <iltsoundmgr.h>")
+}
 
 if (-not $text.Contains("m_hViewWeaponObject(NULL)")) {
     $needle = "m_hClubObject(NULL),"
@@ -140,6 +148,47 @@ if (-not $text.Contains("m_nViewAttackVariant++")) {
     $text = $text.Replace($needle, $replacement)
 }
 
+
+# Left mouse is primary fire_0. Right mouse gets a dedicated fire_1 path.
+$text = $text.Replace(
+    '    PlayViewWeaponAnimation((m_nViewAttackVariant++ & 1) ? "fire_1" : "fire_0", false);',
+    '    PlayViewWeaponAnimation("fire_0", false);' + [Environment]::NewLine + '    PlayViewWeaponSound("FIRE.WAV");'
+)
+
+if (-not $text.Contains("bool CPlayerClnt::AltAttack()")) {
+    $attackMarker = "//----------------------------------------------------------------------------" + [Environment]::NewLine +
+        "// void CPlayerClnt::UpdateAttacking()"
+    $idx = $text.IndexOf($attackMarker)
+    if ($idx -lt 0) { throw "Could not locate UpdateAttacking marker for AltAttack." }
+
+    $altAttack = @"
+
+//----------------------------------------------------------------------------
+// bool CPlayerClnt::AltAttack()
+//
+//----------------------------------------------------------------------------
+bool CPlayerClnt::AltAttack()
+{
+    if(m_bAttacking)
+    {
+        return false;
+    }
+
+    PlayAttackAnimation("UMFi", m_idUpperBodyTracker);
+    m_bAttacking = true;
+
+    PlayViewWeaponAnimation("fire_1", false);
+    PlayViewWeaponSound("FIRE.WAV");
+    m_bViewWeaponAction = true;
+
+    return true;
+}
+
+
+"@
+    $text = $text.Insert($idx, $altAttack)
+}
+
 if (-not $text.Contains("void CPlayerClnt::CreateViewWeapon()")) {
     $append = @"
 
@@ -163,7 +212,7 @@ void CPlayerClnt::CreateViewWeapon()
 
     strcpy(ocs.m_Filenames[0], "Models\\Weapons\\Bowie\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB");
     strcpy(ocs.m_Filenames[1], "Models\\Weapons\\Bowie\\ANI_G_BOWIEKNIFE_CH.LTB");
-    strcpy(ocs.m_SkinNames[0], "ModelTextures\\Weapons\\Bowie\\PV_ML_DF_BOWIEKNIFE_BC.DTX");
+    strcpy(ocs.m_SkinNames[0], "PV_ML_DF_BowieKnife_BC.dtx");
 
     m_hViewWeaponObject = g_pLTClient->CreateObject(&ocs);
     if(!m_hViewWeaponObject)
@@ -173,6 +222,7 @@ void CPlayerClnt::CreateViewWeapon()
     }
 
     PlayViewWeaponAnimation("select", false);
+    PlayViewWeaponSound("SELECT.WAV");
     m_bViewWeaponAction = true;
 }
 
@@ -192,6 +242,22 @@ void CPlayerClnt::PlayViewWeaponAnimation(const char* sAnimName, bool bLooping)
 
     g_pLTCModel->SetCurAnim(m_hViewWeaponObject, MAIN_TRACKER, hAnim);
     g_pLTCModel->SetLooping(m_hViewWeaponObject, MAIN_TRACKER, bLooping ? LTTRUE : LTFALSE);
+}
+
+void CPlayerClnt::PlayViewWeaponSound(const char* sFilename)
+{
+    if(!sFilename || !sFilename[0])
+    {
+        return;
+    }
+
+    PlaySoundInfo psi;
+    PLAYSOUNDINFO_INIT(psi);
+    psi.m_dwFlags = PLAYSOUND_LOCAL;
+    sprintf(psi.m_szSoundName, "Sounds\\Weapons\\Bowie\\%s", sFilename);
+
+    HLTSOUND hSound = NULL;
+    g_pLTCSoundMgr->PlaySound(&psi, hSound);
 }
 
 void CPlayerClnt::UpdateViewWeaponAnimation()
@@ -259,10 +325,40 @@ Write-Host "[OK] Bowie first/third-person visibility hook"
 
 $serverPlayer = Join-Path $sealRoot "sshell\src\playersrvr.cpp"
 Replace-Required $serverPlayer '"Models/Mallet.ltb"' '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"' "Mallet replaced with Bowie world model"
-Replace-Required $serverPlayer '"ModelTextures/Mallet.dtx"' '"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"' "Mallet skin replaced with Bowie"
+Replace-Required $serverPlayer '"ModelTextures/Mallet.dtx"' '"HH_ML_DF_BowieKnife_BC.dtx"' "Mallet skin replaced with Bowie"
 Replace-Required $serverPlayer '"Models/TelePole.ltb"' '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"' "TelePole replaced with Bowie world model"
 Replace-Required $serverPlayer '"ModelTextures/TelePole.dtx"' '"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"' "TelePole skin replaced with Bowie"
 Replace-Required $serverPlayer '"Models/billyclub.ltb"' '"Models/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_CH.LTB"' "Billyclub replaced with Bowie world model"
 Replace-Required $serverPlayer '"ModelTextures/club.dtx"' '"ModelTextures/Weapons/Bowie/HH_ML_DF_BOWIEKNIFE_BC.DTX"' "Billyclub skin replaced with Bowie"
+
+
+$commandIds = Join-Path $sealRoot "shared\src\commandids.h"
+$text = Read-Source $commandIds
+if (-not $text.Contains("COMMAND_ALT_ATTACK")) {
+    $needle = "    COMMAND_CHAT                    = 19,"
+    if (-not $text.Contains($needle)) { throw "Could not locate command id insertion point." }
+    $text = $text.Replace($needle, $needle + [Environment]::NewLine + "    COMMAND_ALT_ATTACK              = 20,")
+    Write-Source $commandIds $text
+}
+Write-Host "[OK] right-click command id"
+
+$clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
+$text = Read-Source $clientShell
+if (-not $text.Contains("COMMAND_ALT_ATTACK")) {
+    $needle = "    if (g_pLTClient->IsCommandOn(COMMAND_SHOOT))" + [Environment]::NewLine +
+        "    {" + [Environment]::NewLine +
+        "        m_pPlayer->Attack();" + [Environment]::NewLine +
+        "    }"
+    if (-not $text.Contains($needle)) { throw "Could not locate primary attack input block." }
+    $replacement = $needle + [Environment]::NewLine + [Environment]::NewLine +
+        "    // Combat Arms knife secondary attack." + [Environment]::NewLine +
+        "    if (g_pLTClient->IsCommandOn(COMMAND_ALT_ATTACK))" + [Environment]::NewLine +
+        "    {" + [Environment]::NewLine +
+        "        m_pPlayer->AltAttack();" + [Environment]::NewLine +
+        "    }"
+    $text = $text.Replace($needle, $replacement)
+    Write-Source $clientShell $text
+}
+Write-Host "[OK] right-click fire_1 input"
 
 Write-Host "[OK] Combat Arms Bowie knife patch set complete."
