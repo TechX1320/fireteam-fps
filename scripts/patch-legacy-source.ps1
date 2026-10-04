@@ -86,10 +86,18 @@ if (Test-Path -LiteralPath $clientFxStdafx) {
 $fxDbPath = Join-Path $shared "ClientFXDB.cpp"
 $text = Read-LegacyFile $fxDbPath
 
-$oldFindFx = 'pKey->m_pFxRef = FindFX( strtok(sTmp, ";") );'
-if ($text.Contains($oldFindFx) -and -not $text.Contains("Combat Arms LTBSystemFX compatibility")) {
+if (-not $text.Contains("Combat Arms LTBSystemFX compatibility")) {
+    # Match the assignment structurally instead of depending on the exact
+    # whitespace used by a particular Jupiter source snapshot.
+    $findFxPattern = '(?m)^[ \t]*pKey->m_pFxRef\s*=\s*FindFX\s*\(\s*strtok\s*\(\s*sTmp\s*,\s*";"\s*\)\s*\)\s*;'
+    $findFxMatch = [regex]::Match($text, $findFxPattern)
+
+    if (-not $findFxMatch.Success) {
+        throw "Could not locate ClientFX FindFX assignment inside ReadFXKey()."
+    }
+
     $newFindFx = @'
-char *pFxTypeName = strtok(sTmp, ";");
+	char *pFxTypeName = strtok(sTmp, ";");
 	pKey->m_pFxRef = FindFX(pFxTypeName);
 
 	// Combat Arms LTBSystemFX compatibility.
@@ -108,13 +116,15 @@ char *pFxTypeName = strtok(sTmp, ";");
 		return false;
 	}
 '@
-    $text = $text.Replace($oldFindFx, $newFindFx)
+
+    $text = $text.Substring(0, $findFxMatch.Index) +
+        $newFindFx +
+        $text.Substring($findFxMatch.Index + $findFxMatch.Length)
+
     Write-LegacyFile $fxDbPath $text
     Write-Host "[OK] Combat Arms LTBSystemFX compatibility"
-} elseif ($text.Contains("Combat Arms LTBSystemFX compatibility")) {
-    Write-Host "[OK] Combat Arms LTBSystemFX compatibility already patched"
 } else {
-    throw "Could not locate ClientFX FindFX assignment for CA compatibility patch."
+    Write-Host "[OK] Combat Arms LTBSystemFX compatibility already patched"
 }
 
 # CA LTBSystemFX uses singular Skin/RenderStyle property names while Jupiter's
