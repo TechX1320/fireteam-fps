@@ -22,7 +22,13 @@ The mission files are not plain Bute text. They are encrypted or obfuscated, but
 | `NEMEXISHQ_CP.GMS` | 13921 | 1 | `5` | 363 |
 | `SANDHOG_CP.GMS` | 11411 | 3 | `6\r\n` | 330 |
 
-The repeated-block signal is strongest when the files are split at offset zero into 8-byte blocks. Archive-wide validation strengthens this substantially: **266 of the 305 GMS files are not divisible by 8, and all 266 of those files have a completely printable ASCII/control-character tail**. This is consistent with a transform that processes complete 8-byte blocks from offset zero and leaves the final 1-7 bytes untouched. Together with the repeated ciphertext blocks, this strongly supports an 8-byte ECB-style `CryBytes` transform over otherwise normal text rather than CBC encryption over the entire file.
+The repeated-block signal is strongest when the files are split at offset zero into 8-byte blocks. Archive-wide validation strengthens this substantially: **266 of the 305 GMS files are not divisible by 8, and all 266 of those files have a completely printable ASCII/control-character tail**. The 16-byte control behaves very differently: **285 files have a 1-15 byte remainder, but only 121 of those 285 remainders are printable text**. This strongly favors an 8-byte transform rather than Twofish's 16-byte block size.
+
+The Fireteam files show the same pattern in repeated ciphertext. Cabin Fever has 2,537 repeated 8-byte occurrences but only 732 repeated 16-byte occurrences; Black Lung drops from 1,344 to 282. The surviving 16-byte repeats are consistent with repeated adjacent pairs of the underlying 8-byte blocks rather than a native 16-byte cipher block.
+
+The cross-file prefix structure is also highly regular. **301 of the 305 GMS files share the same first 8-byte ciphertext block** (`32cf6fd1ecc6ea46`), and **266 share the same first 16 ciphertext bytes** (`32cf6fd1ecc6ea46ddb165cc0845b4e9`). This strongly suggests a common key plus a standardized plaintext header across most of the archive. `NEMEXISHQ_CP.GMS` belongs to a small alternate prefix family rather than appearing randomly unrelated.
+
+Together, the readable 1-7 byte tails, 8-byte repetition, and common ciphertext prefixes strongly support an 8-byte ECB-style `CryBytes` transform over otherwise normal text rather than CBC encryption over the entire file.
 
 The Combat Arms reference `CShell.dll` and `Lithtech.exe` both contain a complete Blowfish implementation (including the standard Blowfish P-array constants). This makes **Blowfish ECB the leading GMS hypothesis**. The exact GMS key or key derivation is not yet recovered.
 
