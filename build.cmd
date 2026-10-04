@@ -99,7 +99,7 @@ if errorlevel 1 (
   goto :fail
 )
 
-for %%F in (cshell.dll object.lto cres.dll sres.dll) do (
+for %%F in (cshell.dll object.lto cres.dll sres.dll ClientFx.fxd) do (
   if not exist "%BIN_DIR%\%%F" (
     echo [ERROR] Build completed but %%F is missing.
     goto :fail
@@ -150,6 +150,8 @@ if errorlevel 1 goto :copyfail
 copy /y "%BIN_DIR%\cres.dll" "%BUILT_DIR%\rez\cres.dll" >nul
 if errorlevel 1 goto :copyfail
 copy /y "%BIN_DIR%\sres.dll" "%BUILT_DIR%\rez\sres.dll" >nul
+if errorlevel 1 goto :copyfail
+copy /y "%BIN_DIR%\ClientFx.fxd" "%BUILT_DIR%\rez\ClientFx.fxd" >nul
 if errorlevel 1 goto :copyfail
 
 echo.
