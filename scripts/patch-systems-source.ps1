@@ -619,6 +619,7 @@ $zombieCpp = @'
 #include "serverinterfaces.h"
 #include "msgids.h"
 
+#include <iltcommon.h>
 #include <iltmodel.h>
 #include <iltphysics.h>
 #include <ltobjectcreate.h>
