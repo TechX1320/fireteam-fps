@@ -10,9 +10,11 @@ if not exist "rez\Worlds\CABINFEVER.DAT" (
 )
 
 if exist "cabinfever-error.log" del /q "cabinfever-error.log"
+if exist "fireteam-trace.log" del /q "fireteam-trace.log"
+for %%D in (term-*.dmp) do del /q "%%D" 2>nul
 
 echo Starting Cabin Fever directly...
-echo If LithTech crashes, send cabinfever-error.log with the result.
+echo If LithTech crashes, send fireteam-trace.log and any term-*.dmp file.
 echo.
 
 Lithtech.exe -rez Engine.REZ -rez rez -config autoexec.cfg +runworld "Worlds/CABINFEVER" +autostart 1 +errorlog 1 +alwaysflushlog 1 +errorlogfile "cabinfever-error.log" +consoleenable 1 +numconsolelines 12
