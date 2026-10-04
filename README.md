@@ -53,3 +53,11 @@ Then:
 - `BUILT\run-cabinfever.cmd` - Cabin Fever
 
 If Cabin Fever crashes, send `BUILT\cabinfever-error.log`.
+
+## Local folder name
+
+The checkout folder can be renamed to `BUILD-GAME` (or anything else). `build.cmd` detects an old CMake absolute path and regenerates only `out\build`; it preserves `.local\` and `BUILT\`.
+
+## Camera
+
+Gameplay now defaults to first person. Press `C` while in-game to toggle back to SealHunter-style third person for testing.
