@@ -927,6 +927,11 @@ uint32 Spawner::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
             {
                 g_pLTServer->SetNextUpdate(m_hObject, 1.0f);
             }
+            else
+            {
+                // Every other imported Cabin Fever spawner stays inert for now.
+                g_pLTServer->SetNextUpdate(m_hObject, 0.0f);
+            }
         }
         break;
 
