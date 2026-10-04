@@ -32,7 +32,8 @@ add_compile_definitions(WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_D
 add_compile_options(/MP /W3)
 
 set(SDK_DIR "${ENGINE_ROOT}/sdk/inc")
-set(CLIENTFX_SHARED_DIR "${ENGINE_ROOT}/clientfx/Shared")
+set(CLIENTFX_ROOT "${ENGINE_ROOT}/clientfx")
+set(CLIENTFX_SHARED_DIR "${CLIENTFX_ROOT}/Shared")
 set(GAME_SHARED_DIR "${SEAL_ROOT}/shared/src")
 
 file(GLOB CSHELL_GAME_SOURCES CONFIGURE_DEPENDS "${SEAL_ROOT}/cshell/src/*.cpp" "${SEAL_ROOT}/cshell/src/*.h")
@@ -48,7 +49,7 @@ set(CSHELL_ENGINE_SOURCES
 )
 add_library(cshell SHARED ${CSHELL_GAME_SOURCES} ${CSHELL_ENGINE_SOURCES})
 target_compile_definitions(cshell PRIVATE _CLIENTBUILD)
-target_include_directories(cshell PRIVATE "${SEAL_ROOT}/cshell/src" "${GAME_SHARED_DIR}" "${SDK_DIR}" "${CLIENTFX_SHARED_DIR}")
+target_include_directories(cshell PRIVATE "${SEAL_ROOT}/cshell/src" "${GAME_SHARED_DIR}" "${SDK_DIR}" "${CLIENTFX_ROOT}" "${CLIENTFX_SHARED_DIR}")
 target_link_libraries(cshell PRIVATE odbc32 odbccp32)
 set_target_properties(cshell PROPERTIES OUTPUT_NAME "cshell" PREFIX "")
 
@@ -76,7 +77,6 @@ set_target_properties(sres PROPERTIES OUTPUT_NAME "sres" PREFIX "")
 # Build Fireteam's ClientFX plugin from the original Jupiter 2006 source.
 # This keeps the runtime ABI matched to our SDK/source instead of dropping in
 # Combat Arms' prebuilt ClientFx.fxd.
-set(CLIENTFX_ROOT "${ENGINE_ROOT}/clientfx")
 set(CLIENTFX_PLUGIN_SOURCES
     "${CLIENTFX_ROOT}/BaseFx.cpp"
     "${CLIENTFX_ROOT}/bouncychunkfx.cpp"
