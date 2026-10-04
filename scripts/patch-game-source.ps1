@@ -128,40 +128,44 @@ Replace-Required $serverShell $oldStart $newStart "GameStartPoint00 compatibilit
 
 # +runworld chooses the world but the original sample still waits at its menu.
 # +autostart 1 directly starts normal/local mode after initialization.
+# Rebuild this block canonically every run so older duplicate patch attempts are cleaned up.
 $clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
 $text = Read-Source $clientShell
 
-# Migrate old branding first so repeated builds remain idempotent.
+# Migrate old branding first.
 $text = $text.Replace("Fireteam FPS:", "Fireteam:")
 
-if (-not $text.Contains("Fireteam: auto-starting selected world...")) {
-    $needle = "m_pChatGui->Init();"
-    $idx = $text.IndexOf($needle)
-    if ($idx -lt 0) {
-        throw "Could not locate client-shell auto-start insertion point."
-    }
+# Remove every previously injected auto-start block. Some older local workspaces
+# accumulated two copies during patch evolution, which causes hAutoStart redefinition.
+$autoStartPattern = '(?ms)^[ \t]*HCONSOLEVAR[ \t]+hAutoStart[ \t]*=[ \t]*g_pLTClient->GetConsoleVar\("autostart"\);[ \t]*\r?\n[ \t]*if\(hAutoStart[ \t]*&&[ \t]*g_pLTClient->GetVarValueFloat\(hAutoStart\)[ \t]*!=[ \t]*0\.0f\)[ \t]*\r?\n[ \t]*\{[ \t]*\r?\n[ \t]*g_pLTClient->CPrint\("Fireteam(?::| FPS:) auto-starting selected world\.\.\."\);[ \t]*\r?\n[ \t]*result[ \t]*=[ \t]*StartNormalGame\(\);[ \t]*\r?\n[ \t]*\}[ \t]*\r?\n?'
+$text = [regex]::Replace($text, $autoStartPattern, "")
 
-    $lineStart = $text.LastIndexOf([Environment]::NewLine, $idx)
-    if ($lineStart -lt 0) { $lineStart = 0 } else { $lineStart += [Environment]::NewLine.Length }
-    $lineEnd = $text.IndexOf([Environment]::NewLine, $idx)
-    if ($lineEnd -lt 0) { $lineEnd = $text.Length }
-
-    $originalLine = $text.Substring($lineStart, $lineEnd - $lineStart)
-    $indent = $originalLine.Substring(0, $originalLine.IndexOf("m_pChatGui->Init();"))
-
-    $insert = $originalLine +
-        [Environment]::NewLine + [Environment]::NewLine +
-        $indent + 'HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");' + [Environment]::NewLine +
-        $indent + 'if(hAutoStart && g_pLTClient->GetVarValueFloat(hAutoStart) != 0.0f)' + [Environment]::NewLine +
-        $indent + '{' + [Environment]::NewLine +
-        $indent + '    g_pLTClient->CPrint("Fireteam: auto-starting selected world...");' + [Environment]::NewLine +
-        $indent + '    result = StartNormalGame();' + [Environment]::NewLine +
-        $indent + '}'
-
-    $text = $text.Remove($lineStart, $lineEnd - $lineStart).Insert($lineStart, $insert)
+$needle = "m_pChatGui->Init();"
+$idx = $text.IndexOf($needle)
+if ($idx -lt 0) {
+    throw "Could not locate client-shell auto-start insertion point."
 }
+
+$lineStart = $text.LastIndexOf([Environment]::NewLine, $idx)
+if ($lineStart -lt 0) { $lineStart = 0 } else { $lineStart += [Environment]::NewLine.Length }
+$lineEnd = $text.IndexOf([Environment]::NewLine, $idx)
+if ($lineEnd -lt 0) { $lineEnd = $text.Length }
+
+$originalLine = $text.Substring($lineStart, $lineEnd - $lineStart)
+$indent = $originalLine.Substring(0, $originalLine.IndexOf("m_pChatGui->Init();"))
+
+$insert = $originalLine +
+    [Environment]::NewLine + [Environment]::NewLine +
+    $indent + 'HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");' + [Environment]::NewLine +
+    $indent + 'if(hAutoStart && g_pLTClient->GetVarValueFloat(hAutoStart) != 0.0f)' + [Environment]::NewLine +
+    $indent + '{' + [Environment]::NewLine +
+    $indent + '    g_pLTClient->CPrint("Fireteam: auto-starting selected world...");' + [Environment]::NewLine +
+    $indent + '    result = StartNormalGame();' + [Environment]::NewLine +
+    $indent + '}'
+
+$text = $text.Remove($lineStart, $lineEnd - $lineStart).Insert($lineStart, $insert)
 Write-Source $clientShell $text
-Write-Host "[OK] command-line normal-game auto-start"
+Write-Host "[OK] command-line normal-game auto-start normalized"
 
 # Launcher-first project: disable SealHunter's splash/menu frontend.
 # Be tolerant of both pristine SealHunter source and already-patched local trees.
