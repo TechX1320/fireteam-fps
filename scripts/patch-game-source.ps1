@@ -153,4 +153,18 @@ if (-not $text.Contains("Fireteam FPS: auto-starting selected world...")) {
     Write-Source $clientShell $text
 }
 Write-Host "[OK] command-line normal-game auto-start"
+# Fireteam FPS is launcher-first. Disable the SealHunter frontend entirely.
+# Keep CGui compiled for now, but do not initialize, render, or feed input
+# to the old splash/menu/HUD path.
+$clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
+Replace-Required $clientShell "m_Gui.Init(15, 18);" "// Fireteam FPS: legacy SealHunter frontend disabled." "legacy frontend initialization disabled"
+Replace-Required $clientShell "m_Gui.Render();" "// Fireteam FPS: legacy SealHunter frontend render disabled." "legacy frontend rendering disabled"
+
+$text = Read-Source $clientShell
+$oldMenuInput = "if (m_nGameMode == LOCAL_GAMEMODE_NONE)" + [Environment]::NewLine + "    {" + [Environment]::NewLine + "        m_Gui.HandleInput(command);" + [Environment]::NewLine + "    }"
+if ($text.Contains($oldMenuInput)) {
+    $text = $text.Replace($oldMenuInput, "// Fireteam FPS: launcher owns frontend/menu input.")
+    Write-Source $clientShell $text
+}
+Write-Host "[OK] legacy frontend input disabled"
 Write-Host "[OK] Fireteam FPS gameplay bring-up patch set complete."
