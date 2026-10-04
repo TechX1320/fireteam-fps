@@ -99,6 +99,30 @@ $playerCpp = Join-Path $sealRoot "cshell\src\playerclnt.cpp"
 $text = Read-Source $playerCpp
 
 # Canonical Fireteam weapon resource layout.
+
+# Bowie CA texture-slot compatibility.
+# Combat Arms LTB pieces may reference a nonzero texture binding index. Bind
+# the same Bowie DTX to every model skin slot until Fireteam has attribute-driven
+# per-slot skin definitions.
+if (-not $text.Contains("Fireteam Bowie: bind all texture slots")) {
+    $oldSkinLine = '    // Fireteam Bowie: bind all texture slots for CA LTB compatibility.
+    for(uint32 nSkin = 0; nSkin < MAX_MODEL_TEXTURES; ++nSkin)
+    {
+        strcpy(ocs.m_SkinNames[nSkin], "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX");
+    }'
+    if ($text.Contains($oldSkinLine)) {
+        $allSkins = @"
+    // Fireteam Bowie: bind all texture slots for CA LTB compatibility.
+    for(uint32 nSkin = 0; nSkin < MAX_MODEL_TEXTURES; ++nSkin)
+    {
+        strcpy(ocs.m_SkinNames[nSkin], "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX");
+    }
+"@
+        $text = $text.Replace($oldSkinLine, $allSkins)
+    }
+}
+
+
 # Migrate both the original Bowie test paths and the short-lived root aliases.
 $text = $text.Replace("Models\\Weapons\\Bowie\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB", "Weapons\\melee_m_pv\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB")
 $text = $text.Replace("Models\\Weapons\\Bowie\\ANI_G_BOWIEKNIFE_CH.LTB", "Weapons\\melee_m_pv\\ANI_G_BOWIEKNIFE_CH.LTB")
