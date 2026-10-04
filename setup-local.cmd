@@ -44,6 +44,10 @@ if not exist "%LOCAL%\imports\engine\sdk\inc\iltclient.h" (
 )
 
 :patch
+echo [3/4] Checking expanded Jupiter engine source...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\refresh-engine-import.ps1" -RepoRoot "%CD%" -LocalRoot "%LOCAL%"
+if errorlevel 1 goto :fail
+
 echo [3/4] Applying current Fireteam patches...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-legacy-source.ps1" -LocalRoot "%LOCAL%"
 if errorlevel 1 goto :fail
