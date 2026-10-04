@@ -121,4 +121,30 @@ if (Test-Path -LiteralPath $gunsHHZip) {
     Write-Host "[SKIP] GunsHH.zip not present - Bowie world model will be unavailable"
 }
 
+
+$bowieSoundZip = Join-Path $assetRoot "BOWIE_KNIFE.zip"
+if (Test-Path -LiteralPath $bowieSoundZip) {
+    Write-Host "[UPDATE] Staging dedicated Bowie sound archive..."
+    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/FIRE.WAV" "Sounds\Weapons\Bowie\FIRE.WAV" | Out-Null
+    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/SELECT.WAV" "Sounds\Weapons\Bowie\SELECT.WAV" | Out-Null
+}
+
+# Combat Arms LTBs also carry bare texture names. Keep aliases at the resource
+# root and ModelTextures root in addition to our organized Bowie directory.
+$pvTex = Join-Path $rezRoot "ModelTextures\Weapons\Bowie\PV_ML_DF_BOWIEKNIFE_BC.DTX"
+if (Test-Path -LiteralPath $pvTex) {
+    Copy-Item -LiteralPath $pvTex -Destination (Join-Path $rezRoot "PV_ML_DF_BowieKnife_BC.dtx") -Force
+    $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
+    New-Item -ItemType Directory -Force -Path $modelTexturesRoot | Out-Null
+    Copy-Item -LiteralPath $pvTex -Destination (Join-Path $modelTexturesRoot "PV_ML_DF_BowieKnife_BC.dtx") -Force
+}
+
+$hhTex = Join-Path $rezRoot "ModelTextures\Weapons\Bowie\HH_ML_DF_BOWIEKNIFE_BC.DTX"
+if (Test-Path -LiteralPath $hhTex) {
+    Copy-Item -LiteralPath $hhTex -Destination (Join-Path $rezRoot "HH_ML_DF_BowieKnife_BC.dtx") -Force
+    $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
+    New-Item -ItemType Directory -Force -Path $modelTexturesRoot | Out-Null
+    Copy-Item -LiteralPath $hhTex -Destination (Join-Path $modelTexturesRoot "HH_ML_DF_BowieKnife_BC.dtx") -Force
+}
+
 Write-Host "[OK] Local game asset staging complete."
