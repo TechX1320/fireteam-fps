@@ -1024,34 +1024,53 @@ Insert-BeforeLineContaining $clientShell "// Render the gui." @(
 Write-Host "[OK] client health/respawn/lightgroup hooks"
 
 # Fireteam player collision dimensions.
-# Do not inherit the larger HARM/NOLF-style animation user dims; Cabin Fever's
-# tight interiors were authored around Combat Arms player dimensions.
+# Replace the RecalculateBoundingBox function body directly. This is tolerant
+# of previous local edits and whitespace differences in the imported sample.
 $playerClient = Join-Path $sealRoot "cshell\src\playerclnt.cpp"
 $text = Read-Source $playerClient
-$oldDims = @"
-    LTVector vDims;
-    HMODELANIM hCurAnim;
-    g_pLTCModel->GetCurAnim(m_hObject, m_idLowerBodyTracker, hCurAnim);
-    g_pLTCCommon->GetModelAnimUserDims(m_hObject, &vDims, hCurAnim);
-    g_pLTCPhysics->SetObjectDims(m_hObject, &vDims, 0);
-"@
-$newDims = @"
+
+$funcMarker = "void CPlayerClnt::RecalculateBoundingBox()"
+$funcStart = $text.IndexOf($funcMarker)
+if ($funcStart -lt 0) {
+    throw "Could not locate CPlayerClnt::RecalculateBoundingBox()."
+}
+
+$braceStart = $text.IndexOf("{", $funcStart)
+if ($braceStart -lt 0) {
+    throw "Could not locate RecalculateBoundingBox opening brace."
+}
+
+$depth = 0
+$braceEnd = -1
+for($i = $braceStart; $i -lt $text.Length; $i++) {
+    if($text[$i] -eq '{') {
+        $depth++
+    }
+    elseif($text[$i] -eq '}') {
+        $depth--
+        if($depth -eq 0) {
+            $braceEnd = $i
+            break
+        }
+    }
+}
+
+if ($braceEnd -lt 0) {
+    throw "Could not locate RecalculateBoundingBox closing brace."
+}
+
+$newBody = @"
+{
     // Fireteam fixed player collision dimensions.
     // LithTech dims are half-extents: ~32 wide x 76 tall overall.
     LTVector vDims(16.0f, 38.0f, 16.0f);
     g_pLTCPhysics->SetObjectDims(m_hObject, &vDims, 0);
-"@
-if ($text.Contains($oldDims)) {
-    $text = $text.Replace($oldDims, $newDims)
-    Write-Source $playerClient $text
-    Write-Host "[OK] Fireteam fixed player collision dimensions"
-} elseif ($text.Contains("LTVector vDims(16.0f, 38.0f, 16.0f);")) {
-    Write-Host "[OK] Fireteam fixed player collision dimensions already patched"
-} else {
-    throw "Could not locate SealHunter player bounding-box update."
 }
+"@
 
-
+$text = $text.Substring(0, $braceStart) + $newBody + $text.Substring($braceEnd + 1)
+Write-Source $playerClient $text
+Write-Host "[OK] Fireteam fixed player collision dimensions"
 
 # ---------------------------------------------------------------------------
 # Server-authoritative health, poison damage, death/respawn.
