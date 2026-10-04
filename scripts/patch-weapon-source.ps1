@@ -395,19 +395,18 @@ Write-Host "[OK] right-click command id"
 
 $clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
 $text = Read-Source $clientShell
-if (-not $text.Contains("COMMAND_ALT_ATTACK")) {
-    $needle = "    if (g_pLTClient->IsCommandOn(COMMAND_SHOOT))" + [Environment]::NewLine +
-        "    {" + [Environment]::NewLine +
-        "        m_pPlayer->Attack();" + [Environment]::NewLine +
-        "    }"
-    if (-not $text.Contains($needle)) { throw "Could not locate primary attack input block." }
-    $replacement = $needle + [Environment]::NewLine + [Environment]::NewLine +
-        "    // Combat Arms knife secondary attack." + [Environment]::NewLine +
+if (-not $text.Contains("m_pPlayer->AltAttack();")) {
+    $needle = "// jump"
+    $idx = $text.IndexOf($needle)
+    if ($idx -lt 0) { throw "Could not locate jump marker for secondary attack input." }
+
+    $insert = "    // Combat Arms knife secondary attack." + [Environment]::NewLine +
         "    if (g_pLTClient->IsCommandOn(COMMAND_ALT_ATTACK))" + [Environment]::NewLine +
         "    {" + [Environment]::NewLine +
         "        m_pPlayer->AltAttack();" + [Environment]::NewLine +
-        "    }"
-    $text = $text.Replace($needle, $replacement)
+        "    }" + [Environment]::NewLine + [Environment]::NewLine + "    "
+
+    $text = $text.Insert($idx, $insert)
     Write-Source $clientShell $text
 }
 Write-Host "[OK] right-click fire_1 input"
