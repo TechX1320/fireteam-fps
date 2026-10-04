@@ -169,14 +169,6 @@ if (Test-Path -LiteralPath $resolved -PathType Container) {
             if (Test-TailPrintable $tail16) { $printableTails16++ }
         }
 
-        $tailLength16 = $bytes.Length % 16
-        if ($tailLength16 -gt 0) {
-            $nonAligned16++
-            $tail16 = New-Object byte[] $tailLength16
-            [Array]::Copy($bytes, $bytes.Length - $tailLength16, $tail16, 0, $tailLength16)
-            if (Test-TailPrintable $tail16) { $printableTails16++ }
-        }
-
         if ($file.Name -like $Pattern) {
             $results += Get-GmsStats $file.Name $bytes
         }
@@ -202,6 +194,8 @@ elseif ([IO.Path]::GetExtension($resolved) -ieq '.zip') {
 
         $nonAligned = 0
         $printableTails = 0
+        $nonAligned16 = 0
+        $printableTails16 = 0
 
         foreach ($entry in $allEntries) {
             $stream = $entry.Open()
@@ -217,6 +211,14 @@ elseif ([IO.Path]::GetExtension($resolved) -ieq '.zip') {
                 $tail = New-Object byte[] $tailLength
                 [Array]::Copy($bytes, $bytes.Length - $tailLength, $tail, 0, $tailLength)
                 if (Test-TailPrintable $tail) { $printableTails++ }
+            }
+
+            $tailLength16 = $bytes.Length % 16
+            if ($tailLength16 -gt 0) {
+                $nonAligned16++
+                $tail16 = New-Object byte[] $tailLength16
+                [Array]::Copy($bytes, $bytes.Length - $tailLength16, $tail16, 0, $tailLength16)
+                if (Test-TailPrintable $tail16) { $printableTails16++ }
             }
 
             if ($entry.Name -like $Pattern) {
@@ -259,7 +261,11 @@ if ($archiveSummary) {
 }
 
 $results |
-    Select-Object Name, Size, Mod8, FullBlocks, UniqueBlocks, RepeatedOccurrences, MaxRepeat, RepeatedOccurrences16, MaxRepeat16, TailText |
+    Select-Object Name, Size, Mod8,
+        @{ Name = 'Rep8'; Expression = { $_.RepeatedOccurrences } },
+        @{ Name = 'Max8'; Expression = { $_.MaxRepeat } },
+        @{ Name = 'Rep16'; Expression = { $_.RepeatedOccurrences16 } },
+        @{ Name = 'Max16'; Expression = { $_.MaxRepeat16 } } |
     Format-Table -AutoSize
 
 foreach ($result in $results) {
