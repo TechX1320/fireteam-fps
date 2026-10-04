@@ -2,32 +2,44 @@
 
 Standalone co-op FPS experiment built from the 2006 LithTech Jupiter Enterprise **SealHunter** networking sample, targeting a FireTeam-style zombie survival game.
 
-## v0.0.1 — build baseline
+## v0.0.1 - build baseline
 
-The first milestone compiles the original SealHunter gameplay locally with Visual Studio 2022 x86 and produces a runnable `BUILT\\` folder.
+The original SealHunter gameplay now compiles locally with Visual Studio 2022 x86 and produces a runnable `BUILT\` folder.
 
-`setup-local.cmd` applies a tiny compatibility patch set for old Visual C++ behavior (missing return type/include and legacy for-loop scoping). Gameplay remains unchanged in v0.0.1.
+`setup-local.cmd` automatically applies the small modern-C++ compatibility fixes required by current MSVC.
+
+## v0.0.2 - Cabin Fever bring-up
+
+This milestone starts modifying gameplay:
+
+- Listen-server capacity raised from 12 to 24 connections for testing.
+- SealHunter's enemy-spawning `AIVolume` is renamed internally to `ZombieSpawner`.
+- Imported `AIVolume` objects are registered as inert navigation placeholders so Cabin Fever cannot turn them into seal spawners.
+- `GameStartPoint00` is supported with the original `GameStartPoint0` as fallback.
+- Cabin Fever resources can be staged locally without committing commercial assets.
 
 ## Build locally
 
 Requirements: Windows + Visual Studio 2022 with **Desktop development with C++** and CMake tools.
 
-1. Clone this repository.
-2. Put these three original ZIPs in `imports\\`:
+1. Clone/check out the branch.
+2. Put these original archives in `imports\`:
    - `release.zip`
    - `sealhunter.zip`
    - `EngineMissing.zip`
-3. Run `setup-local.cmd` once.
-4. Run `build.cmd`.
-5. If it succeeds, launch `BUILT\\run-normal.cmd`.
+3. For Cabin Fever testing, put these in `assets-local\`:
+   - `CABINFEVER.DAT`
+   - `TEXTURES.zip`
+   - `FX.zip`
+   - `RS.zip`
+4. Run `setup-local.cmd`.
+5. Run `build.cmd`.
+6. Test:
+   - `BUILT\run-normal.cmd` - stock SealHunter world
+   - `BUILT\run-cabinfever.cmd` - Cabin Fever
 
-The build script can find Visual Studio's bundled CMake even when `cmake.exe` is not in the normal Windows PATH.
-
-The original Jupiter/SealHunter files remain local and are ignored by Git.
+The original engine files and extracted commercial assets remain local and are ignored by Git.
 
 ## Next
 
-- Raise hosted player count toward 16/24.
-- Separate SealHunter's enemy spawner from imported `AIVolume` navigation objects.
-- Add `GameStartPoint00`-style spawn compatibility.
-- Start Cabin Fever map/resource testing.
+Once Cabin Fever reliably loads and spawns a player, the next milestone is player-model/weapon import followed by the first real zombie actor and wave director.
