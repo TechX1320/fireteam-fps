@@ -75,7 +75,52 @@ public:
     $text = $text.Replace($marker, $stub + $marker)
     Write-Source $aiHeader $text
 }
-Write-Host "[OK] AIVolume header split into ZombieSpawner + inert AIVolume"
+# Upgrade older generated workspaces from the inert compatibility stub to a
+# lightweight navigation-volume representation that preserves the NOLF2/CA
+# map-authored fields used by Cabin Fever.
+$text = Read-Source $aiHeader
+$oldCompatStub = @"
+class AIVolume : public BaseClass
+{
+public:
+    AIVolume() {}
+    ~AIVolume() {}
+};
+"@
+$newCompatStub = @"
+class AIVolume : public BaseClass
+{
+public:
+    AIVolume();
+    ~AIVolume() {}
+
+    uint32 EngineMessageFn(uint32 messageID, void *pData, float fData);
+
+    const LTVector& GetDims() const { return m_vDims; }
+    const char* GetRegionName() const { return m_sRegion; }
+    const char* GetVolumeName() const { return m_sName; }
+    bool IsLit() const { return m_bLit; }
+    bool IsPreferredPath() const { return m_bPreferredPath; }
+    bool Contains2D(const LTVector& vPos) const;
+
+private:
+    void ReadNavigationProps(ObjectCreateStruct *pOCS);
+
+    char     m_sName[64];
+    char     m_sRegion[64];
+    char     m_sLightSwitchNode[64];
+    LTVector m_vDims;
+    bool     m_bLit;
+    bool     m_bPreferredPath;
+};
+"@
+if ($text.Contains($oldCompatStub)) {
+    $text = $text.Replace($oldCompatStub, $newCompatStub)
+    Write-Source $aiHeader $text
+} elseif (-not $text.Contains("ReadNavigationProps")) {
+    throw "Could not locate Fireteam AIVolume compatibility stub."
+}
+Write-Host "[OK] AIVolume header split into ZombieSpawner + navigation AIVolume"
 
 $aiCpp = Join-Path $sealRoot "sshell\src\AIVolume.cpp"
 $text = Read-Source $aiCpp
@@ -101,7 +146,123 @@ END_CLASS_DEFAULT_FLAGS(AIVolume, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
     $text = $text.Replace($registration, $compatRegistration)
     Write-Source $aiCpp $text
 }
-Write-Host "[OK] AIVolume implementation collision removed"
+# Preserve the NOLF2/Combat Arms navigation properties on the compatibility
+# AIVolume class. Older generated trees only registered Target + Dims.
+$text = Read-Source $aiCpp
+$oldCompatRegistration = @"
+BEGIN_CLASS(AIVolume)
+ADD_STRINGPROP_FLAG(Target, "", PF_OBJECTLINK)
+ADD_VECTORPROP_FLAG(Dims, PF_DIMS)
+END_CLASS_DEFAULT_FLAGS(AIVolume, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
+"@
+$newCompatRegistration = @"
+BEGIN_CLASS(AIVolume)
+ADD_VECTORPROP_VAL_FLAG(Dims, 32.0f, 8.0f, 32.0f, PF_DIMS)
+ADD_STRINGPROP_FLAG(Region, "", PF_OBJECTLINK)
+ADD_BOOLPROP(Lit, LTTRUE)
+ADD_STRINGPROP_FLAG(LightSwitchNode, "", PF_OBJECTLINK)
+ADD_BOOLPROP(PreferredPath, LTFALSE)
+END_CLASS_DEFAULT_FLAGS(AIVolume, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
+"@
+if ($text.Contains($oldCompatRegistration)) {
+    $text = $text.Replace($oldCompatRegistration, $newCompatRegistration)
+}
+
+if (-not $text.Contains("void AIVolume::ReadNavigationProps")) {
+    if (-not $text.Contains($newCompatRegistration)) {
+        throw "Could not locate Fireteam AIVolume compatibility registration."
+    }
+
+    $compatImpl = @"
+
+AIVolume::AIVolume() :
+    m_vDims(0.0f, 0.0f, 0.0f),
+    m_bLit(true),
+    m_bPreferredPath(false)
+{
+    m_sName[0] = '\0';
+    m_sRegion[0] = '\0';
+    m_sLightSwitchNode[0] = '\0';
+}
+
+void AIVolume::ReadNavigationProps(ObjectCreateStruct *pOCS)
+{
+    GenericProp prop;
+
+    if(g_pLTServer->GetPropGeneric("Name", &prop) == LT_OK)
+    {
+        strncpy(m_sName, prop.m_String, sizeof(m_sName) - 1);
+        m_sName[sizeof(m_sName) - 1] = '\0';
+        strncpy(pOCS->m_Name, m_sName, sizeof(pOCS->m_Name) - 1);
+        pOCS->m_Name[sizeof(pOCS->m_Name) - 1] = '\0';
+    }
+
+    if(g_pLTServer->GetPropGeneric("Dims", &prop) == LT_OK)
+    {
+        m_vDims = prop.m_Vec;
+    }
+
+    if(g_pLTServer->GetPropGeneric("Region", &prop) == LT_OK)
+    {
+        strncpy(m_sRegion, prop.m_String, sizeof(m_sRegion) - 1);
+        m_sRegion[sizeof(m_sRegion) - 1] = '\0';
+    }
+
+    if(g_pLTServer->GetPropGeneric("LightSwitchNode", &prop) == LT_OK)
+    {
+        strncpy(m_sLightSwitchNode, prop.m_String, sizeof(m_sLightSwitchNode) - 1);
+        m_sLightSwitchNode[sizeof(m_sLightSwitchNode) - 1] = '\0';
+    }
+
+    if(g_pLTServer->GetPropGeneric("Lit", &prop) == LT_OK)
+    {
+        m_bLit = (prop.m_Bool != LTFALSE);
+    }
+
+    if(g_pLTServer->GetPropGeneric("PreferredPath", &prop) == LT_OK)
+    {
+        m_bPreferredPath = (prop.m_Bool != LTFALSE);
+    }
+
+    pOCS->m_ObjectType = OT_NORMAL;
+    pOCS->m_Flags = 0;
+}
+
+uint32 AIVolume::EngineMessageFn(uint32 messageID, void *pData, float fData)
+{
+    if(messageID == MID_PRECREATE)
+    {
+        ObjectCreateStruct *pOCS = (ObjectCreateStruct*)pData;
+        if(pOCS && fData == PRECREATE_WORLDFILE)
+        {
+            ReadNavigationProps(pOCS);
+        }
+    }
+    else if(messageID == MID_INITIALUPDATE)
+    {
+        g_pLTServer->SetNextUpdate(m_hObject, 0.0f);
+    }
+
+    return BaseClass::EngineMessageFn(messageID, pData, fData);
+}
+
+bool AIVolume::Contains2D(const LTVector& vPos) const
+{
+    LTVector vCenter;
+    g_pLTServer->GetObjectPos(m_hObject, &vCenter);
+
+    return (vPos.x >= (vCenter.x - m_vDims.x)) &&
+           (vPos.x <= (vCenter.x + m_vDims.x)) &&
+           (vPos.z >= (vCenter.z - m_vDims.z)) &&
+           (vPos.z <= (vCenter.z + m_vDims.z));
+}
+"@
+
+    $text = $text.Replace($newCompatRegistration, $newCompatRegistration + $compatImpl)
+}
+
+Write-Source $aiCpp $text
+Write-Host "[OK] AIVolume navigation metadata preserved"
 
 $sealCpp = Join-Path $sealRoot "sshell\src\seal.cpp"
 Replace-Required $sealCpp '"AIVolume0"' '"ZombieSpawner0"' "legacy seal spawner lookup"
