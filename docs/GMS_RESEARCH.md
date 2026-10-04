@@ -92,3 +92,26 @@ powershell -ExecutionPolicy Bypass -File scripts\inspect-gms.ps1 -Path assets-lo
 ```
 
 The tool intentionally performs structural inspection only. It reports both 8-byte and 16-byte repetition so the GMS format can be compared directly against the historical Twofish/CBC Attributes implementation. Once the exact GMS Blowfish key/key derivation is recovered, decryption support can be added without changing the research workflow.
+
+
+## Matching CA Engine/CShell protection research
+
+A matching legacy Combat Arms binary pair was supplied for the same general data era:
+
+- `Engine.exe` SHA-256: `74c502904b938421fd3a2f6f1f351b8dd97b0d98261b09ca271fce8a17640c4e`
+- `CShell.dll` SHA-256: `201ada09376da0f2264b20dfa0e89c40268b171f229bceeada1fae8ff8b36a3f`
+- PE timestamps are May 15, 2012.
+
+Both binaries are heavily protected with WinLicense-style packing. Their visible import tables are reduced to only a tiny bootstrap set and the main sections have near-random entropy.
+
+The first protection stage was recovered statically. The entry stub decrypts the first 4 KiB of the hidden loader section with a DWORD transform of the form:
+
+```text
+value = (value XOR key1) + key2
+```
+
+That reveals a standard aPLib-compatible depacker. Replaying the depacker offline recovers about 1.38 MiB of second-stage WinLicense loader code/data from each binary.
+
+The second-stage payload still contains the WinLicense runtime rather than the original unobfuscated Combat Arms code. Direct scans of the recovered payload found no plaintext `GMS`, `Attributes`, `CabinFever`, `seungho`, historical Twofish key/IV, or Blowfish P-array constants.
+
+Practical conclusion: recovering the exact GMS key from these binaries now requires a full WinLicense runtime unpack/dump (or a clean DServer/server binary/source) rather than another cheap static pass. Park this work unless the authentic GMS values become important enough to justify dynamic WinLicense unpacking.
