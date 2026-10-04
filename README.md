@@ -78,6 +78,8 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - Cabin Fever `PoisonGas` volumes are registered as damaging containers and apply a simple client poison tint while the player is inside.
 - Cabin Fever `Spawner` objects are recognized, but bring-up is deliberately capped: only outside perimeter `Spawner_01_01N` is active so testing cannot reproduce the old mass-spawn crash.
 - That single outside spawner creates three human-scale `FireteamZombie` placeholders as an AI/melee validation step. They use temporary HARM-guard visuals while Combat Arms infected assets are brought online. All other imported spawners remain inert.
+- Cabin Fever's map-authored navigation metadata is now preserved: `AIRegion`, `AIVolume` fields, and `AINodePatrol` objects load instead of being discarded. The current step logs the region/node graph; Fireteam-specific volume pathfinding comes next.
+- Bowie melee keeps the Combat Arms 135-unit range during bring-up and can damage `FireteamZombie` objects. The old SealHunter single-OBB assumption is patched structurally so persistent local source trees are upgraded correctly.
 - Player damage is real again. The earlier respawn loop was caused by stale PoisonGas hazard code surviving in the local generated source; the build now replaces that function body explicitly. Environmental PoisonGas damage remains disabled until Combat Arms safe/outside volume semantics are reproduced.
 
 ## Combat Arms compatibility work
@@ -85,3 +87,4 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - Local `CLIENTFX.zip` and `ClientFx.fxd` can replace SealHunter's small FxED database without committing commercial files. Cabin Fever references `Foggy_Vio`, which is present in the supplied Combat Arms ClientFX database.
 - Cabin Fever texture references are read directly from the DAT during local staging. Missing flattened paths are aliased to matching extracted textures when the match is unambiguous.
 - A minimal Specialist male body/face/hand asset set is staged from `CharModels-Textur.zip` for upcoming player-model work.
+- LightGroup compatibility now logs the map-authored StartOn/StartColor state and the client's resolved global/base light values during Cabin Fever bring-up. This is diagnostic only; no arbitrary brightness override is applied.
