@@ -127,6 +127,7 @@ if (-not $text.Contains('#include <fireteamtrace.h>')) {
         $needle,
         $needle + [Environment]::NewLine +
         '#include <fireteamtrace.h>' + [Environment]::NewLine +
+        '#include <time.h>' + [Environment]::NewLine +
         '#include <ltcrashhandler.h>')
 }
 
