@@ -111,6 +111,11 @@ echo [3/5] Staging runtime...
 if not exist "%BUILT_DIR%" mkdir "%BUILT_DIR%" >nul
 if not exist "%BUILT_DIR%\rez" mkdir "%BUILT_DIR%\rez" >nul
 
+if exist "%BUILT_DIR%\rez\ClientFx.fxd" (
+  echo [CLEAN] Removing stale Combat Arms ClientFx.fxd override...
+  del /q "%BUILT_DIR%\rez\ClientFx.fxd"
+)
+
 for %%F in (Lithtech.exe Engine.REZ LTMsg.dll SndDrv.dll server.dll) do (
   if not exist "%RELEASE_DIR%\%%F" (
     echo [ERROR] Runtime file missing: %RELEASE_DIR%\%%F
