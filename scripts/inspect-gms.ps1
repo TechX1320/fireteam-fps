@@ -58,6 +58,27 @@ function Get-GmsStats([string]$Name, [byte[]]$Bytes) {
         if ($count -gt $maxRepeat) { $maxRepeat = $count }
     }
 
+    $fullBlockBytes16 = [int]($Bytes.Length - ($Bytes.Length % 16))
+    $blockCount16 = [int]($fullBlockBytes16 / 16)
+    $counts16 = @{}
+
+    for ($i = 0; $i -lt $blockCount16; $i++) {
+        $block16 = New-Object byte[] 16
+        [Array]::Copy($Bytes, $i * 16, $block16, 0, 16)
+        $hex16 = Convert-ToHex $block16
+        if ($counts16.ContainsKey($hex16)) { $counts16[$hex16]++ }
+        else { $counts16[$hex16] = 1 }
+    }
+
+    $repeatedOccurrences16 = 0
+    $maxRepeat16 = 0
+    foreach ($count in $counts16.Values) {
+        if ($count -gt 1) {
+            $repeatedOccurrences16 += ($count - 1)
+        }
+        if ($count -gt $maxRepeat16) { $maxRepeat16 = $count }
+    }
+
     $tailLength = $Bytes.Length - $fullBlockBytes
     if ($tailLength -gt 0) {
         $tail = New-Object byte[] $tailLength
@@ -95,6 +116,10 @@ function Get-GmsStats([string]$Name, [byte[]]$Bytes) {
         RepeatedBlockKinds = $repeatedKinds
         RepeatedOccurrences = $repeatedOccurrences
         MaxRepeat = $maxRepeat
+        FullBlocks16 = $blockCount16
+        UniqueBlocks16 = $counts16.Count
+        RepeatedOccurrences16 = $repeatedOccurrences16
+        MaxRepeat16 = $maxRepeat16
         TailHex = Convert-ToHex $tail
         TailText = Convert-TailToText $tail
         First32Hex = Convert-ToHex $prefix
@@ -123,6 +148,8 @@ if (Test-Path -LiteralPath $resolved -PathType Container) {
 
     $nonAligned = 0
     $printableTails = 0
+    $nonAligned16 = 0
+    $printableTails16 = 0
 
     foreach ($file in $allFiles) {
         $bytes = [IO.File]::ReadAllBytes($file.FullName)
@@ -134,6 +161,22 @@ if (Test-Path -LiteralPath $resolved -PathType Container) {
             if (Test-TailPrintable $tail) { $printableTails++ }
         }
 
+        $tailLength16 = $bytes.Length % 16
+        if ($tailLength16 -gt 0) {
+            $nonAligned16++
+            $tail16 = New-Object byte[] $tailLength16
+            [Array]::Copy($bytes, $bytes.Length - $tailLength16, $tail16, 0, $tailLength16)
+            if (Test-TailPrintable $tail16) { $printableTails16++ }
+        }
+
+        $tailLength16 = $bytes.Length % 16
+        if ($tailLength16 -gt 0) {
+            $nonAligned16++
+            $tail16 = New-Object byte[] $tailLength16
+            [Array]::Copy($bytes, $bytes.Length - $tailLength16, $tail16, 0, $tailLength16)
+            if (Test-TailPrintable $tail16) { $printableTails16++ }
+        }
+
         if ($file.Name -like $Pattern) {
             $results += Get-GmsStats $file.Name $bytes
         }
@@ -143,6 +186,8 @@ if (Test-Path -LiteralPath $resolved -PathType Container) {
         TotalGms = $allFiles.Count
         NonAligned = $nonAligned
         PrintableTails = $printableTails
+        NonAligned16 = $nonAligned16
+        PrintableTails16 = $printableTails16
     }
 }
 elseif ([IO.Path]::GetExtension($resolved) -ieq '.zip') {
@@ -183,6 +228,8 @@ elseif ([IO.Path]::GetExtension($resolved) -ieq '.zip') {
             TotalGms = $allEntries.Count
             NonAligned = $nonAligned
             PrintableTails = $printableTails
+            NonAligned16 = $nonAligned16
+            PrintableTails16 = $printableTails16
         }
     } finally {
         $zip.Dispose()
@@ -206,12 +253,13 @@ if ($Json) {
 }
 
 if ($archiveSummary) {
-    Write-Host ('Archive check: {0} GMS files; {1} have a 1-7 byte tail; {2}/{1} tails are printable ASCII/control text.' -f $archiveSummary.TotalGms, $archiveSummary.NonAligned, $archiveSummary.PrintableTails)
+    Write-Host ('8-byte check:  {0} GMS files; {1} have a 1-7 byte tail; {2}/{1} tails are printable ASCII/control text.' -f $archiveSummary.TotalGms, $archiveSummary.NonAligned, $archiveSummary.PrintableTails)
+    Write-Host ('16-byte check: {0} GMS files; {1} have a 1-15 byte tail; {2}/{1} tails are printable ASCII/control text.' -f $archiveSummary.TotalGms, $archiveSummary.NonAligned16, $archiveSummary.PrintableTails16)
     Write-Host ''
 }
 
 $results |
-    Select-Object Name, Size, Mod8, FullBlocks, UniqueBlocks, RepeatedOccurrences, MaxRepeat, TailText |
+    Select-Object Name, Size, Mod8, FullBlocks, UniqueBlocks, RepeatedOccurrences, MaxRepeat, RepeatedOccurrences16, MaxRepeat16, TailText |
     Format-Table -AutoSize
 
 foreach ($result in $results) {

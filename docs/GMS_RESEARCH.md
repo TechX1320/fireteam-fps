@@ -28,7 +28,18 @@ The Combat Arms reference `CShell.dll` and `Lithtech.exe` both contain a complet
 
 A client-side Blowfish wrapper was traced far enough to recover its key-schedule behavior. In this build that wrapper passes a **fixed key length of 4 bytes** into the Blowfish key setup. Direct tests of `seungho`, and of its first four bytes `seun`, using both standard Blowfish block ordering and the native DWORD ordering seen in the CA implementation did **not** produce valid GMS plaintext. The reported `seungho` key may belong to another CA build/tool/server path, but it is not confirmed for these files.
 
-A reported alternative of Twofish-256/CBC with key `620C724A2FF22C975B5A2B9C21430820227B3D2800193AAA4CF3128803AC3ABD` matches known Combat Arms attribute-encryption research, but direct tests against these GMS files do not fit the observed repeated-block structure or produce valid plaintext. Do not reuse the attribute cipher for GMS without new evidence.
+The historical Attributes decryptor is now preserved more precisely from the original working code:
+
+- Twofish engine
+- CBC mode
+- 256-bit key: `620C724A2FF22C975B5A2B9C21430820227B3D2800193AAA4CF3128803AC3ABD`
+- 128-bit IV: `56B83E3F68B60F0F29357BED335E5642`
+- BouncyCastle `TwofishEngine` + `CbcBlockCipher`
+- no PKCS padding wrapper
+- decrypt processes only `floor(fileLength / 16)` complete blocks
+- encrypt zero-fills the last partial 16-byte input block and always emits complete 16-byte blocks
+
+That implementation is a useful control case, but it does **not** match GMS. Twofish's block size is 16 bytes, true CBC should not leak large numbers of repeated ciphertext blocks, and the historical encryptor emits lengths divisible by 16. The GMS corpus instead shows strong repetition at 8-byte boundaries and 266 files with readable 1-7 byte remainders. Do not reuse the Attributes cipher for GMS without new evidence.
 
 ## Client vs. server loader
 
@@ -74,4 +85,4 @@ powershell -ExecutionPolicy Bypass -File scripts\inspect-gms.ps1 -Pattern *.GMS
 powershell -ExecutionPolicy Bypass -File scripts\inspect-gms.ps1 -Path assets-local\GMS.zip -Json
 ```
 
-The tool intentionally performs structural inspection only. Once the exact GMS Blowfish key/key derivation is recovered, decryption support can be added without changing the research workflow.
+The tool intentionally performs structural inspection only. It reports both 8-byte and 16-byte repetition so the GMS format can be compared directly against the historical Twofish/CBC Attributes implementation. Once the exact GMS Blowfish key/key derivation is recovered, decryption support can be added without changing the research workflow.
