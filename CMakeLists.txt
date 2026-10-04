@@ -49,6 +49,7 @@ set(CSHELL_ENGINE_SOURCES
 )
 add_library(cshell SHARED ${CSHELL_GAME_SOURCES} ${CSHELL_ENGINE_SOURCES})
 target_compile_definitions(cshell PRIVATE _CLIENTBUILD)
+target_compile_options(cshell PRIVATE /FIfireteamtrace.h)
 target_include_directories(cshell PRIVATE "${SEAL_ROOT}/cshell/src" "${GAME_SHARED_DIR}" "${SDK_DIR}" "${CLIENTFX_ROOT}" "${CLIENTFX_SHARED_DIR}")
 target_link_libraries(cshell PRIVATE odbc32 odbccp32)
 set_target_properties(cshell PROPERTIES OUTPUT_NAME "cshell" PREFIX "")
@@ -108,6 +109,7 @@ set(CLIENTFX_PLUGIN_SOURCES
 if(EXISTS "${CLIENTFX_ROOT}/clientfx.cpp")
     add_library(clientfx_fxd SHARED ${CLIENTFX_PLUGIN_SOURCES})
     target_compile_definitions(clientfx_fxd PRIVATE NOPS2 MEMTRACK_CLIENTFX)
+    target_compile_options(clientfx_fxd PRIVATE /FIfireteamtrace.h)
     target_include_directories(clientfx_fxd PRIVATE
         "${CLIENTFX_ROOT}"
         "${CLIENTFX_ROOT}/Shared"
