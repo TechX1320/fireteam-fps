@@ -65,4 +65,60 @@ Expand-OptionalZip "TEXTURES.zip" "Textures"
 Expand-OptionalZip "FX.zip" "FX"
 Expand-OptionalZip "RS.zip" "RenderStyles"
 
+
+function Extract-ZipEntry([string]$ZipName, [string]$EntryName, [string]$DestinationRelative) {
+    $zipPath = Join-Path $assetRoot $ZipName
+    if (-not (Test-Path -LiteralPath $zipPath)) {
+        return $false
+    }
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+    try {
+        $entry = $zip.Entries | Where-Object { $_.FullName -ieq $EntryName } | Select-Object -First 1
+        if (-not $entry) {
+            throw "Missing $EntryName inside $ZipName"
+        }
+
+        $dest = Join-Path $rezRoot $DestinationRelative
+        $destDir = Split-Path -Parent $dest
+        New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+
+        if ((-not (Test-Path -LiteralPath $dest)) -or
+            ((Get-Item -LiteralPath $dest).LastWriteTimeUtc -lt (Get-Item -LiteralPath $zipPath).LastWriteTimeUtc)) {
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $dest, $true)
+            Write-Host "[OK] $ZipName::$EntryName"
+        } else {
+            Write-Host "[OK] Bowie asset unchanged: $DestinationRelative"
+        }
+    }
+    finally {
+        $zip.Dispose()
+    }
+
+    return $true
+}
+
+$gunsZip = Join-Path $assetRoot "Guns.zip"
+$gunsHHZip = Join-Path $assetRoot "GunsHH.zip"
+
+if (Test-Path -LiteralPath $gunsZip) {
+    Write-Host "[UPDATE] Staging Combat Arms Bowie knife player-view assets..."
+    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" "Models\Weapons\Bowie\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/ANI_G_BOWIEKNIFE_CH.LTB" "Models\Weapons\Bowie\ANI_G_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_T_PV_MELEE/PV_ML_DF_BOWIEKNIFE_BC.DTX" "ModelTextures\Weapons\Bowie\PV_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/FIRE.WAV" "Sounds\Weapons\Bowie\FIRE.WAV" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/SELECT.WAV" "Sounds\Weapons\Bowie\SELECT.WAV" | Out-Null
+} else {
+    Write-Host "[SKIP] Guns.zip not present - Bowie player-view model will be unavailable"
+}
+
+if (Test-Path -LiteralPath $gunsHHZip) {
+    Write-Host "[UPDATE] Staging Combat Arms Bowie knife world assets..."
+    Extract-ZipEntry "GunsHH.zip" "GUNS_M_HH/HH_ML_DF_BOWIEKNIFE_CH.LTB" "Models\Weapons\Bowie\HH_ML_DF_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "GunsHH.zip" "GUNS_T_HH/HH_ML_DF_BOWIEKNIFE_BC.DTX" "ModelTextures\Weapons\Bowie\HH_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
+} else {
+    Write-Host "[SKIP] GunsHH.zip not present - Bowie world model will be unavailable"
+}
+
 Write-Host "[OK] Local game asset staging complete."
