@@ -64,7 +64,108 @@ if (Test-Path -LiteralPath $mapPath) {
 Expand-OptionalZip "TEXTURES.zip" "Textures"
 Expand-OptionalZip "FX.zip" "FX"
 Expand-OptionalZip "RS.zip" "RenderStyles"
+Expand-OptionalZip "CLIENTFX.zip" "ClientFX"
 
+
+
+function Map-CabinFeverTextureReferences([string]$DatPath) {
+    if (-not (Test-Path -LiteralPath $DatPath)) {
+        return
+    }
+
+    $texturesRoot = Join-Path $rezRoot "Textures"
+    if (-not (Test-Path -LiteralPath $texturesRoot)) {
+        return
+    }
+
+    Write-Host "[UPDATE] Mapping Cabin Fever texture references from DAT..."
+
+    $bytes = [System.IO.File]::ReadAllBytes($DatPath)
+    $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+    $matches = [regex]::Matches(
+        $ascii,
+        '(?i)textures[\\/][A-Za-z0-9_ .\-\\\/]+?\.dtx'
+    )
+
+    $refs = @($matches | ForEach-Object { $_.Value } | Sort-Object -Unique)
+    $mapped = 0
+    $ambiguous = 0
+
+    foreach($ref in $refs) {
+        $normalized = $ref.Replace("/", "\")
+        $relative = $normalized.Substring($normalized.IndexOf("\") + 1)
+        $target = Join-Path $texturesRoot $relative
+
+        if (Test-Path -LiteralPath $target) {
+            continue
+        }
+
+        $leaf = [System.IO.Path]::GetFileName($relative)
+        $candidates = @(
+            Get-ChildItem -LiteralPath $texturesRoot -Recurse -File |
+                Where-Object { $_.Name -ieq $leaf }
+        )
+
+        if ($candidates.Count -eq 0) {
+            continue
+        }
+
+        $segments = $relative -split '\\'
+        $targetTop = if($segments.Count -gt 1) { $segments[0] } else { "" }
+
+        $preferred = @(
+            $candidates | Where-Object {
+                $candidateRelative = $_.FullName.Substring($texturesRoot.Length).TrimStart('\')
+                $candidateSegments = $candidateRelative -split '\\'
+                $candidateSegments.Count -gt 1 -and $candidateSegments[0] -ieq $targetTop
+            }
+        )
+
+        if ($preferred.Count -gt 0) {
+            $candidates = $preferred
+        }
+
+        $chosen = $null
+
+        if ($candidates.Count -eq 1) {
+            $chosen = $candidates[0]
+        }
+        else {
+            # If duplicate category copies are byte-identical, either one is safe.
+            $hashGroups = @{}
+            foreach($candidate in $candidates) {
+                $hash = (Get-FileHash -LiteralPath $candidate.FullName -Algorithm SHA256).Hash
+                if (-not $hashGroups.ContainsKey($hash)) {
+                    $hashGroups[$hash] = @()
+                }
+                $hashGroups[$hash] += $candidate
+            }
+
+            if ($hashGroups.Keys.Count -eq 1) {
+                $chosen = @($candidates | Sort-Object FullName)[0]
+            }
+        }
+
+        if (-not $chosen) {
+            Write-Host "[AMBIGUOUS] $normalized"
+            foreach($candidate in $candidates) {
+                Write-Host "            $($candidate.FullName)"
+            }
+            $ambiguous++
+            continue
+        }
+
+        $targetDir = Split-Path -Parent $target
+        New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+        Copy-Item -LiteralPath $chosen.FullName -Destination $target -Force
+        Write-Host "[MAP] $normalized <- $($chosen.FullName.Substring($texturesRoot.Length).TrimStart('\'))"
+        $mapped++
+    }
+
+    Write-Host "[OK] Cabin Fever texture map: $mapped aliases created, $ambiguous ambiguous"
+}
+
+Map-CabinFeverTextureReferences $mapPath
 
 function Extract-ZipEntry([string]$ZipName, [string]$EntryName, [string]$DestinationRelative) {
     $zipPath = Join-Path $assetRoot $ZipName
@@ -97,6 +198,17 @@ function Extract-ZipEntry([string]$ZipName, [string]$EntryName, [string]$Destina
     }
 
     return $true
+}
+
+
+$charZip = Join-Path $assetRoot "CharModels-Textur.zip"
+if (Test-Path -LiteralPath $charZip) {
+    Write-Host "[UPDATE] Staging Combat Arms Specialist character test assets..."
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_M_BODY/CM_BODY_NM_SPECIAL_BC.LTB" "Characters\male\body\CM_BODY_NM_SPECIAL_BC.LTB" | Out-Null
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_BODY/CM_BODY_NM_SPECIAL_BC.DTX" "Characters\male\textures\CM_BODY_NM_SPECIAL_BC.DTX" | Out-Null
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_M_FACE/CM_FC_NM_SPECIAL_BC.LTB" "Characters\male\face\CM_FC_NM_SPECIAL_BC.LTB" | Out-Null
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_FACE/CM_FC_NM_SPECIAL_BC.DTX" "Characters\male\textures\CM_FC_NM_SPECIAL_BC.DTX" | Out-Null
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_HAND/CM_HND_NM_SPECIAL_BC.DTX" "Characters\male\hands\CM_HND_NM_SPECIAL_BC.DTX" | Out-Null
 }
 
 $gunsZip = Join-Path $assetRoot "Guns.zip"
@@ -145,6 +257,19 @@ if (Test-Path -LiteralPath $hhTex) {
     $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
     New-Item -ItemType Directory -Force -Path $modelTexturesRoot | Out-Null
     Copy-Item -LiteralPath $hhTex -Destination (Join-Path $modelTexturesRoot "HH_ML_DF_BowieKnife_BC.dtx") -Force
+}
+
+
+$clientFxDll = Join-Path $assetRoot "ClientFx.fxd"
+if (Test-Path -LiteralPath $clientFxDll) {
+    $destClientFxDll = Join-Path $rezRoot "ClientFx.fxd"
+    if ((-not (Test-Path -LiteralPath $destClientFxDll)) -or
+        ((Get-Item -LiteralPath $destClientFxDll).LastWriteTimeUtc -lt (Get-Item -LiteralPath $clientFxDll).LastWriteTimeUtc)) {
+        Copy-Item -LiteralPath $clientFxDll -Destination $destClientFxDll -Force
+        Write-Host "[OK] Combat Arms ClientFx.fxd refreshed"
+    } else {
+        Write-Host "[OK] Combat Arms ClientFx.fxd unchanged"
+    }
 }
 
 Write-Host "[OK] Local game asset staging complete."
