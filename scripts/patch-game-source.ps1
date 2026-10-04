@@ -168,4 +168,87 @@ if ($text.Contains($oldMenuInput)) {
     Write-Source $clientShell $text
 }
 Write-Host "[OK] legacy frontend input disabled"
+# First-person camera bring-up. NOLF2 uses the same basic model: a chase
+# camera mode plus a first-person mode attached near the player head. Keep
+# SealHunter third-person available, but default to first person and toggle
+# views with C.
+$cameraH = Join-Path $sealRoot "cshell\src\camera.h"
+$text = Read-Source $cameraH
+if (-not $text.Contains("ToggleView()")) {
+    $updated = [regex]::Replace($text, '(?m)^(\s*void\s+UpdateZoom\(float zoom\);\s*)
+, '$1' + [Environment]::NewLine + "    void            ToggleView();" + [Environment]::NewLine + "    bool            IsFirstPerson() const { return m_bFirstPerson; }", 1)
+    if ($updated -eq $text) { throw "Could not add camera toggle declarations." }
+    $text = $updated
+
+    $updated = [regex]::Replace($text, '(?m)^(\s*float\s+m_fZoom;\s*)
+, '$1' + [Environment]::NewLine + "    bool            m_bFirstPerson;", 1)
+    if ($updated -eq $text) { throw "Could not add first-person camera state." }
+    $text = $updated
+    Write-Source $cameraH $text
+}
+Write-Host "[OK] camera first-person declarations"
+
+$cameraCpp = Join-Path $sealRoot "cshell\src\camera.cpp"
+$text = Read-Source $cameraCpp
+if (-not $text.Contains('#include "clientinterfaces.h"')) {
+    $needle = '#include <ltobjectcreate.h>'
+    if (-not $text.Contains($needle)) { throw "Could not locate camera include insertion point." }
+    $text = $text.Replace($needle, $needle + [Environment]::NewLine + '#include "clientinterfaces.h"')
+}
+$text = $text.Replace("#define MAX_PITCH   30.0f", "#define MAX_PITCH   85.0f")
+if (-not $text.Contains("m_bFirstPerson(true)")) {
+    $needle = "m_fZoom(MIN_ZOOM)"
+    if (-not $text.Contains($needle)) { throw "Could not locate camera constructor." }
+    $text = $text.Replace($needle, $needle + "," + [Environment]::NewLine + "m_bFirstPerson(true)")
+}
+if (-not $text.Contains("Fireteam FPS first-person camera")) {
+    $needle = "    rRot.Rotate(rRot.Right(), (m_fPitch * 0.0174533f));"
+    if (-not $text.Contains($needle)) { throw "Could not locate camera pitch update." }
+    $insert = "    LTVector vEyeUp = rRot.Up();" + [Environment]::NewLine +
+        "    rRot.Rotate(rRot.Right(), (m_fPitch * 0.0174533f));" + [Environment]::NewLine + [Environment]::NewLine +
+        "    // Fireteam FPS first-person camera." + [Environment]::NewLine +
+        "    if (m_bFirstPerson)" + [Environment]::NewLine +
+        "    {" + [Environment]::NewLine +
+        "        g_pLTCCommon->SetObjectFlags(hObject, OFT_Flags, 0, FLAG_VISIBLE);" + [Environment]::NewLine +
+        "        vPos += vEyeUp * 65.0f;" + [Environment]::NewLine +
+        "        vPos += rRot.Forward() * 3.0f;" + [Environment]::NewLine +
+        "        g_pLTClient->SetObjectPosAndRotation(m_hObject, &vPos, &rRot);" + [Environment]::NewLine +
+        "        return;" + [Environment]::NewLine +
+        "    }" + [Environment]::NewLine + [Environment]::NewLine +
+        "    g_pLTCCommon->SetObjectFlags(hObject, OFT_Flags, FLAG_VISIBLE, FLAG_VISIBLE);"
+    $text = $text.Replace($needle, $insert)
+}
+if (-not $text.Contains("void CCamera::ToggleView()")) {
+    $text += [Environment]::NewLine + [Environment]::NewLine +
+        "//----------------------------------------------------------------------------" + [Environment]::NewLine +
+        "// CCamera::ToggleView()" + [Environment]::NewLine +
+        "//----------------------------------------------------------------------------" + [Environment]::NewLine +
+        "void CCamera::ToggleView()" + [Environment]::NewLine +
+        "{" + [Environment]::NewLine +
+        "    m_bFirstPerson = !m_bFirstPerson;" + [Environment]::NewLine +
+        '    g_pLTClient->CPrint("Camera: %s", m_bFirstPerson ? "First Person" : "Third Person");' + [Environment]::NewLine +
+        "}" + [Environment]::NewLine
+}
+Write-Source $cameraCpp $text
+Write-Host "[OK] first-person camera implementation"
+
+$clientShell = Join-Path $sealRoot "cshell\src\ltclientshell.cpp"
+$text = Read-Source $clientShell
+if (-not $text.Contains("m_pCamera->ToggleView();")) {
+    $needle = "           if(VK_ESCAPE == key)"
+    if (-not $text.Contains($needle)) {
+        $needle = "            if(VK_ESCAPE == key)"
+    }
+    if (-not $text.Contains($needle)) { throw "Could not locate in-game key handler." }
+    $indent = $needle.Substring(0, $needle.IndexOf("if("))
+    $insert = $indent + "if('C' == key)" + [Environment]::NewLine +
+        $indent + "{" + [Environment]::NewLine +
+        $indent + "    m_pCamera->ToggleView();" + [Environment]::NewLine +
+        $indent + "}" + [Environment]::NewLine +
+        $indent + "else if(VK_ESCAPE == key)"
+    $text = $text.Replace($needle, $insert)
+    Write-Source $clientShell $text
+}
+Write-Host "[OK] C toggles first/third person"
+
 Write-Host "[OK] Fireteam FPS gameplay bring-up patch set complete."
