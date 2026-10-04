@@ -49,6 +49,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-legacy-s
 if errorlevel 1 goto :fail
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-game-source.ps1" -LocalRoot "%LOCAL%"
 if errorlevel 1 goto :fail
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-weapon-source.ps1" -LocalRoot "%LOCAL%"
+if errorlevel 1 goto :fail
 
 echo [4/4] Refreshing optional local assets...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-local-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%LOCAL%"
