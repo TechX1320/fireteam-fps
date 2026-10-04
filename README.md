@@ -74,5 +74,12 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - Health is server-authoritative at 100 HP with a simple HUD bar.
 - Death currently respawns the player at the map start after 2 seconds.
 - Cabin Fever `PoisonGas` volumes are registered as damaging containers and apply a simple client poison tint while the player is inside.
-- Cabin Fever `Spawner` objects are now recognized, but bring-up is deliberately capped: only `Spawner_02_01` creates one placeholder `FireteamZombie` so testing cannot reproduce the old mass-spawn crash.
-- The placeholder zombie uses the existing HARM guard model temporarily, follows the nearest living player, deals 10 damage per hit, has 40 HP, and can be killed by the Bowie knife.
+- Cabin Fever `Spawner` objects are recognized, but bring-up is deliberately capped: only `Spawner_02_01` is active so testing cannot reproduce the old mass-spawn crash.
+- That single active spawner now creates three original SealHunter `Seal` objects as an AI/melee validation step. All other imported spawners remain inert.
+- Player damage is real again. The earlier respawn loop was caused by stale PoisonGas hazard code surviving in the local generated source; the build now replaces that function body explicitly. Environmental PoisonGas damage remains disabled until Combat Arms safe/outside volume semantics are reproduced.
+
+## Combat Arms compatibility work
+
+- Local `CLIENTFX.zip` and `ClientFx.fxd` can replace SealHunter's small FxED database without committing commercial files. Cabin Fever references `Foggy_Vio`, which is present in the supplied Combat Arms ClientFX database.
+- Cabin Fever texture references are read directly from the DAT during local staging. Missing flattened paths are aliased to matching extracted textures when the match is unambiguous.
+- A minimal Specialist male body/face/hand asset set is staged from `CharModels-Textur.zip` for upcoming player-model work.
