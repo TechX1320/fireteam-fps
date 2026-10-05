@@ -554,49 +554,41 @@ if (-not $text.Contains('if(FT_SettingsIsOpen())')) {
     $text = $text.Insert($inputIndex, $insert)
 }
 
-$inWorldEscapePattern = '(?s)else if\\s*\\(VK_ESCAPE == key\\)\\s*\\{\\s*g_pLTClient->Shutdown\\(\\);\\s*\\}'
-if (-not $text.Contains('FT_SettingsToggle();')) {
-    $match = [regex]::Match($text, $inWorldEscapePattern)
-    if (-not $match.Success) {
-        throw "Could not locate in-world Escape shutdown handler."
-    }
-
-    $replacement = @"
-else if(VK_ESCAPE == key)
-           {
-               FT_SettingsToggle();
-               return;
-           }
-"@
-
-    $text = $text.Substring(0, $match.Index) +
-        $replacement +
-        $text.Substring($match.Index + $match.Length)
-}
-
-if (-not $text.Contains('FT_SettingsHandleKey(key);')) {
+# Route settings keys structurally at the top of OnKeyDown. Do not rewrite the
+# legacy Escape shutdown branch: persistent .local trees may have camera/loadout
+# edits around it, and returning here makes that old branch unreachable in-world.
+if (-not $text.Contains('// Fireteam settings key routing')) {
     $onKeyMarker = 'void CLTClientShell::OnKeyDown(int key, int rep)'
     $onKeyStart = $text.IndexOf($onKeyMarker)
     if ($onKeyStart -lt 0) {
         throw "Could not locate OnKeyDown."
     }
 
-    $chatGuard = '        if(m_pChatGui->IsChatInputActive())'
-    $chatIndex = $text.IndexOf($chatGuard, $onKeyStart)
-    if ($chatIndex -lt 0) {
-        throw "Could not locate OnKeyDown chat guard."
+    $braceStart = $text.IndexOf('{', $onKeyStart)
+    if ($braceStart -lt 0) {
+        throw "Could not locate OnKeyDown opening brace."
     }
 
-    $insert = @"
-        if(FT_SettingsIsOpen())
-        {
-            FT_SettingsHandleKey(key);
-            return;
-        }
+    $routing = @"
+
+    // Fireteam settings key routing
+    if(FT_SettingsIsOpen())
+    {
+        FT_SettingsHandleKey(key);
+        return;
+    }
+
+    if(m_bInWorld &&
+       VK_ESCAPE == key &&
+       !m_pChatGui->IsChatInputActive())
+    {
+        FT_SettingsToggle();
+        return;
+    }
 
 "@
 
-    $text = $text.Insert($chatIndex, $insert)
+    $text = $text.Insert($braceStart + 1, $routing)
 }
 
 if (-not $text.Contains('FT_SettingsTerm();')) {
