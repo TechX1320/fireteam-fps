@@ -15,6 +15,7 @@
 #define __PLAYERCLNT_H__
 
 #include "ltclientshell.h"
+#include "FireteamWeaponDefs.h"
 
 // Engine includes
 #include <ltbasedefs.h>
@@ -41,7 +42,9 @@ public:
     bool                AltAttack();
     bool                SelectWeaponSlot(uint8 nSlot);
     void                CycleWeapon(int nDirection);
+    bool                ReloadWeapon();
     uint8               GetWeaponSlot() const { return m_nWeaponSlot; }
+    const FTWeaponDef*  GetCurrentWeaponDef() const { return FT_GetWeaponDef(m_WeaponDefs, m_nWeaponSlot); }
 
 	bool        		Attack();
     void        		SetClub(HOBJECT hObj);
@@ -94,6 +97,7 @@ private:
     uint32              m_nViewAttackVariant;
     uint8               m_nWeaponSlot;
     float               m_fNextPrimaryClientShot;
+    FTWeaponDef         m_WeaponDefs[6];
 
     uint32          	m_iScore;
     float           	m_fMoney;
