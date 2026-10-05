@@ -29,8 +29,11 @@ private:
     float   m_fSplashRadius;
     float   m_fSpeed;
     float   m_fFuseSeconds;
+    float   m_fExplodeAt;
     bool    m_bRocket;
     bool    m_bExploded;
+    bool    m_bHaveLastPos;
+    LTVector m_vLastPos;
 };
 
 #endif
