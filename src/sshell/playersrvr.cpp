@@ -30,6 +30,7 @@
 #include "statsmanager.h"
 #include <string.h>
 #include "FireteamPoisonGas.h"
+#include "FireteamExplosiveProjectile.h"
 
 
 //-----------------------------------------------------------------------------
@@ -86,6 +87,7 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
             else
             {
                 UpdateHazards();
+                CompleteReloadIfReady();
             }
 
             //Do we need to send score stats?
@@ -788,11 +790,14 @@ void CPlayerSrvr::SendHealth()
 //-----------------------------------------------------------------------------
 void CPlayerSrvr::SetWeaponSlot(uint8 nSlot)
 {
-    if(nSlot != 1 && nSlot != 3)
+    const FTWeaponDef *pDef = FT_GetWeaponDef(m_WeaponDefs, nSlot);
+    if(!pDef)
     {
         return;
     }
 
+    m_bReloading = false;
+    m_nReloadSlot = 0;
     m_nWeaponSlot = nSlot;
     SendPrimaryAmmo();
 
@@ -805,66 +810,88 @@ void CPlayerSrvr::SetWeaponSlot(uint8 nSlot)
     ocs.Clear();
     ocs.m_ObjectType = OT_MODEL;
 
-    if(m_nWeaponSlot == 1)
-    {
-        strncpy(
-            ocs.m_Filename,
-            "Weapons/primary_m_hh/HH_AK-47.LTB",
-            sizeof(ocs.m_Filename) - 1);
-        strncpy(
-            ocs.m_SkinName,
-            "Weapons/primary_t/HH_AK-47.DTX",
-            sizeof(ocs.m_SkinName) - 1);
-    }
-    else
-    {
-        strncpy(
-            ocs.m_Filename,
-            "Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB",
-            sizeof(ocs.m_Filename) - 1);
-        strncpy(
-            ocs.m_SkinName,
-            "Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX",
-            sizeof(ocs.m_SkinName) - 1);
-    }
+    FT_CopyWeaponString(
+        ocs.m_Filename,
+        sizeof(ocs.m_Filename),
+        pDef->sHHModel);
+    FT_CopyWeaponString(
+        ocs.m_SkinName,
+        sizeof(ocs.m_SkinName),
+        pDef->sHHTexture);
 
     g_pLTSCommon->SetObjectFilenames(m_hClub, &ocs);
+
+    g_pLTServer->CPrint(
+        "Fireteam weapon: slot %u %s ammo=%u/%u",
+        (uint32)m_nWeaponSlot,
+        pDef->sName,
+        (uint32)m_nWeaponAmmoInClip[m_nWeaponSlot],
+        (uint32)m_nWeaponAmmoReserve[m_nWeaponSlot]);
 }
 
 void CPlayerSrvr::FirePrimary(
     const LTVector &vFrom,
     const LTVector &vDirection)
 {
-    if(!m_bAlive || m_nWeaponSlot != 1)
+    if(!m_bAlive)
+    {
+        return;
+    }
+
+    const FTWeaponDef *pDef = FT_GetWeaponDef(
+        m_WeaponDefs,
+        m_nWeaponSlot);
+
+    if(!pDef || pDef->eType == FT_WEAPON_MELEE)
+    {
+        return;
+    }
+
+    CompleteReloadIfReady();
+    if(m_bReloading && m_nReloadSlot == m_nWeaponSlot)
     {
         return;
     }
 
     const float fNow = g_pLTServer->GetTime();
-    if(fNow < m_fNextPrimaryShot)
+    if(fNow < m_fNextWeaponShot[m_nWeaponSlot])
     {
         return;
     }
 
-    if(m_nPrimaryAmmoInClip == 0)
+    if(m_nWeaponAmmoInClip[m_nWeaponSlot] == 0)
     {
         SendPrimaryAmmo();
         return;
     }
 
-    // Combat Arms Weapon12 AK-47 bring-up values:
-    // 30-round magazine, 48 close damage, 3500 maximum effect range.
-    m_fNextPrimaryShot = fNow + 0.10f;
-    --m_nPrimaryAmmoInClip;
-    SendPrimaryAmmo();
-
     LTVector vDir = vDirection;
     if(vDir.MagSqr() < 0.0001f)
     {
-        g_pLTServer->CPrint("Fireteam gun: rejected zero-length AK-47 direction.");
         return;
     }
     vDir.Normalize();
+
+    m_fNextWeaponShot[m_nWeaponSlot] =
+        fNow + pDef->fFireInterval;
+
+    --m_nWeaponAmmoInClip[m_nWeaponSlot];
+    SendPrimaryAmmo();
+
+    if(pDef->eType == FT_WEAPON_GRENADE ||
+       pDef->eType == FT_WEAPON_ROCKET)
+    {
+        SpawnExplosiveProjectile(
+            *pDef,
+            vFrom,
+            vDir);
+        return;
+    }
+
+    if(pDef->eType != FT_WEAPON_HITSCAN)
+    {
+        return;
+    }
 
     LTVector vPlayerPos;
     g_pLTServer->GetObjectPos(m_hObject, &vPlayerPos);
@@ -880,7 +907,7 @@ void CPlayerSrvr::FirePrimary(
     IntersectInfo info;
 
     query.m_From = vStart + (vDir * 4.0f);
-    query.m_To = query.m_From + (vDir * 3500.0f);
+    query.m_To = query.m_From + (vDir * pDef->fRange);
     query.m_Flags =
         INTERSECT_OBJECTS |
         IGNORE_NONSOLID |
@@ -896,54 +923,59 @@ void CPlayerSrvr::FirePrimary(
     if(!g_pLTServer->IntersectSegment(&query, &info))
     {
         g_pLTServer->CPrint(
-            "Fireteam gun: AK-47 no hit (%u/%u)",
-            (uint32)m_nPrimaryAmmoInClip,
-            (uint32)m_nPrimaryAmmoReserve);
+            "Fireteam weapon: %s no hit (%u/%u)",
+            pDef->sName,
+            (uint32)m_nWeaponAmmoInClip[m_nWeaponSlot],
+            (uint32)m_nWeaponAmmoReserve[m_nWeaponSlot]);
         return;
     }
 
-    const float fDistance = (info.m_Point - query.m_From).Mag();
+    const float fDistance =
+        (info.m_Point - query.m_From).Mag();
 
     if(!info.m_hObject ||
        g_pLTSPhysics->IsWorldObject(info.m_hObject) == LT_YES)
     {
         g_pLTServer->CPrint(
-            "Fireteam gun: AK-47 world hit %.1f (%u/%u)",
-            fDistance,
-            (uint32)m_nPrimaryAmmoInClip,
-            (uint32)m_nPrimaryAmmoReserve);
+            "Fireteam weapon: %s world hit %.1f",
+            pDef->sName,
+            fDistance);
         return;
     }
 
-    HCLASS hTarget = g_pLTServer->GetObjectClass(info.m_hObject);
-    HCLASS hZombie = g_pLTServer->GetClass("FireteamZombie");
-    HCLASS hSeal = g_pLTServer->GetClass("Seal");
+    HCLASS hTarget =
+        g_pLTServer->GetObjectClass(info.m_hObject);
+    HCLASS hZombie =
+        g_pLTServer->GetClass("FireteamZombie");
+    HCLASS hSeal =
+        g_pLTServer->GetClass("Seal");
 
-    const bool bDamage =
+    const bool bEnemy =
         (hZombie && hTarget &&
          g_pLTServer->IsKindOf(hTarget, hZombie)) ||
         (hSeal && hTarget &&
          g_pLTServer->IsKindOf(hTarget, hSeal));
 
-    if(!bDamage)
+    if(!bEnemy)
     {
-        // Co-op invariant: firearm damage is only sent to Fireteam enemies.
-        g_pLTServer->CPrint(
-            "Fireteam gun: AK-47 non-enemy hit %.1f (%u/%u)",
-            fDistance,
-            (uint32)m_nPrimaryAmmoInClip,
-            (uint32)m_nPrimaryAmmoReserve);
+        // Co-op invariant: players never receive weapon damage.
         return;
     }
 
-    uint8 nDamage = 48;
-    if(fDistance > 3000.0f)
+    uint8 nDamage = pDef->nDamage;
+
+    // Keep the researched Combat Arms AK-47 falloff until the generalized
+    // falloff fields are imported from decrypted weapon data.
+    if(_stricmp(pDef->sId, "ak47") == 0)
     {
-        nDamage = 17;
-    }
-    else if(fDistance > 2500.0f)
-    {
-        nDamage = 34;
+        if(fDistance > 3000.0f)
+        {
+            nDamage = 17;
+        }
+        else if(fDistance > 2500.0f)
+        {
+            nDamage = 34;
+        }
     }
 
     ILTMessage_Write *pDamage = LTNULL;
@@ -960,11 +992,10 @@ void CPlayerSrvr::FirePrimary(
         pDamage->DecRef();
 
         g_pLTServer->CPrint(
-            "Fireteam gun: AK-47 infected hit damage=%u distance=%.1f (%u/%u)",
+            "Fireteam weapon: %s infected hit damage=%u distance=%.1f",
+            pDef->sName,
             (uint32)nDamage,
-            fDistance,
-            (uint32)m_nPrimaryAmmoInClip,
-            (uint32)m_nPrimaryAmmoReserve);
+            fDistance);
     }
 }
 
@@ -972,6 +1003,15 @@ void CPlayerSrvr::FirePrimary(
 void CPlayerSrvr::SendPrimaryAmmo()
 {
     if(!m_hClient)
+    {
+        return;
+    }
+
+    const FTWeaponDef *pDef = FT_GetWeaponDef(
+        m_WeaponDefs,
+        m_nWeaponSlot);
+
+    if(!pDef)
     {
         return;
     }
@@ -984,11 +1024,157 @@ void CPlayerSrvr::SendPrimaryAmmo()
 
     pMsg->IncRef();
     pMsg->Writeuint8(MSG_SC_AMMO);
-    pMsg->Writeuint16(m_nPrimaryAmmoInClip);
-    pMsg->Writeuint16(m_nPrimaryAmmoReserve);
+    pMsg->Writeuint16(m_nWeaponAmmoInClip[m_nWeaponSlot]);
+    pMsg->Writeuint16(m_nWeaponAmmoReserve[m_nWeaponSlot]);
     g_pLTServer->SendToClient(
         pMsg->Read(),
         m_hClient,
         MESSAGE_GUARANTEED);
     pMsg->DecRef();
+}
+
+
+void CPlayerSrvr::ReloadWeapon()
+{
+    if(!m_bAlive)
+    {
+        return;
+    }
+
+    const FTWeaponDef *pDef = FT_GetWeaponDef(
+        m_WeaponDefs,
+        m_nWeaponSlot);
+
+    if(!pDef ||
+       pDef->eType == FT_WEAPON_MELEE ||
+       pDef->nClipSize == 0 ||
+       m_bReloading)
+    {
+        return;
+    }
+
+    if(m_nWeaponAmmoInClip[m_nWeaponSlot] >= pDef->nClipSize ||
+       m_nWeaponAmmoReserve[m_nWeaponSlot] == 0)
+    {
+        return;
+    }
+
+    m_bReloading = true;
+    m_nReloadSlot = m_nWeaponSlot;
+    m_fReloadComplete =
+        g_pLTServer->GetTime() + pDef->fReloadSeconds;
+
+    g_pLTServer->CPrint(
+        "Fireteam weapon: reloading %s",
+        pDef->sName);
+}
+
+void CPlayerSrvr::CompleteReloadIfReady()
+{
+    if(!m_bReloading ||
+       g_pLTServer->GetTime() < m_fReloadComplete)
+    {
+        return;
+    }
+
+    const FTWeaponDef *pDef = FT_GetWeaponDef(
+        m_WeaponDefs,
+        m_nReloadSlot);
+
+    if(!pDef)
+    {
+        m_bReloading = false;
+        m_nReloadSlot = 0;
+        return;
+    }
+
+    const uint16 nNeeded =
+        (pDef->nClipSize > m_nWeaponAmmoInClip[m_nReloadSlot])
+        ? (pDef->nClipSize - m_nWeaponAmmoInClip[m_nReloadSlot])
+        : 0;
+
+    const uint16 nTransfer =
+        (nNeeded < m_nWeaponAmmoReserve[m_nReloadSlot])
+        ? nNeeded
+        : m_nWeaponAmmoReserve[m_nReloadSlot];
+
+    m_nWeaponAmmoInClip[m_nReloadSlot] += nTransfer;
+    m_nWeaponAmmoReserve[m_nReloadSlot] -= nTransfer;
+
+    m_bReloading = false;
+    const uint8 nCompletedSlot = m_nReloadSlot;
+    m_nReloadSlot = 0;
+
+    if(nCompletedSlot == m_nWeaponSlot)
+    {
+        SendPrimaryAmmo();
+    }
+}
+
+void CPlayerSrvr::SpawnExplosiveProjectile(
+    const FTWeaponDef &def,
+    const LTVector &vFrom,
+    const LTVector &vDirection)
+{
+    HCLASS hProjectileClass =
+        g_pLTServer->GetClass("FireteamExplosiveProjectile");
+
+    if(!hProjectileClass)
+    {
+        return;
+    }
+
+    LTVector vDir = vDirection;
+    vDir.Normalize();
+
+    ObjectCreateStruct ocs;
+    ocs.Clear();
+    ocs.m_ObjectType = OT_MODEL;
+    ocs.m_Pos = vFrom + (vDir * 28.0f);
+    ocs.m_Rotation = LTRotation(
+        vDir,
+        LTVector(0.0f, 1.0f, 0.0f));
+
+    if(def.eType == FT_WEAPON_GRENADE)
+    {
+        FT_CopyWeaponString(
+            ocs.m_Filename,
+            sizeof(ocs.m_Filename),
+            def.sHHModel);
+        FT_CopyWeaponString(
+            ocs.m_SkinName,
+            sizeof(ocs.m_SkinName),
+            def.sHHTexture);
+    }
+    else
+    {
+        // Temporary visible rocket body until the CA projectile model is
+        // identified separately from the hand-held LAW model.
+        FT_CopyWeaponString(
+            ocs.m_Filename,
+            sizeof(ocs.m_Filename),
+            "Models/GenCan.ltb");
+        FT_CopyWeaponString(
+            ocs.m_SkinName,
+            sizeof(ocs.m_SkinName),
+            "ModelTextures/GenCan1.dtx");
+    }
+
+    FireteamExplosiveProjectile *pProjectile =
+        (FireteamExplosiveProjectile*)g_pLTServer->CreateObject(
+            hProjectileClass,
+            &ocs);
+
+    if(!pProjectile)
+    {
+        return;
+    }
+
+    pProjectile->Configure(
+        m_hObject,
+        def.nDamage,
+        def.fSplashRadius,
+        def.fProjectileSpeed,
+        def.fFuseSeconds,
+        def.eType == FT_WEAPON_ROCKET);
 }
