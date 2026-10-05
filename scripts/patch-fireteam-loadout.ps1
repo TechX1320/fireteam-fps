@@ -223,7 +223,7 @@ $createBody = @'
     if(m_nWeaponSlot == 1)
     {
         FILE *pAK = fopen(
-            "rez\\Weapons\\primary_m_pv\\AK47_PV.LTB",
+            "rez\\Weapons\\primary_m_pv\\PV_AR_AK47_SH.LTB",
             "rb");
 
         if(!pAK)
@@ -249,19 +249,14 @@ $createBody = @'
     {
         strcpy(
             ocs.m_Filenames[0],
-            "Weapons\\primary_m_pv\\AK47_PV.LTB");
+            "Weapons\\primary_m_pv\\PV_AR_AK47_SH.LTB");
 
-        FILE *pAni = fopen(
-            "rez\\Weapons\\primary_m_pv\\AK47_ANI.LTB",
-            "rb");
+        strcpy(
+            ocs.m_Filenames[1],
+            "Weapons\\primary_m_pv\\AK47_ANIBASE.LTB");
 
-        if(pAni)
-        {
-            fclose(pAni);
-            strcpy(
-                ocs.m_Filenames[1],
-                "Weapons\\primary_m_pv\\AK47_ANI.LTB");
-        }
+        // Combat Arms Weapon12 player-view offset.
+        ocs.m_Pos.Init(0.3f, -0.6f, 1.2f);
 
         strcpy(
             ocs.m_SkinNames[0],
