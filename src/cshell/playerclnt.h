@@ -43,6 +43,7 @@ public:
     bool                SelectWeaponSlot(uint8 nSlot);
     void                CycleWeapon(int nDirection);
     bool                ReloadWeapon();
+    void                ReleaseAttackTrigger() { m_bSemiAutoTriggerHeld = false; }
     uint8               GetWeaponSlot() const { return m_nWeaponSlot; }
     const FTWeaponDef*  GetCurrentWeaponDef() const { return FT_GetWeaponDef(m_WeaponDefs, m_nWeaponSlot); }
 
@@ -97,6 +98,7 @@ private:
     uint32              m_nViewAttackVariant;
     uint8               m_nWeaponSlot;
     float               m_fNextPrimaryClientShot;
+    bool                m_bSemiAutoTriggerHeld;
     FTWeaponDef         m_WeaponDefs[6];
 
     uint32          	m_iScore;
