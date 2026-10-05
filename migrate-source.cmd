@@ -62,6 +62,18 @@ if errorlevel 1 goto :copyfail
 xcopy "%LOCAL_SEAL%\sres\src\*" "%SRC%\sres\" /E /I /Y /Q >nul
 if errorlevel 1 goto :copyfail
 
+rem Diagnostics originally generated this header under the local Jupiter SDK.
+rem Promote it into committed shared source so clean future setups do not depend
+rem on a generated header.
+if exist "%CD%\.local\imports\engine\sdk\inc\fireteamtrace.h" (
+  copy /y "%CD%\.local\imports\engine\sdk\inc\fireteamtrace.h" "%SRC%\shared\fireteamtrace.h" >nul
+  if errorlevel 1 goto :copyfail
+) else (
+  echo [ERROR] fireteamtrace.h was not found in the current local SDK.
+  echo Run the last working setup/build once or attach the missing header.
+  goto :fail
+)
+
 del /q "%SRC%\cshell\*.vcproj" >nul 2>nul
 del /q "%SRC%\sshell\*.vcproj" >nul 2>nul
 del /q "%SRC%\cres\*.vcproj" >nul 2>nul
