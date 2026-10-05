@@ -514,6 +514,37 @@ void CLTClientShell::OnEnterWorld()
 
     m_bInWorld = true;
 
+    // NOLF2/Jupiter lighting diagnostics. Do not modify these values here;
+    // record them so CA map parity can be fixed from evidence rather than a
+    // blanket brightness multiplier.
+    float fGammaR = 1.0f;
+    float fGammaG = 1.0f;
+    float fGammaB = 1.0f;
+
+    HCONSOLEVAR hGamma = g_pLTClient->GetConsoleVar("GammaR");
+    if(hGamma) fGammaR = g_pLTClient->GetVarValueFloat(hGamma);
+    hGamma = g_pLTClient->GetConsoleVar("GammaG");
+    if(hGamma) fGammaG = g_pLTClient->GetVarValueFloat(hGamma);
+    hGamma = g_pLTClient->GetConsoleVar("GammaB");
+    if(hGamma) fGammaB = g_pLTClient->GetVarValueFloat(hGamma);
+
+    LTVector vCameraLightAdd(0.0f, 0.0f, 0.0f);
+    if(m_hCamera)
+    {
+        g_pLTClient->GetCameraLightAdd(
+            m_hCamera,
+            &vCameraLightAdd);
+    }
+
+    g_pLTClient->CPrint(
+        "Fireteam lighting: gamma %.2f %.2f %.2f camera light-add %.2f %.2f %.2f",
+        fGammaR,
+        fGammaG,
+        fGammaB,
+        vCameraLightAdd.x,
+        vCameraLightAdd.y,
+        vCameraLightAdd.z);
+
 }
 
 
