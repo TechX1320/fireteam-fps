@@ -17,6 +17,7 @@
 // Engine includes
 #include <ltbasedefs.h>
 #include <ltengineobjects.h>
+#include "FireteamWeaponDefs.h"
 
 
 
@@ -39,10 +40,18 @@ public:
           m_fRespawnTimer(0.0f),
           m_fPoisonCarry(0.0f),
           m_nWeaponSlot(3),
-          m_fNextPrimaryShot(0.0f),
-          m_nPrimaryAmmoInClip(30),
-          m_nPrimaryAmmoReserve(90)
+          m_bReloading(false),
+          m_nReloadSlot(0),
+          m_fReloadComplete(0.0f)
     {
+        FT_LoadWeaponDefs("config/weapons.cfg", m_WeaponDefs);
+
+        for(uint8 nSlot = 0; nSlot < 6; ++nSlot)
+        {
+            m_fNextWeaponShot[nSlot] = 0.0f;
+            m_nWeaponAmmoInClip[nSlot] = m_WeaponDefs[nSlot].nClipSize;
+            m_nWeaponAmmoReserve[nSlot] = m_WeaponDefs[nSlot].nStartReserve;
+        }
     }
 
 	~CPlayerSrvr()
@@ -67,6 +76,7 @@ public:
     void    			SetClubID();
     void                SetWeaponSlot(uint8 nSlot);
     void                FirePrimary(const LTVector &vFrom, const LTVector &vDirection);
+    void                ReloadWeapon();
     void                SetClientID(uint32 id){ m_iClientID = id; }
     uint32              GetClientID(){ return m_iClientID; }
     uint32              GetScore(){ return m_iScore; }
@@ -92,6 +102,11 @@ private:
     void 				PlaySound(int i);
     void                SendHealth();
     void                SendPrimaryAmmo();
+    void                CompleteReloadIfReady();
+    void                SpawnExplosiveProjectile(
+                            const FTWeaponDef &def,
+                            const LTVector &vFrom,
+                            const LTVector &vDirection);
     void                Respawn();
     void                UpdateHazards();
 
@@ -111,9 +126,13 @@ private:
 	HOBJECT             m_hClub;
 	ModelOBB			m_WeaponOBB;
     uint8               m_nWeaponSlot;
-    float               m_fNextPrimaryShot;
-    uint16              m_nPrimaryAmmoInClip;
-    uint16              m_nPrimaryAmmoReserve;
+    FTWeaponDef         m_WeaponDefs[6];
+    float               m_fNextWeaponShot[6];
+    uint16              m_nWeaponAmmoInClip[6];
+    uint16              m_nWeaponAmmoReserve[6];
+    bool                m_bReloading;
+    uint8               m_nReloadSlot;
+    float               m_fReloadComplete;
 
     HCLIENT             m_hClient;
 
