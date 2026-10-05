@@ -133,7 +133,7 @@ void FT_SetPrimaryAmmo(uint16 nClip, uint16 nReserve)
     s_nPrimaryReserve = nReserve;
 }
 
-void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson)
+void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson, bool bShowCrosshair, bool bShowAmmo)
 {
     if(!bFirstPerson ||
        nWeaponSlot < 1 ||
@@ -150,68 +150,72 @@ void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson)
         &nScreenW,
         &nScreenH);
 
-    const float cx = (float)nScreenW * 0.5f;
-    const float cy = (float)nScreenH * 0.5f;
-
-    // NOLF2 HUDCrosshair uses screen-centered DrawPrim geometry. Keep the
-    // same basic approach here without depending on NOLF2 texture assets.
-    const float fGap = 6.0f;
-    const float fLength = 10.0f;
-    const float fThickness = 2.0f;
-
-    LT_POLYF4 crosshair[4];
-
-    FT_SetupQuad(
-        crosshair[0],
-        cx - fGap - fLength,
-        cy - (fThickness * 0.5f),
-        fLength,
-        fThickness,
-        0, 255, 255, 235);
-
-    FT_SetupQuad(
-        crosshair[1],
-        cx + fGap,
-        cy - (fThickness * 0.5f),
-        fLength,
-        fThickness,
-        0, 255, 255, 235);
-
-    FT_SetupQuad(
-        crosshair[2],
-        cx - (fThickness * 0.5f),
-        cy - fGap - fLength,
-        fThickness,
-        fLength,
-        0, 255, 255, 235);
-
-    FT_SetupQuad(
-        crosshair[3],
-        cx - (fThickness * 0.5f),
-        cy + fGap,
-        fThickness,
-        fLength,
-        0, 255, 255, 235);
-
-    FT_SetDrawState();
-
-    g_pLTCDrawPrim->BeginDrawPrim();
-    g_pLTCDrawPrim->DrawPrim(crosshair, 4);
-    g_pLTCDrawPrim->EndDrawPrim();
-
-    const FTWeaponDef *pDef =
-        FT_GetWeaponDef(s_WeaponDefs, nWeaponSlot);
-
-    if(s_pWeaponName && pDef)
+    if(bShowCrosshair)
     {
-        s_pWeaponName->SetText(pDef->sName);
-        s_pWeaponName->SetPosition(
-            (float)nScreenW - 210.0f,
-            (float)nScreenH - 102.0f);
-        s_pWeaponName->Render();
+        const float cx = (float)nScreenW * 0.5f;
+        const float cy = (float)nScreenH * 0.5f;
+
+        // NOLF2 HUDCrosshair uses screen-centered DrawPrim geometry. Keep the
+        // same basic approach here without depending on NOLF2 texture assets.
+        const float fGap = 6.0f;
+        const float fLength = 10.0f;
+        const float fThickness = 2.0f;
+
+        LT_POLYF4 crosshair[4];
+
+        FT_SetupQuad(
+            crosshair[0],
+            cx - fGap - fLength,
+            cy - (fThickness * 0.5f),
+            fLength,
+            fThickness,
+            0, 255, 255, 235);
+
+        FT_SetupQuad(
+            crosshair[1],
+            cx + fGap,
+            cy - (fThickness * 0.5f),
+            fLength,
+            fThickness,
+            0, 255, 255, 235);
+
+        FT_SetupQuad(
+            crosshair[2],
+            cx - (fThickness * 0.5f),
+            cy - fGap - fLength,
+            fThickness,
+            fLength,
+            0, 255, 255, 235);
+
+        FT_SetupQuad(
+            crosshair[3],
+            cx - (fThickness * 0.5f),
+            cy + fGap,
+            fThickness,
+            fLength,
+            0, 255, 255, 235);
+
+        FT_SetDrawState();
+
+        g_pLTCDrawPrim->BeginDrawPrim();
+        g_pLTCDrawPrim->DrawPrim(crosshair, 4);
+        g_pLTCDrawPrim->EndDrawPrim();
+
+        const FTWeaponDef *pDef =
+            FT_GetWeaponDef(s_WeaponDefs, nWeaponSlot);
+
+        if(s_pWeaponName && pDef)
+        {
+            s_pWeaponName->SetText(pDef->sName);
+            s_pWeaponName->SetPosition(
+                (float)nScreenW - 210.0f,
+                (float)nScreenH - 102.0f);
+            s_pWeaponName->Render();
+        }
+
     }
 
-    if(nWeaponSlot == 3)
+    if(!bShowAmmo)
     {
         return;
     }
