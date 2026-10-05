@@ -41,7 +41,12 @@ function Stage-PlayerViewWeapon {
   if($model) { Copy-ZipEntry $Zip $model $ModelDest } else { Write-Host "[SKIP] No PV model found for $($Tokens -join '/')" }
   $anim = $null
   if($ExactAnimLeaf) { $anim = $Zip.Entries | Where-Object { $_.Name -ieq $ExactAnimLeaf } | Select-Object -First 1 }
-  if(-not $anim) { $anim = Find-BestEntry $Zip $Tokens "LTB" "(?i)GUNS_M_PV" "(?i)ANIBASE|^ANI_" "(?i)I_INFO|HH_" }
+  if(-not $anim) {
+    foreach($token in $Tokens) {
+      $anim = $Zip.Entries | Where-Object { $_.FullName -match "(?i)GUNS_M_PV" -and $_.Name -match [regex]::Escape($token) -and $_.Name -match "(?i)(ANIBASE|^ANI_).*\.LTB$" -and $_.Name -notmatch "(?i)I_INFO|HH_" } | Sort-Object FullName | Select-Object -First 1
+      if($anim) { break }
+    }
+  }
   if($anim) { Copy-ZipEntry $Zip $anim $AnimDest } else { Write-Host "[SKIP] No PV animation companion found for $($Tokens -join '/')" }
   $texture = $null
   if($ExactTextureLeaf) { $texture = $Zip.Entries | Where-Object { $_.Name -ieq $ExactTextureLeaf } | Select-Object -First 1 }
