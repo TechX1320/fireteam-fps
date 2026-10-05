@@ -39,7 +39,9 @@ public:
           m_fRespawnTimer(0.0f),
           m_fPoisonCarry(0.0f),
           m_nWeaponSlot(3),
-          m_fNextPrimaryShot(0.0f)
+          m_fNextPrimaryShot(0.0f),
+          m_nPrimaryAmmoInClip(30),
+          m_nPrimaryAmmoReserve(90)
     {
     }
 
@@ -61,7 +63,7 @@ public:
     char*   			GetPlayerName();
 
     void    			PlayAnimation(const char* sAnimName, uint8 nTracker, bool bLooping);
-    void                SetClient(HCLIENT hClient){ m_hClient = hClient; SendHealth(); }
+    void                SetClient(HCLIENT hClient){ m_hClient = hClient; SendHealth(); SendPrimaryAmmo(); }
     void    			SetClubID();
     void                SetWeaponSlot(uint8 nSlot);
     void                FirePrimary(const LTVector &vFrom, const LTVector &vDirection);
@@ -89,6 +91,7 @@ private:
     void 				CheckForHit();
     void 				PlaySound(int i);
     void                SendHealth();
+    void                SendPrimaryAmmo();
     void                Respawn();
     void                UpdateHazards();
 
@@ -109,6 +112,8 @@ private:
 	ModelOBB			m_WeaponOBB;
     uint8               m_nWeaponSlot;
     float               m_fNextPrimaryShot;
+    uint16              m_nPrimaryAmmoInClip;
+    uint16              m_nPrimaryAmmoReserve;
 
     HCLIENT             m_hClient;
 
