@@ -25,6 +25,7 @@
 #include "commandids.h"
 #include "msgids.h"
 #include "animids.h"
+#include "FireteamWeaponHud.h"
 
 #define MOVEMENT_RATE 2000.0f
 #define JUMP_TIME 0.25f
@@ -62,7 +63,7 @@ m_fLeashingDelay(0.0f)
 {
     if(!FT_LoadWeaponDefs("config/weapons.cfg", m_WeaponDefs))
     {
-        g_pLTClient->CPrint("Fireteam: using built-in weapon definition fallback.");
+        g_pLTClient->CPrint("Fireteam: failed to load config/weapons.cfg.");
     }
 }
 
@@ -170,6 +171,22 @@ void CPlayerClnt::UpdateRotation(float yaw, float pitch, float roll)
     m_fYaw += yaw;
     m_fPitch += pitch;
     m_fRoll += roll;
+}
+
+bool CPlayerClnt::IsMoving()
+{
+    if(!m_hObject)
+    {
+        return false;
+    }
+
+    LTVector vVelocity;
+    g_pLTCPhysics->GetVelocity(
+        m_hObject,
+        &vVelocity);
+
+    return ((vVelocity.x * vVelocity.x) +
+            (vVelocity.z * vVelocity.z)) > 100.0f;
 }
 
 
@@ -484,6 +501,7 @@ bool CPlayerClnt::Attack()
             hFire != INVALID_MODEL_ANIM ? "fire_0" : "fire",
             false);
         PlayViewWeaponSound("FIRE.WAV");
+        FT_WeaponHudOnShot(m_nWeaponSlot);
         return true;
     }
 
