@@ -32,7 +32,7 @@ $menuH = @'
 
 class CUIFont;
 
-void FT_SettingsInit(CUIFont *pFont);
+void FT_SettingsInit();
 void FT_SettingsTerm();
 void FT_SettingsRender();
 void FT_SettingsToggle();
@@ -255,16 +255,33 @@ static void FTSetupQuad(
     poly.verts[3].rhw = 1.0f;
 }
 
-void FT_SettingsInit(CUIFont *pFont)
+void FT_SettingsInit()
 {
-    s_pFont = pFont;
     FTReadCurrentVideo();
     FTLoadSettings();
     FTApplySensitivity();
 
     if(!s_pFont)
     {
-        return;
+        const char *pFontFilename = "fonts/SQR721B.TTF";
+        const char *pFontFace = "Square721 BT";
+
+        s_pFont = g_pLTCFontManager->CreateFont(
+            pFontFilename,
+            pFontFace,
+            18,
+            33,
+            255);
+
+        if(!s_pFont)
+        {
+            g_pLTClient->CPrint(
+                "Fireteam: failed to create settings font.");
+            return;
+        }
+
+        s_pFont->SetDefCharWidth(5);
+        s_pFont->SetDefColor(0xFFFFFFFF);
     }
 
     s_pTitle = g_pLTCFontManager->CreateFormattedPolyString(
@@ -299,7 +316,12 @@ void FT_SettingsTerm()
         s_pBody = LTNULL;
     }
 
-    s_pFont = LTNULL;
+    if(s_pFont)
+    {
+        g_pLTCFontManager->DestroyFont(s_pFont);
+        s_pFont = LTNULL;
+    }
+
     s_bOpen = false;
 }
 
@@ -487,14 +509,15 @@ if (-not $text.Contains('#include "FireteamSettingsMenu.h"')) {
         $includeAnchor + [Environment]::NewLine + '#include "FireteamSettingsMenu.h"')
 }
 
-if (-not $text.Contains('FT_SettingsInit(m_Gui.GetVectorFont());')) {
-    $anchor = 'm_Gui.Init(15, 18);'
+if (-not $text.Contains('FT_SettingsInit();')) {
+    $anchor = 'm_pChatGui->Init();'
     if (-not $text.Contains($anchor)) {
-        throw "Could not locate GUI initialization."
+        throw "Could not locate active chat GUI initialization."
     }
+
     $text = $text.Replace(
         $anchor,
-        $anchor + [Environment]::NewLine + '    FT_SettingsInit(m_Gui.GetVectorFont());')
+        $anchor + [Environment]::NewLine + '    FT_SettingsInit();')
 }
 
 if (-not $text.Contains('FT_SettingsRender();')) {
@@ -577,10 +600,11 @@ if (-not $text.Contains('FT_SettingsHandleKey(key);')) {
 }
 
 if (-not $text.Contains('FT_SettingsTerm();')) {
-    $anchor = 'm_Gui.Term();'
+    $anchor = 'm_pChatGui->Term();'
     if (-not $text.Contains($anchor)) {
-        throw "Could not locate GUI termination."
+        throw "Could not locate active chat GUI termination."
     }
+
     $text = $text.Replace(
         $anchor,
         'FT_SettingsTerm();' + [Environment]::NewLine + '    ' + $anchor)
