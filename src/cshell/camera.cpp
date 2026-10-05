@@ -16,7 +16,7 @@
 #include <ltobjectcreate.h>
 #include "clientinterfaces.h"
 
-#define MAX_PITCH   85.0f
+#define MAX_PITCH   (85.0f * (MATH_PI / 180.0f))
 #define MIN_ZOOM	200.0f
 #define MAX_ZOOM	400.0f
 
@@ -134,7 +134,9 @@ void CCamera::UpdatePosition(HOBJECT hObject)
     g_pLTClient->GetObjectRotation(hObject, &rRot);
 
     LTVector vEyeUp = rRot.Up();
-    rRot.Rotate(rRot.Right(), (m_fPitch * 0.0174533f));
+    // Mouse axis offsets and player yaw are already radians. Keep pitch in
+    // radians too so horizontal/vertical sensitivity use the same units.
+    rRot.Rotate(rRot.Right(), m_fPitch);
 
     // Fireteam FPS first-person camera.
     if (m_bFirstPerson)
