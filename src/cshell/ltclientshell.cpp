@@ -610,6 +610,21 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             uint16 nClip = pMessage->Readuint16();
             uint16 nReserve = pMessage->Readuint16();
             FT_SetPrimaryAmmo(nClip, nReserve);
+
+            // Normal Fireteam behavior: an empty magazine with reserve ammo
+            // immediately requests a server-authoritative reload. A future
+            // Expert mode can deliberately disable this convenience.
+            if(m_pPlayer && nClip == 0 && nReserve > 0)
+            {
+                const FTWeaponDef *pDef = m_pPlayer->GetCurrentWeaponDef();
+                if(pDef &&
+                   pDef->nClipSize > 0 &&
+                   pDef->eType != FT_WEAPON_MELEE &&
+                   pDef->fReloadSeconds > 0.0f)
+                {
+                    m_pPlayer->ReloadWeapon();
+                }
+            }
         }
         break;
 	case MSG_WORLD_PROPS:
@@ -1059,7 +1074,12 @@ LTRESULT CLTClientShell::PollInput()
                 pMessage->Writeuint8(MSG_CS_SHOOT);
                 pMessage->WriteLTVector(vFirePos);
                 pMessage->WriteLTVector(vFireDir);
-                g_pLTClient->SendToServer(pMessage->Read(), 0);
+                const uint32 nDelivery =
+                    (pWeaponDef->eType == FT_WEAPON_GRENADE ||
+                     pWeaponDef->eType == FT_WEAPON_ROCKET)
+                    ? MESSAGE_GUARANTEED
+                    : 0;
+                g_pLTClient->SendToServer(pMessage->Read(), nDelivery);
                 pMessage->DecRef();
             }
         }
