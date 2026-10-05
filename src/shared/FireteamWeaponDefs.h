@@ -29,8 +29,15 @@ struct FTWeaponDef
 
     float fFireInterval;
     float fRange;
+    float fEffectRange0;
+    float fEffectRange1;
+    float fEffectRange2;
+    float fDamageMult0;
+    float fDamageMult1;
+    float fDamageMult2;
     float fReloadSeconds;
     bool  bAutomatic;
+    bool  bShowCrosshair;
 
     float fProjectileSpeed;
     float fSplashRadius;
@@ -104,8 +111,13 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     for(uint8 nSlot = 1; nSlot <= 5; ++nSlot)
     {
         aDefs[nSlot].nSlot = nSlot;
+        aDefs[nSlot].fDamageMult0 = 1.0f;
+        aDefs[nSlot].fDamageMult1 = 1.0f;
+        aDefs[nSlot].fDamageMult2 = 1.0f;
+        aDefs[nSlot].bShowCrosshair = true;
     }
 
+    // Combat Arms Weapon12 / Ammo1.
     FT_CopyWeaponString(aDefs[1].sId, sizeof(aDefs[1].sId), "ak47");
     FT_CopyWeaponString(aDefs[1].sName, sizeof(aDefs[1].sName), "AK-47");
     aDefs[1].eType = FT_WEAPON_HITSCAN;
@@ -114,6 +126,12 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     aDefs[1].nDamage = 48;
     aDefs[1].fFireInterval = 0.10f;
     aDefs[1].fRange = 3500.0f;
+    aDefs[1].fEffectRange0 = 2500.0f;
+    aDefs[1].fEffectRange1 = 3000.0f;
+    aDefs[1].fEffectRange2 = 3500.0f;
+    aDefs[1].fDamageMult0 = 1.0f;
+    aDefs[1].fDamageMult1 = 0.70f;
+    aDefs[1].fDamageMult2 = 0.35f;
     aDefs[1].fReloadSeconds = 2.30f;
     aDefs[1].bAutomatic = true;
     aDefs[1].fViewX = 0.30f;
@@ -126,18 +144,26 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     FT_CopyWeaponString(aDefs[1].sHHTexture, sizeof(aDefs[1].sHHTexture), "Weapons/primary_t/HH_AK-47.DTX");
     FT_CopyWeaponString(aDefs[1].sSoundDir, sizeof(aDefs[1].sSoundDir), "Weapons/primary_snd/AK47");
 
+    // Combat Arms Weapon24 / Ammo20.
     FT_CopyWeaponString(aDefs[2].sId, sizeof(aDefs[2].sId), "beretta_m92fs");
     FT_CopyWeaponString(aDefs[2].sName, sizeof(aDefs[2].sName), "Beretta M92FS");
     aDefs[2].eType = FT_WEAPON_HITSCAN;
     aDefs[2].nClipSize = 15;
-    aDefs[2].nStartReserve = 45;
-    aDefs[2].nDamage = 30;
+    aDefs[2].nStartReserve = 30;
+    aDefs[2].nDamage = 26;
     aDefs[2].fFireInterval = 0.18f;
-    aDefs[2].fRange = 2200.0f;
+    aDefs[2].fRange = 2500.0f;
+    aDefs[2].fEffectRange0 = 1000.0f;
+    aDefs[2].fEffectRange1 = 2000.0f;
+    aDefs[2].fEffectRange2 = 2500.0f;
+    aDefs[2].fDamageMult0 = 1.0f;
+    aDefs[2].fDamageMult1 = 0.70f;
+    aDefs[2].fDamageMult2 = 0.35f;
     aDefs[2].fReloadSeconds = 1.65f;
-    aDefs[2].fViewX = 0.18f;
-    aDefs[2].fViewY = -0.62f;
-    aDefs[2].fViewZ = 1.08f;
+    aDefs[2].bAutomatic = false;
+    aDefs[2].fViewX = -0.10f;
+    aDefs[2].fViewY = -0.20f;
+    aDefs[2].fViewZ = 0.70f;
     FT_CopyWeaponString(aDefs[2].sPVModel, sizeof(aDefs[2].sPVModel), "Weapons/secondary_m_pv/BERETTA_M92FS_PV.LTB");
     FT_CopyWeaponString(aDefs[2].sPVAnim, sizeof(aDefs[2].sPVAnim), "Weapons/secondary_m_pv/BERETTA_M92FS_ANI.LTB");
     FT_CopyWeaponString(aDefs[2].sPVTexture, sizeof(aDefs[2].sPVTexture), "Weapons/secondary_t/BERETTA_M92FS_PV.DTX");
@@ -145,12 +171,17 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     FT_CopyWeaponString(aDefs[2].sHHTexture, sizeof(aDefs[2].sHHTexture), "Weapons/secondary_t/HH_BERETTA_M92FS.DTX");
     FT_CopyWeaponString(aDefs[2].sSoundDir, sizeof(aDefs[2].sSoundDir), "Weapons/secondary_snd/BERETTA_M92FS");
 
+    // Combat Arms Weapon107 / Ammo107.
     FT_CopyWeaponString(aDefs[3].sId, sizeof(aDefs[3].sId), "bowie");
     FT_CopyWeaponString(aDefs[3].sName, sizeof(aDefs[3].sName), "Bowie Knife");
     aDefs[3].eType = FT_WEAPON_MELEE;
-    aDefs[3].nDamage = 40;
+    aDefs[3].nDamage = 70;
     aDefs[3].fFireInterval = 0.55f;
     aDefs[3].fRange = 135.0f;
+    aDefs[3].fEffectRange0 = 135.0f;
+    aDefs[3].fEffectRange1 = 135.0f;
+    aDefs[3].fEffectRange2 = 135.0f;
+    aDefs[3].bShowCrosshair = false;
     FT_CopyWeaponString(aDefs[3].sPVModel, sizeof(aDefs[3].sPVModel), "Weapons/melee_m_pv/CM_HND_NM_DF_BOWIEKNIFE_CH.LTB");
     FT_CopyWeaponString(aDefs[3].sPVAnim, sizeof(aDefs[3].sPVAnim), "Weapons/melee_m_pv/ANI_G_BOWIEKNIFE_CH.LTB");
     FT_CopyWeaponString(aDefs[3].sPVTexture, sizeof(aDefs[3].sPVTexture), "Weapons/melee_t/PV_ML_DF_BOWIEKNIFE_BC.DTX");
@@ -158,20 +189,27 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     FT_CopyWeaponString(aDefs[3].sHHTexture, sizeof(aDefs[3].sHHTexture), "Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX");
     FT_CopyWeaponString(aDefs[3].sSoundDir, sizeof(aDefs[3].sSoundDir), "Weapons/melee_snd/BOWIE_KNIFE");
 
+    // Combat Arms Weapon7 / Ammo9. Projectile speed/fuse are DEV timing.
     FT_CopyWeaponString(aDefs[4].sId, sizeof(aDefs[4].sId), "m67");
     FT_CopyWeaponString(aDefs[4].sName, sizeof(aDefs[4].sName), "M67 Frag Grenade");
     aDefs[4].eType = FT_WEAPON_GRENADE;
     aDefs[4].nClipSize = 1;
-    aDefs[4].nStartReserve = 2;
-    aDefs[4].nDamage = 120;
+    aDefs[4].nStartReserve = 0;
+    aDefs[4].nDamage = 60;
     aDefs[4].fFireInterval = 0.80f;
-    aDefs[4].fReloadSeconds = 0.45f;
+    aDefs[4].fRange = 450.0f;
+    aDefs[4].fEffectRange0 = 450.0f;
+    aDefs[4].fEffectRange1 = 450.0f;
+    aDefs[4].fEffectRange2 = 450.0f;
+    aDefs[4].fDamageMult0 = 1.0f;
+    aDefs[4].fDamageMult1 = 0.80f;
+    aDefs[4].fDamageMult2 = 0.50f;
     aDefs[4].fProjectileSpeed = 650.0f;
-    aDefs[4].fSplashRadius = 350.0f;
+    aDefs[4].fSplashRadius = 450.0f;
     aDefs[4].fFuseSeconds = 3.0f;
-    aDefs[4].fViewX = 0.08f;
-    aDefs[4].fViewY = -0.58f;
-    aDefs[4].fViewZ = 0.98f;
+    aDefs[4].fViewX = 0.50f;
+    aDefs[4].fViewY = -0.90f;
+    aDefs[4].fViewZ = 1.50f;
     FT_CopyWeaponString(aDefs[4].sPVModel, sizeof(aDefs[4].sPVModel), "Weapons/grenade_m_pv/M67_PV.LTB");
     FT_CopyWeaponString(aDefs[4].sPVAnim, sizeof(aDefs[4].sPVAnim), "Weapons/grenade_m_pv/M67_ANI.LTB");
     FT_CopyWeaponString(aDefs[4].sPVTexture, sizeof(aDefs[4].sPVTexture), "Weapons/grenade_t/M67_PV.DTX");
@@ -179,21 +217,28 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     FT_CopyWeaponString(aDefs[4].sHHTexture, sizeof(aDefs[4].sHHTexture), "Weapons/grenade_t/HH_M67.DTX");
     FT_CopyWeaponString(aDefs[4].sSoundDir, sizeof(aDefs[4].sSoundDir), "Weapons/grenade_snd/M67");
 
+    // Combat Arms Weapon29 / Ammo29. Projectile speed/reload timing are DEV.
     FT_CopyWeaponString(aDefs[5].sId, sizeof(aDefs[5].sId), "law");
     FT_CopyWeaponString(aDefs[5].sName, sizeof(aDefs[5].sName), "LAW");
     aDefs[5].eType = FT_WEAPON_ROCKET;
     aDefs[5].nClipSize = 1;
     aDefs[5].nStartReserve = 2;
-    aDefs[5].nDamage = 200;
+    aDefs[5].nDamage = 40;
     aDefs[5].fFireInterval = 1.0f;
-    aDefs[5].fRange = 6000.0f;
+    aDefs[5].fRange = 5000.0f;
+    aDefs[5].fEffectRange0 = 2500.0f;
+    aDefs[5].fEffectRange1 = 4000.0f;
+    aDefs[5].fEffectRange2 = 5000.0f;
+    aDefs[5].fDamageMult0 = 0.0f;
+    aDefs[5].fDamageMult1 = 0.0f;
+    aDefs[5].fDamageMult2 = 0.0f;
     aDefs[5].fReloadSeconds = 2.80f;
     aDefs[5].fProjectileSpeed = 1600.0f;
-    aDefs[5].fSplashRadius = 450.0f;
+    aDefs[5].fSplashRadius = 550.0f;
     aDefs[5].fFuseSeconds = 8.0f;
-    aDefs[5].fViewX = 0.10f;
-    aDefs[5].fViewY = -0.72f;
-    aDefs[5].fViewZ = 1.32f;
+    aDefs[5].fViewX = 0.30f;
+    aDefs[5].fViewY = -0.60f;
+    aDefs[5].fViewZ = 1.80f;
     FT_CopyWeaponString(aDefs[5].sPVModel, sizeof(aDefs[5].sPVModel), "Weapons/special_m_pv/LAW_PV.LTB");
     FT_CopyWeaponString(aDefs[5].sPVAnim, sizeof(aDefs[5].sPVAnim), "Weapons/special_m_pv/LAW_ANI.LTB");
     FT_CopyWeaponString(aDefs[5].sPVTexture, sizeof(aDefs[5].sPVTexture), "Weapons/special_t/LAW_PV.DTX");
@@ -261,8 +306,15 @@ inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
         else if(_stricmp(pKey, "damage") == 0) def.nDamage = (uint8)atoi(pValue);
         else if(_stricmp(pKey, "fire_interval") == 0) def.fFireInterval = (float)atof(pValue);
         else if(_stricmp(pKey, "range") == 0) def.fRange = (float)atof(pValue);
+        else if(_stricmp(pKey, "effect_range0") == 0) def.fEffectRange0 = (float)atof(pValue);
+        else if(_stricmp(pKey, "effect_range1") == 0) def.fEffectRange1 = (float)atof(pValue);
+        else if(_stricmp(pKey, "effect_range2") == 0) def.fEffectRange2 = (float)atof(pValue);
+        else if(_stricmp(pKey, "damage_mult0") == 0) def.fDamageMult0 = (float)atof(pValue);
+        else if(_stricmp(pKey, "damage_mult1") == 0) def.fDamageMult1 = (float)atof(pValue);
+        else if(_stricmp(pKey, "damage_mult2") == 0) def.fDamageMult2 = (float)atof(pValue);
         else if(_stricmp(pKey, "reload") == 0) def.fReloadSeconds = (float)atof(pValue);
         else if(_stricmp(pKey, "automatic") == 0) def.bAutomatic = atoi(pValue) != 0;
+        else if(_stricmp(pKey, "show_crosshair") == 0) def.bShowCrosshair = atoi(pValue) != 0;
         else if(_stricmp(pKey, "projectile_speed") == 0) def.fProjectileSpeed = (float)atof(pValue);
         else if(_stricmp(pKey, "splash_radius") == 0) def.fSplashRadius = (float)atof(pValue);
         else if(_stricmp(pKey, "fuse") == 0) def.fFuseSeconds = (float)atof(pValue);
