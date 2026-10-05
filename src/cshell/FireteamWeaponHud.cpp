@@ -113,20 +113,10 @@ void FT_SetPrimaryAmmo(uint16 nClip, uint16 nReserve)
     s_nPrimaryReserve = nReserve;
 }
 
-bool FT_ConsumePrimaryAmmoLocal()
-{
-    if(s_nPrimaryClip == 0)
-    {
-        return false;
-    }
-
-    --s_nPrimaryClip;
-    return true;
-}
-
 void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson)
 {
-    if(!bFirstPerson || nWeaponSlot != 1 ||
+    if(!bFirstPerson ||
+       (nWeaponSlot != 1 && nWeaponSlot != 3) ||
        !g_pLTClient || !g_pLTCDrawPrim)
     {
         return;
@@ -142,8 +132,8 @@ void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson)
     const float cx = (float)nScreenW * 0.5f;
     const float cy = (float)nScreenH * 0.5f;
 
-    // Ported from NOLF2's DrawPrim crosshair construction: four posts
-    // surrounding a center gap.
+    // NOLF2 HUDCrosshair uses screen-centered DrawPrim geometry. Keep the
+    // same basic approach here without depending on NOLF2 texture assets.
     const float fGap = 6.0f;
     const float fLength = 10.0f;
     const float fThickness = 2.0f;
@@ -187,6 +177,11 @@ void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson)
     g_pLTCDrawPrim->BeginDrawPrim();
     g_pLTCDrawPrim->DrawPrim(crosshair, 4);
     g_pLTCDrawPrim->EndDrawPrim();
+
+    if(nWeaponSlot != 1)
+    {
+        return;
+    }
 
     if(!s_pAmmoText)
     {
