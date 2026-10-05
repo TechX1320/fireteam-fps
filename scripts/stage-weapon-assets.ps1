@@ -52,7 +52,7 @@ function Stage-PlayerViewWeapon {
   if($ExactTextureLeaf) { $texture = $Zip.Entries | Where-Object { $_.Name -ieq $ExactTextureLeaf } | Select-Object -First 1 }
   if(-not $texture) { $texture = Find-BestEntry $Zip $Tokens "DTX" "(?i)GUNS_T_PV" "(?i)^PV_" "" }
   if($texture) { Copy-ZipEntry $Zip $texture $TextureDest } else { Write-Host "[SKIP] No PV texture found for $($Tokens -join '/')" }
-  foreach($sound in @("FIRE","SELECT","RELOAD")) { $entry = Find-SoundEntry $Zip $Tokens $sound; if($entry) { Copy-ZipEntry $Zip $entry ($SoundDest + "\\" + $sound + ".WAV") } else { Write-Host "[SKIP] No $sound sound found for $($Tokens -join '/')" } }
+  foreach($sound in @("FIRE","SELECT","RELOAD")) { $entry = Find-SoundEntry $Zip $Tokens $sound; if($entry) { Copy-ZipEntry $Zip $entry ($SoundDest + "\" + $sound + ".WAV") } else { Write-Host "[SKIP] No $sound sound found for $($Tokens -join '/')" } }
 }
 
 function Stage-WorldWeapon {
@@ -69,10 +69,10 @@ if(Test-Path -LiteralPath $gunsPath) {
   Write-Host "[UPDATE] Staging Combat Arms player-view weapon assets..."
   $zip = [System.IO.Compression.ZipFile]::OpenRead($gunsPath)
   try {
-    Stage-PlayerViewWeapon $zip @("AK-47","AK47") "Weapons\\primary_m_pv\\PV_AR_AK47_SH.LTB" "Weapons\\primary_m_pv\\AK47_ANIBASE.LTB" "Weapons\\primary_t\\AK47_PV.DTX" "Weapons\\primary_snd\\AK47" "PV_AR_AK47_SH.LTB" "AK47_ANIBASE.LTB" "PV_AK-47.DTX"
-    Stage-PlayerViewWeapon $zip @("BERETTA_M92FS","M92FS","BERETTA") "Weapons\\secondary_m_pv\\BERETTA_M92FS_PV.LTB" "Weapons\\secondary_m_pv\\BERETTA_M92FS_ANI.LTB" "Weapons\\secondary_t\\BERETTA_M92FS_PV.DTX" "Weapons\\secondary_snd\\BERETTA_M92FS"
-    Stage-PlayerViewWeapon $zip @("M67") "Weapons\\grenade_m_pv\\M67_PV.LTB" "Weapons\\grenade_m_pv\\M67_ANI.LTB" "Weapons\\grenade_t\\M67_PV.DTX" "Weapons\\grenade_snd\\M67"
-    Stage-PlayerViewWeapon $zip @("LAW") "Weapons\\special_m_pv\\LAW_PV.LTB" "Weapons\\special_m_pv\\LAW_ANI.LTB" "Weapons\\special_t\\LAW_PV.DTX" "Weapons\\special_snd\\LAW"
+    Stage-PlayerViewWeapon $zip @("AK-47","AK47") "Weapons\primary_m_pv\\PV_AR_AK47_SH.LTB" "Weapons\primary_m_pv\\AK47_ANIBASE.LTB" "Weapons\primary_t\\AK47_PV.DTX" "Weapons\primary_snd\\AK47" "PV_AR_AK47_SH.LTB" "AK47_ANIBASE.LTB" "PV_AK-47.DTX"
+    Stage-PlayerViewWeapon $zip @("BERETTA_M92FS","M92FS","BERETTA") "Weapons\secondary_m_pv\\BERETTA_M92FS_PV.LTB" "Weapons\secondary_m_pv\\BERETTA_M92FS_ANI.LTB" "Weapons\secondary_t\\BERETTA_M92FS_PV.DTX" "Weapons\secondary_snd\\BERETTA_M92FS"
+    Stage-PlayerViewWeapon $zip @("M67") "Weapons\grenade_m_pv\\M67_PV.LTB" "Weapons\grenade_m_pv\\M67_ANI.LTB" "Weapons\grenade_t\\M67_PV.DTX" "Weapons\grenade_snd\\M67"
+    Stage-PlayerViewWeapon $zip @("LAW") "Weapons\special_m_pv\\LAW_PV.LTB" "Weapons\special_m_pv\\LAW_ANI.LTB" "Weapons\special_t\\LAW_PV.DTX" "Weapons\special_snd\\LAW"
   } finally { $zip.Dispose() }
 } else { Write-Host "[SKIP] Guns.zip not present - player-view firearm assets unavailable" }
 
@@ -80,10 +80,10 @@ if(Test-Path -LiteralPath $gunsHHPath) {
   Write-Host "[UPDATE] Staging Combat Arms world/hand weapon assets..."
   $zip = [System.IO.Compression.ZipFile]::OpenRead($gunsHHPath)
   try {
-    Stage-WorldWeapon $zip "HH_AK-47.LTB" "HH_AK-47.DTX" "Weapons\\primary_m_hh\\HH_AK-47.LTB" "Weapons\\primary_t\\HH_AK-47.DTX"
-    Stage-WorldWeapon $zip "HH_BERETTA_M92FS.LTB" "HH_BERETTA_M92FS.DTX" "Weapons\\secondary_m_hh\\HH_BERETTA_M92FS.LTB" "Weapons\\secondary_t\\HH_BERETTA_M92FS.DTX"
-    Stage-WorldWeapon $zip "HH_M67.LTB" "HH_M67.DTX" "Weapons\\grenade_m_hh\\HH_M67.LTB" "Weapons\\grenade_t\\HH_M67.DTX"
-    Stage-WorldWeapon $zip "HH_LAW.LTB" "HH_LAW.DTX" "Weapons\\special_m_hh\\HH_LAW.LTB" "Weapons\\special_t\\HH_LAW.DTX"
+    Stage-WorldWeapon $zip "HH_AK-47.LTB" "HH_AK-47.DTX" "Weapons\primary_m_hh\\HH_AK-47.LTB" "Weapons\primary_t\\HH_AK-47.DTX"
+    Stage-WorldWeapon $zip "HH_BERETTA_M92FS.LTB" "HH_BERETTA_M92FS.DTX" "Weapons\secondary_m_hh\\HH_BERETTA_M92FS.LTB" "Weapons\secondary_t\\HH_BERETTA_M92FS.DTX"
+    Stage-WorldWeapon $zip "HH_M67.LTB" "HH_M67.DTX" "Weapons\grenade_m_hh\\HH_M67.LTB" "Weapons\grenade_t\\HH_M67.DTX"
+    Stage-WorldWeapon $zip "HH_LAW.LTB" "HH_LAW.DTX" "Weapons\special_m_hh\\HH_LAW.LTB" "Weapons\special_t\\HH_LAW.DTX"
   } finally { $zip.Dispose() }
 } else { Write-Host "[SKIP] GunsHH.zip not present - world weapon assets unavailable" }
 Write-Host "[OK] Fireteam local weapon asset staging complete."
