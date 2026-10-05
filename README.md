@@ -4,15 +4,36 @@ Standalone co-op FPS built from the 2006 LithTech Jupiter Enterprise **SealHunte
 
 ## Development workflow
 
-This project now uses **main as the single working branch** for iterative development.
+Fireteam now keeps its **actual game source in Git** under `src/`.
 
-The local Jupiter workspace is persistent:
+- `src/cshell/` - client game code
+- `src/sshell/` - server/game-object code
+- `src/shared/` - shared protocol/helpers
+- `src/cres/` and `src/sres/` - resource DLL stubs
 
-1. Run `setup-local.cmd` once to extract the original engine/sample archives.
-2. After that, pull/update the repo and normally just run `build.cmd`.
-3. `build.cmd` reapplies current source patches and refreshes optional local assets automatically.
-4. The existing `BUILT\` folder is preserved so extra test files you add there are not wiped.
-5. Use `setup-local.cmd --reset` only when you intentionally want a clean re-extraction.
+The old system that regenerated/modified SealHunter source in `.local` on every build is retired. `build.cmd` compiles `src/` directly.
+
+The `.local` tree is dependency-only:
+- Jupiter engine/SDK source
+- LithTech runtime files
+- original SealHunter REZ content still needed by the sample runtime
+- locally staged Combat Arms assets
+
+### One-time migration for existing checkouts
+
+Existing development checkouts that already contain the patched Fireteam source under `.local\imports\sealhunter` should run:
+
+`migrate-source.cmd`
+
+That copies the current source into `src/`, removes the obsolete game-source patch scripts, commits the migration, and pushes it to `main`.
+
+After that, normal development is simply:
+
+1. `git pull --ff-only`
+2. edit/pull committed files under `src/`
+3. `build.cmd`
+
+Do **not** rerun `setup-local.cmd` for ordinary source changes.
 
 ## Local imports
 
@@ -55,10 +76,12 @@ Run:
 
 `build.cmd`
 
+The build now **fails immediately** if `src/cshell/ltclientshell.cpp` is missing and tells an existing checkout to run `migrate-source.cmd`. It never mutates the committed game source.
+
 Then:
 
-- `BUILT\run-normal.cmd` - stock sample
-- `BUILT\run-cabinfever.cmd` - Cabin Fever
+- `BUILT\run-normal.cmd` - stock/sample sanity test
+- `BUILT\run-cabinfever.cmd` - Cabin Fever / Fireteam test
 
 If Cabin Fever crashes, send `BUILT\cabinfever-error.log`.
 
@@ -84,7 +107,7 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - A 2% bonus crawler easter egg can spawn an original SealHunter seal from a perimeter point. Bonus seals do not count toward round completion.
 - Bowie melee keeps the Combat Arms 135-unit range during bring-up and can damage `FireteamZombie` objects. The old SealHunter single-OBB assumption is patched structurally so persistent local source trees are upgraded correctly.
 - Basic in-game settings are available from Escape: mouse sensitivity, resolution, windowed/fullscreen, Apply Video, Resume and Quit.
-- The first Fireteam loadout is now `1 = AK-47`, `3 = Bowie`; slots 2/4/5 remain empty and the mouse wheel cycles occupied slots. AK asset staging discovers the matching local Combat Arms PV/animation/texture/sounds from `Guns.zip` and uses the known HH model from `GunsHH.zip`. AK damage/fire timing are temporary development values; ammo/reload are not implemented yet.
+- The first Fireteam loadout is `1 = AK-47`, `3 = Bowie`; slots 2/4/5 remain empty and the mouse wheel cycles occupied slots. The exact CA player-view model is `PV_AR_AK47_SH.LTB` with `AK47_ANIBASE.LTB` as its animation companion. Combat HUD/ammo work is the next direct-source task after the source-tree migration.
 - Player damage is real again. The earlier respawn loop was caused by stale PoisonGas hazard code surviving in the local generated source; the build now replaces that function body explicitly. Environmental PoisonGas damage remains disabled until Combat Arms safe/outside volume semantics are reproduced.
 
 ## Combat Arms compatibility work
@@ -93,3 +116,10 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - Cabin Fever texture references are read directly from the DAT during local staging. Missing flattened paths are aliased to matching extracted textures when the match is unambiguous.
 - A minimal Specialist male body/face/hand asset set is staged from `CharModels-Textur.zip` for upcoming player-model work.
 - LightGroup compatibility now logs the map-authored StartOn/StartColor state and the client's resolved global/base light values during Cabin Fever bring-up. This is diagnostic only; no arbitrary brightness override is applied.
+
+
+## Source and licensing
+
+The committed game code is derived from the LithTech Jupiter Enterprise SealHunter sample and is distributed under the GNU GPL v2; see `LICENSE`. Original copyright notices are retained in imported source files.
+
+Combat Arms maps, models, textures, sounds, decrypted attributes, GMS files, and other commercial/extracted data are **not** committed to this repository. Those remain local-only under `assets-local/` or `.local/`.
