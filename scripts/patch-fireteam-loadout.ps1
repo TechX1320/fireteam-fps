@@ -775,9 +775,9 @@ void CPlayerSrvr::FirePrimary(
 
     bool bDamage =
         (hZombie && hTarget &&
-         g_pLTServer->IsKindOf(hZombie, hTarget)) ||
+         g_pLTServer->IsKindOf(hTarget, hZombie)) ||
         (hSeal && hTarget &&
-         g_pLTServer->IsKindOf(hSeal, hTarget));
+         g_pLTServer->IsKindOf(hTarget, hSeal));
 
     if(!bDamage)
     {
