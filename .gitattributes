@@ -1,0 +1,11 @@
+* text=auto
+
+*.cpp text eol=lf
+*.h text eol=lf
+*.c text eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.md text eol=lf
+*.txt text eol=lf
+*.cfg text eol=crlf
+*.rc text eol=crlf
