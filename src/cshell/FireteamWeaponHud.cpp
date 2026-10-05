@@ -15,6 +15,10 @@ static FTWeaponDef s_WeaponDefs[6];
 static uint16 s_nPrimaryClip = 30;
 static uint16 s_nPrimaryReserve = 90;
 
+static float s_fCrosshairKick = 0.0f;
+static float s_fLastCrosshairTime = 0.0f;
+static uint8 s_nCrosshairSlot = 0;
+
 static void FT_SetupQuad(
     LT_POLYF4 &poly,
     float x,
@@ -133,7 +137,41 @@ void FT_SetPrimaryAmmo(uint16 nClip, uint16 nReserve)
     s_nPrimaryReserve = nReserve;
 }
 
-void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson, bool bShowCrosshair, bool bShowAmmo)
+void FT_WeaponHudOnShot(uint8 nWeaponSlot)
+{
+    const FTWeaponDef *pDef =
+        FT_GetWeaponDef(s_WeaponDefs, nWeaponSlot);
+
+    if(!pDef)
+    {
+        return;
+    }
+
+    if(s_nCrosshairSlot != nWeaponSlot)
+    {
+        s_nCrosshairSlot = nWeaponSlot;
+        s_fCrosshairKick = 0.0f;
+    }
+
+    s_fCrosshairKick += pDef->fCrosshairShotKick;
+
+    const float fMaxExtra =
+        pDef->fCrosshairMaxGap > pDef->fCrosshairBaseGap
+        ? (pDef->fCrosshairMaxGap - pDef->fCrosshairBaseGap)
+        : 0.0f;
+
+    if(s_fCrosshairKick > fMaxExtra)
+    {
+        s_fCrosshairKick = fMaxExtra;
+    }
+}
+
+void FT_RenderWeaponHud(
+    uint8 nWeaponSlot,
+    bool bFirstPerson,
+    bool bShowCrosshair,
+    bool bShowAmmo,
+    bool bMoving)
 {
     if(!bFirstPerson ||
        nWeaponSlot < 1 ||
@@ -150,14 +188,53 @@ void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson, bool bShowCrosshai
         &nScreenW,
         &nScreenH);
 
-    if(bShowCrosshair)
+    const FTWeaponDef *pDef =
+        FT_GetWeaponDef(s_WeaponDefs, nWeaponSlot);
+
+    const float fNow = g_pLTClient->GetTime();
+    if(s_fLastCrosshairTime <= 0.0f)
+    {
+        s_fLastCrosshairTime = fNow;
+    }
+
+    float fDelta = fNow - s_fLastCrosshairTime;
+    if(fDelta < 0.0f) fDelta = 0.0f;
+    if(fDelta > 0.25f) fDelta = 0.25f;
+    s_fLastCrosshairTime = fNow;
+
+    if(s_nCrosshairSlot != nWeaponSlot)
+    {
+        s_nCrosshairSlot = nWeaponSlot;
+        s_fCrosshairKick = 0.0f;
+    }
+
+    if(pDef && s_fCrosshairKick > 0.0f)
+    {
+        s_fCrosshairKick -= pDef->fCrosshairRecover * fDelta;
+        if(s_fCrosshairKick < 0.0f)
+        {
+            s_fCrosshairKick = 0.0f;
+        }
+    }
+
+    if(bShowCrosshair && pDef)
     {
         const float cx = (float)nScreenW * 0.5f;
         const float cy = (float)nScreenH * 0.5f;
 
         // NOLF2 HUDCrosshair uses screen-centered DrawPrim geometry. Keep the
         // same basic approach here without depending on NOLF2 texture assets.
-        const float fGap = 6.0f;
+        float fGap =
+            pDef->fCrosshairBaseGap +
+            s_fCrosshairKick +
+            (bMoving ? pDef->fCrosshairMoveKick : 0.0f);
+
+        if(pDef->fCrosshairMaxGap > 0.0f &&
+           fGap > pDef->fCrosshairMaxGap)
+        {
+            fGap = pDef->fCrosshairMaxGap;
+        }
+
         const float fLength = 10.0f;
         const float fThickness = 2.0f;
 
@@ -202,9 +279,6 @@ void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson, bool bShowCrosshai
         g_pLTCDrawPrim->EndDrawPrim();
 
     }
-
-    const FTWeaponDef *pDef =
-        FT_GetWeaponDef(s_WeaponDefs, nWeaponSlot);
 
     if(s_pWeaponName && pDef)
     {
