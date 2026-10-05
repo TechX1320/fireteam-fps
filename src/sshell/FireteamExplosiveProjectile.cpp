@@ -22,8 +22,11 @@ FireteamExplosiveProjectile::FireteamExplosiveProjectile() :
     m_fSplashRadius(0.0f),
     m_fSpeed(0.0f),
     m_fFuseSeconds(8.0f),
+    m_fExplodeAt(0.0f),
     m_bRocket(false),
-    m_bExploded(false)
+    m_bExploded(false),
+    m_bHaveLastPos(false),
+    m_vLastPos(0.0f, 0.0f, 0.0f)
 {
 }
 
@@ -39,8 +42,10 @@ void FireteamExplosiveProjectile::Configure(
     m_nDamage = nDamage;
     m_fSplashRadius = fSplashRadius;
     m_fSpeed = fSpeed;
-    m_fFuseSeconds = fFuseSeconds;
+    m_fFuseSeconds = (fFuseSeconds > 0.01f) ? fFuseSeconds : 0.01f;
+    m_fExplodeAt = g_pLTServer->GetTime() + m_fFuseSeconds;
     m_bRocket = bRocket;
+    m_bExploded = false;
 
     uint32 nFlags = FLAG_VISIBLE |
                     FLAG_SOLID |
@@ -72,6 +77,17 @@ void FireteamExplosiveProjectile::Configure(
     }
 
     g_pLTSPhysics->SetVelocity(m_hObject, &vVelocity);
+
+    g_pLTServer->GetObjectPos(m_hObject, &m_vLastPos);
+    m_bHaveLastPos = true;
+    g_pLTServer->SetNextUpdate(m_hObject, 0.01f);
+
+    g_pLTServer->CPrint(
+        "Fireteam explosive: armed %s speed=%.1f fuse=%.2f radius=%.1f",
+        m_bRocket ? "rocket" : "grenade",
+        m_fSpeed,
+        m_fFuseSeconds,
+        m_fSplashRadius);
 }
 
 uint32 FireteamExplosiveProjectile::EngineMessageFn(
@@ -116,7 +132,7 @@ uint32 FireteamExplosiveProjectile::EngineMessageFn(
                 0.0f);
             g_pLTServer->SetNextUpdate(
                 m_hObject,
-                0.05f);
+                0.01f);
             return 1;
         }
 
@@ -126,7 +142,7 @@ uint32 FireteamExplosiveProjectile::EngineMessageFn(
             {
                 g_pLTServer->SetNextUpdate(
                     m_hObject,
-                    0.05f);
+                    0.01f);
             }
             return 1;
 
@@ -151,17 +167,48 @@ void FireteamExplosiveProjectile::UpdateProjectile()
         return;
     }
 
-    m_fFuseSeconds -= 0.05f;
-
     if(m_bRocket)
     {
+        LTVector vCurrentPos;
+        g_pLTServer->GetObjectPos(m_hObject, &vCurrentPos);
+
+        if(m_bHaveLastPos)
+        {
+            LTVector vTravel = vCurrentPos - m_vLastPos;
+            if(vTravel.MagSqr() > 0.01f)
+            {
+                IntersectQuery query;
+                IntersectInfo info;
+                query.m_From = m_vLastPos;
+                query.m_To = vCurrentPos;
+                query.m_Flags =
+                    INTERSECT_OBJECTS |
+                    IGNORE_NONSOLID |
+                    INTERSECT_HPOLY;
+
+                if(g_pLTServer->IntersectSegment(&query, &info))
+                {
+                    if(info.m_hObject != m_hOwner &&
+                       info.m_hObject != m_hObject)
+                    {
+                        g_pLTServer->SetObjectPos(m_hObject, &info.m_Point);
+                        Explode();
+                        return;
+                    }
+                }
+            }
+        }
+
+        m_vLastPos = vCurrentPos;
+        m_bHaveLastPos = true;
+
         LTRotation rRot;
         g_pLTServer->GetObjectRotation(m_hObject, &rRot);
         LTVector vVelocity = rRot.Forward() * m_fSpeed;
         g_pLTSPhysics->SetVelocity(m_hObject, &vVelocity);
     }
 
-    if(m_fFuseSeconds <= 0.0f)
+    if(g_pLTServer->GetTime() >= m_fExplodeAt)
     {
         Explode();
     }
@@ -194,6 +241,9 @@ void FireteamExplosiveProjectile::Explode()
 
     HCLASS hZombieClass = g_pLTServer->GetClass("FireteamZombie");
     HCLASS hSealClass = g_pLTServer->GetClass("Seal");
+
+    uint32 nEnemiesHit = 0;
+    uint32 nTotalDamage = 0;
 
     HOBJECT hObject = g_pLTServer->GetNextObject(LTNULL);
     while(hObject)
@@ -246,6 +296,9 @@ void FireteamExplosiveProjectile::Explode()
             nAppliedDamage = 1;
         }
 
+        ++nEnemiesHit;
+        nTotalDamage += nAppliedDamage;
+
         ILTMessage_Write *pDamage = LTNULL;
         if(g_pLTSCommon->CreateMessage(pDamage) == LT_OK && pDamage)
         {
@@ -263,6 +316,14 @@ void FireteamExplosiveProjectile::Explode()
         hObject = hNextObject;
     }
 
+    g_pLTServer->CPrint(
+        "Fireteam explosive: %s exploded, enemies=%u totalDamage=%u",
+        m_bRocket ? "rocket" : "grenade",
+        nEnemiesHit,
+        nTotalDamage);
+
+    // Placeholder Jupiter effect until the matching Combat Arms explosion FX
+    // is reproduced in Fireteam's compatible ClientFX database.
     PlayClientFX("CanImpact", m_hObject, LTNULL, LTNULL, 0);
     g_pLTServer->RemoveObject(m_hObject);
 }
