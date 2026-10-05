@@ -501,33 +501,49 @@ if(-not $text.Contains('#include "FireteamWeaponHud.h"'))
 
 if(-not $text.Contains('FT_WeaponHudInit();'))
 {
-    $anchor = 'FT_SettingsInit();'
-    if(-not $text.Contains($anchor))
+    $anchor = 'm_pChatGui->Init();'
+    $index = $text.IndexOf($anchor)
+
+    if($index -lt 0)
     {
-        throw "Could not locate Fireteam settings initialization."
+        throw "Could not locate active chat GUI initialization for weapon HUD."
     }
 
-    $text = $text.Replace(
-        $anchor,
-        $anchor +
-        [Environment]::NewLine +
-        '    FT_WeaponHudInit();')
+    $lineEnd = $text.IndexOf([Environment]::NewLine, $index)
+    if($lineEnd -lt 0)
+    {
+        $lineEnd = $text.Length
+    }
+
+    $insertAt = $lineEnd
+    $text = $text.Insert(
+        $insertAt,
+        [Environment]::NewLine + '    FT_WeaponHudInit();')
 }
 
 if(-not $text.Contains('FT_WeaponHudTerm();'))
 {
-    $anchor = 'FT_SettingsTerm();'
-    if(-not $text.Contains($anchor))
+    $anchor = 'm_pChatGui->Term();'
+    $index = $text.IndexOf($anchor)
+
+    if($index -lt 0)
     {
-        throw "Could not locate Fireteam settings termination."
+        throw "Could not locate active chat GUI termination for weapon HUD."
     }
 
-    $text = $text.Replace(
-        $anchor,
-        'FT_WeaponHudTerm();' +
-        [Environment]::NewLine +
-        '    ' +
-        $anchor)
+    $lineStart = $text.LastIndexOf([Environment]::NewLine, $index)
+    if($lineStart -lt 0)
+    {
+        $lineStart = 0
+    }
+    else
+    {
+        $lineStart += [Environment]::NewLine.Length
+    }
+
+    $text = $text.Insert(
+        $lineStart,
+        '    FT_WeaponHudTerm();' + [Environment]::NewLine)
 }
 
 if(-not $text.Contains('case MSG_SC_AMMO:'))
@@ -551,22 +567,54 @@ if(-not $text.Contains('case MSG_SC_AMMO:'))
 
 if(-not $text.Contains('FT_RenderWeaponHud('))
 {
-    # Hook into the active in-world GUI render path rather than depending on
-    # the exact health-HUD line. Persistent .local trees may have that block
-    # reformatted by earlier UI migrations, but chat rendering remains the
-    # stable client-shell anchor.
-    $anchor = 'm_pChatGui->Render();'
-    $index = $text.IndexOf($anchor)
+    $renderSignature = 'LTRESULT CLTClientShell::Render()'
+    $renderStart = $text.IndexOf($renderSignature)
 
-    if($index -lt 0)
+    if($renderStart -lt 0)
     {
-        throw "Could not locate active in-world GUI render anchor."
+        throw "Could not locate CLTClientShell::Render for weapon HUD."
     }
 
-    $lineStart = $text.LastIndexOf([Environment]::NewLine, $index)
+    $braceStart = $text.IndexOf('{', $renderStart)
+    if($braceStart -lt 0)
+    {
+        throw "Could not locate CLTClientShell::Render opening brace."
+    }
+
+    $depth = 0
+    $braceEnd = -1
+    for($i = $braceStart; $i -lt $text.Length; ++$i)
+    {
+        if($text[$i] -eq '{')
+        {
+            ++$depth
+        }
+        elseif($text[$i] -eq '}')
+        {
+            --$depth
+            if($depth -eq 0)
+            {
+                $braceEnd = $i
+                break
+            }
+        }
+    }
+
+    if($braceEnd -lt 0)
+    {
+        throw "Could not locate CLTClientShell::Render closing brace."
+    }
+
+    $end3DIndex = $text.IndexOf('g_pLTClient->End3D(', $braceStart)
+    if($end3DIndex -lt 0 -or $end3DIndex -gt $braceEnd)
+    {
+        throw "Could not locate End3D inside CLTClientShell::Render."
+    }
+
+    $lineStart = $text.LastIndexOf([Environment]::NewLine, $end3DIndex)
     if($lineStart -lt 0)
     {
-        $lineStart = 0
+        $lineStart = $braceStart + 1
     }
     else
     {
@@ -574,14 +622,15 @@ if(-not $text.Contains('FT_RenderWeaponHud('))
     }
 
     $render = @"
-        if(m_pPlayer &&
-           m_pCamera &&
-           !FT_SettingsIsOpen())
-        {
-            FT_RenderWeaponHud(
-                m_pPlayer->GetWeaponSlot(),
-                m_pCamera->IsFirstPerson());
-        }
+    if(IsInWorld() &&
+       m_pPlayer &&
+       m_pCamera &&
+       !FT_SettingsIsOpen())
+    {
+        FT_RenderWeaponHud(
+            m_pPlayer->GetWeaponSlot(),
+            m_pCamera->IsFirstPerson());
+    }
 
 "@
 
