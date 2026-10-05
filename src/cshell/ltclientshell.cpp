@@ -835,8 +835,12 @@ LTRESULT CLTClientShell::Render()
             FT_RenderWeaponHud(
                 m_pPlayer->GetWeaponSlot(),
                 m_pCamera->IsFirstPerson(),
-                pHudWeapon ? pHudWeapon->bShowCrosshair : true,
-                pHudWeapon ? (pHudWeapon->nClipSize > 0) : false);
+                pHudWeapon
+                    ? (pHudWeapon->bShowCrosshair &&
+                       !m_pChatGui->IsChatInputActive())
+                    : false,
+                pHudWeapon ? (pHudWeapon->nClipSize > 0) : false,
+                m_pPlayer->IsMoving());
         }
     }
 
