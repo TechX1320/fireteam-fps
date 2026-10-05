@@ -16,7 +16,7 @@ function Copy-ZipEntry {
 function Find-BestEntry {
   param($Zip,[string[]]$Tokens,[string]$Extension,[string]$PathPattern,[string]$PreferPattern,[string]$ExcludePattern)
   foreach($token in $Tokens) {
-    $matches = @($Zip.Entries | Where-Object { $_.Name -match [regex]::Escape($token) -and $_.Name -match ("(?i)\\." + [regex]::Escape($Extension) + "$") -and (-not $PathPattern -or $_.FullName -match $PathPattern) -and (-not $ExcludePattern -or $_.Name -notmatch $ExcludePattern) } | Sort-Object FullName)
+    $matches = @($Zip.Entries | Where-Object { $_.Name -match [regex]::Escape($token) -and $_.Name -match ("(?i)\." + [regex]::Escape($Extension) + "$") -and (-not $PathPattern -or $_.FullName -match $PathPattern) -and (-not $ExcludePattern -or $_.Name -notmatch $ExcludePattern) } | Sort-Object FullName)
     if($matches.Count -eq 0) { continue }
     if($PreferPattern) { $preferred = $matches | Where-Object { $_.Name -match $PreferPattern } | Select-Object -First 1; if($preferred) { return $preferred } }
     return $matches[0]
@@ -27,7 +27,7 @@ function Find-BestEntry {
 function Find-SoundEntry {
   param($Zip,[string[]]$Tokens,[string]$Stem)
   foreach($token in $Tokens) {
-    $entry = $Zip.Entries | Where-Object { $_.FullName -match [regex]::Escape($token) -and $_.Name -match ("(?i)^" + [regex]::Escape($Stem) + ".*\\.WAV$") } | Sort-Object FullName | Select-Object -First 1
+    $entry = $Zip.Entries | Where-Object { $_.FullName -match [regex]::Escape($token) -and $_.Name -match ("(?i)^" + [regex]::Escape($Stem) + ".*\.WAV$") } | Sort-Object FullName | Select-Object -First 1
     if($entry) { return $entry }
   }
   return $null
