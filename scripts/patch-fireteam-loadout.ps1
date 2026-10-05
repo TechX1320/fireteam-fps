@@ -530,20 +530,53 @@ if(-not $text.Contains('m_pPlayer->CycleWeapon(')) {
 }
 
 if(-not $text.Contains('pMessage->Writeuint8(MSG_CS_SHOOT);')) {
-    $oldShoot = @"
-    // shoot
-    if (g_pLTClient->IsCommandOn(COMMAND_SHOOT))
-    {
-		m_pPlayer->Attack();
-    }
-"@
+    $shootPattern = 'g_pLTClient->IsCommandOn\s*\(\s*COMMAND_SHOOT\s*\)'
+    $shootMatch = [regex]::Match($text, $shootPattern)
 
-    if(-not $text.Contains($oldShoot)) {
-        throw "Could not locate SealHunter shoot input block."
+    if(-not $shootMatch.Success) {
+        throw "Could not locate COMMAND_SHOOT input branch."
+    }
+
+    $ifStart = $text.LastIndexOf("if", $shootMatch.Index)
+    if($ifStart -lt 0) {
+        throw "Could not locate COMMAND_SHOOT if statement."
+    }
+
+    $braceStart = $text.IndexOf("{", $shootMatch.Index)
+    if($braceStart -lt 0) {
+        throw "Could not locate COMMAND_SHOOT opening brace."
+    }
+
+    $depth = 0
+    $braceEnd = -1
+    for($i = $braceStart; $i -lt $text.Length; ++$i) {
+        if($text[$i] -eq '{') {
+            ++$depth
+        }
+        elseif($text[$i] -eq '}') {
+            --$depth
+            if($depth -eq 0) {
+                $braceEnd = $i
+                break
+            }
+        }
+    }
+
+    if($braceEnd -lt 0) {
+        throw "Could not locate COMMAND_SHOOT closing brace."
+    }
+
+    # Include the indentation immediately before the if, but leave any
+    # preceding comment/marker intact.
+    $lineStart = $text.LastIndexOf([Environment]::NewLine, $ifStart)
+    if($lineStart -lt 0) {
+        $lineStart = 0
+    }
+    else {
+        $lineStart += [Environment]::NewLine.Length
     }
 
     $newShoot = @"
-    // shoot
     if (g_pLTClient->IsCommandOn(COMMAND_SHOOT))
     {
         if(m_pPlayer->Attack() &&
@@ -579,7 +612,9 @@ if(-not $text.Contains('pMessage->Writeuint8(MSG_CS_SHOOT);')) {
     }
 "@
 
-    $text = $text.Replace($oldShoot, $newShoot)
+    $text = $text.Substring(0, $lineStart) +
+        $newShoot +
+        $text.Substring($braceEnd + 1)
 }
 
 Write-Source $clientShell $text
