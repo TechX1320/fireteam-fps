@@ -58,6 +58,8 @@ echo.
 echo [UPDATE] Refreshing local optional game assets...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-local-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%CD%\.local"
 if errorlevel 1 goto :fail
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-ak-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%CD%\.local"
+if errorlevel 1 goto :fail
 
 echo.
 echo [CHECK] Looking for CMake...
