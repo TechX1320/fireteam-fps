@@ -734,6 +734,15 @@ void CPlayerSrvr::Respawn()
     m_nHealth = m_nMaxHealth;
     m_fRespawnTimer = 0.0f;
     m_fPoisonCarry = 0.0f;
+    m_bReloading = false;
+    m_nReloadSlot = 0;
+
+    for(uint8 nSlot = 1; nSlot <= 5; ++nSlot)
+    {
+        m_nWeaponAmmoInClip[nSlot] = m_WeaponDefs[nSlot].nClipSize;
+        m_nWeaponAmmoReserve[nSlot] = m_WeaponDefs[nSlot].nStartReserve;
+        m_fNextWeaponShot[nSlot] = 0.0f;
+    }
 
     g_pLTServer->TeleportObject(m_hObject, &m_vSpawnPos);
     g_pLTServer->SetObjectRotation(m_hObject, &m_rSpawnRot);
@@ -756,6 +765,7 @@ void CPlayerSrvr::Respawn()
     }
 
     SendHealth();
+    SendPrimaryAmmo();
 }
 
 void CPlayerSrvr::SendHealth()
@@ -865,6 +875,10 @@ void CPlayerSrvr::FirePrimary(
     }
     vDir.Normalize();
 
+    LTVector vServerFrom;
+    g_pLTServer->GetObjectPos(m_hObject, &vServerFrom);
+    vServerFrom.y += 30.0f;
+
     m_fNextWeaponShot[m_nWeaponSlot] =
         fNow + pDef->fFireInterval;
 
@@ -876,7 +890,7 @@ void CPlayerSrvr::FirePrimary(
     {
         SpawnExplosiveProjectile(
             *pDef,
-            vFrom,
+            vServerFrom,
             vDir);
         return;
     }
@@ -886,15 +900,7 @@ void CPlayerSrvr::FirePrimary(
         return;
     }
 
-    LTVector vPlayerPos;
-    g_pLTServer->GetObjectPos(m_hObject, &vPlayerPos);
-
-    LTVector vStart = vFrom;
-    if(vStart.DistSqr(vPlayerPos) > (256.0f * 256.0f))
-    {
-        vStart = vPlayerPos;
-        vStart.y += 30.0f;
-    }
+    LTVector vStart = vServerFrom;
 
     IntersectQuery query;
     IntersectInfo info;
