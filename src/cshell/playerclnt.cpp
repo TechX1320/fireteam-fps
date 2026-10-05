@@ -939,6 +939,20 @@ void CPlayerClnt::CreateViewWeapon()
         "RenderStyles\\DEFAULT.LTB");
 
     m_hViewWeaponObject = g_pLTClient->CreateObject(&ocs);
+
+    // Some CA archives contain multiple token-matched animation companions.
+    // If a staged companion is not compatible with the chosen PV model, retry
+    // with the weapon model alone instead of leaving the slot invisible.
+    if(!m_hViewWeaponObject && ocs.m_Filenames[1][0])
+    {
+        g_pLTClient->CPrint(
+            "Fireteam: %s PV failed with animation companion %s; retrying model only.",
+            pDef->sName,
+            ocs.m_Filenames[1]);
+        ocs.m_Filenames[1][0] = '\0';
+        m_hViewWeaponObject = g_pLTClient->CreateObject(&ocs);
+    }
+
     if(!m_hViewWeaponObject)
     {
         g_pLTClient->CPrint(
