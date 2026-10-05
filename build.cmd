@@ -47,6 +47,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-systems-
 if errorlevel 1 goto :fail
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-fireteam-gameplay.ps1" -LocalRoot "%CD%\.local"
 if errorlevel 1 goto :fail
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-fireteam-ui.ps1" -LocalRoot "%CD%\.local"
+if errorlevel 1 goto :fail
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-diagnostics-v2.ps1" -LocalRoot "%CD%\.local"
 if errorlevel 1 goto :fail
 
