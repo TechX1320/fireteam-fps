@@ -95,7 +95,6 @@ private:
 	uint32				PreCreate(void *pData, float fData);
 	uint32				InitialUpdate(void *pData, float fData);
 	void				ReadProps(ObjectCreateStruct* pStruct);
-    void        		CreateProjectile();
     void        		CreateAttachment(HATTACHMENT &hAttachment, HOBJECT hChildObject, const char* sSocket,
                     	             	 LTVector &vRotOffset, LTVector &vPosOffset);
     void 				CheckForHit();
