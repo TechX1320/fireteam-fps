@@ -460,49 +460,6 @@ void CPlayerSrvr::PlayAnimation(const char* sAnimName, uint8 nTracker, bool bLoo
 
 
 //-----------------------------------------------------------------------------
-//	CPlayerSrvr::CreateProjectile()
-//
-//-----------------------------------------------------------------------------
-void CPlayerSrvr::CreateProjectile()
-{
-    LTVector vPos, vVel;
-    LTRotation rRot;
-
-    g_pLTServer->GetObjectPos(m_hObject, &vPos);
-    g_pLTServer->GetObjectRotation(m_hObject, &rRot);
-    g_pLTSPhysics->GetVelocity(m_hObject, &vVel);
-
-    LTransform tSocketTransform;
-    LTRESULT SocketTrResult = g_pLTSModel->GetSocketTransform(m_hObject,
-                                                              hRightHandSocket,
-                                                              tSocketTransform,
-                                                              LTTRUE);
-
-    // Create Projectile
-    HCLASS hClass = g_pLTServer->GetClass("Projectile");
-
-    ObjectCreateStruct ocs;
-    ocs.m_ObjectType = OT_MODEL;
-    ocs.m_Flags      = FLAG_VISIBLE;
-    ocs.m_Rotation   = rRot;
-    vPos += rRot.Forward() * 25.f;
-    ocs.m_Pos        = tSocketTransform.m_Pos;
-
-    strncpy(ocs.m_Filename, "Models/GenCan.ltb", MAX_CS_FILENAME_LEN -1);
-    strncpy(ocs.m_SkinName, "ModelTextures/GenCan1.dtx", MAX_CS_FILENAME_LEN -1);
-    Projectile* pObject = (Projectile*)g_pLTServer->CreateObject(hClass, &ocs);
-
-    if(pObject)
-    {
-        pObject->SetOwner(m_hObject);
-        g_pLTSPhysics->SetVelocity(pObject->m_hObject, &vVel);
-    }
-}
-
-
-
-
-//-----------------------------------------------------------------------------
 //	CPlayerSrvr::CreateAttachment()
 //
 //-----------------------------------------------------------------------------
