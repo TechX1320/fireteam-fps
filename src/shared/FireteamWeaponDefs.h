@@ -164,8 +164,8 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     aDefs[2].fViewX = -0.10f;
     aDefs[2].fViewY = -0.20f;
     aDefs[2].fViewZ = 0.70f;
-    FT_CopyWeaponString(aDefs[2].sPVModel, sizeof(aDefs[2].sPVModel), "Weapons/secondary_m_pv/BERETTA_M92FS_PV.LTB");
-    FT_CopyWeaponString(aDefs[2].sPVAnim, sizeof(aDefs[2].sPVAnim), "Weapons/secondary_m_pv/BERETTA_M92FS_ANI.LTB");
+    FT_CopyWeaponString(aDefs[2].sPVModel, sizeof(aDefs[2].sPVModel), "Weapons/secondary_m_pv/PVMLA_BERETTA_M92FS.LTB");
+    FT_CopyWeaponString(aDefs[2].sPVAnim, sizeof(aDefs[2].sPVAnim), "Weapons/secondary_m_pv/COLT_MEU_ANIBASE-1.LTB");
     FT_CopyWeaponString(aDefs[2].sPVTexture, sizeof(aDefs[2].sPVTexture), "Weapons/secondary_t/BERETTA_M92FS_PV.DTX");
     FT_CopyWeaponString(aDefs[2].sHHModel, sizeof(aDefs[2].sHHModel), "Weapons/secondary_m_hh/HH_BERETTA_M92FS.LTB");
     FT_CopyWeaponString(aDefs[2].sHHTexture, sizeof(aDefs[2].sHHTexture), "Weapons/secondary_t/HH_BERETTA_M92FS.DTX");
@@ -210,8 +210,8 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     aDefs[4].fViewX = 0.50f;
     aDefs[4].fViewY = -0.90f;
     aDefs[4].fViewZ = 1.50f;
-    FT_CopyWeaponString(aDefs[4].sPVModel, sizeof(aDefs[4].sPVModel), "Weapons/grenade_m_pv/M67_PV.LTB");
-    FT_CopyWeaponString(aDefs[4].sPVAnim, sizeof(aDefs[4].sPVAnim), "Weapons/grenade_m_pv/M67_ANI.LTB");
+    FT_CopyWeaponString(aDefs[4].sPVModel, sizeof(aDefs[4].sPVModel), "Weapons/grenade_m_pv/PVMLA_M67.LTB");
+    FT_CopyWeaponString(aDefs[4].sPVAnim, sizeof(aDefs[4].sPVAnim), "Weapons/grenade_m_pv/M67_ANIBASE-1.LTB");
     FT_CopyWeaponString(aDefs[4].sPVTexture, sizeof(aDefs[4].sPVTexture), "Weapons/grenade_t/M67_PV.DTX");
     FT_CopyWeaponString(aDefs[4].sHHModel, sizeof(aDefs[4].sHHModel), "Weapons/grenade_m_hh/HH_M67.LTB");
     FT_CopyWeaponString(aDefs[4].sHHTexture, sizeof(aDefs[4].sHHTexture), "Weapons/grenade_t/HH_M67.DTX");
@@ -239,8 +239,8 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     aDefs[5].fViewX = 0.30f;
     aDefs[5].fViewY = -0.60f;
     aDefs[5].fViewZ = 1.80f;
-    FT_CopyWeaponString(aDefs[5].sPVModel, sizeof(aDefs[5].sPVModel), "Weapons/special_m_pv/LAW_PV.LTB");
-    FT_CopyWeaponString(aDefs[5].sPVAnim, sizeof(aDefs[5].sPVAnim), "Weapons/special_m_pv/LAW_ANI.LTB");
+    FT_CopyWeaponString(aDefs[5].sPVModel, sizeof(aDefs[5].sPVModel), "Weapons/special_m_pv/PVMLA_LAW.LTB");
+    FT_CopyWeaponString(aDefs[5].sPVAnim, sizeof(aDefs[5].sPVAnim), "Weapons/special_m_pv/LAW_ANIBASE.LTB");
     FT_CopyWeaponString(aDefs[5].sPVTexture, sizeof(aDefs[5].sPVTexture), "Weapons/special_t/LAW_PV.DTX");
     FT_CopyWeaponString(aDefs[5].sHHModel, sizeof(aDefs[5].sHHModel), "Weapons/special_m_hh/HH_LAW.LTB");
     FT_CopyWeaponString(aDefs[5].sHHTexture, sizeof(aDefs[5].sHHTexture), "Weapons/special_t/HH_LAW.DTX");
