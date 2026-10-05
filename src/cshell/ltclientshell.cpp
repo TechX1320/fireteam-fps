@@ -1064,6 +1064,11 @@ LTRESULT CLTClientShell::PollInput()
             }
         }
     }
+    else
+    {
+        m_pPlayer->ReleaseAttackTrigger();
+    }
+
 
 	    // Combat Arms knife secondary attack.
     if (g_pLTClient->IsCommandOn(COMMAND_ALT_ATTACK))
