@@ -7,9 +7,9 @@ set "LOCAL=%CD%\.local"
 set "RESET=%~1"
 
 if exist "%LOCAL%\imports\sealhunter\cshell\src\ltclientshell.cpp" if /I not "%RESET%"=="--reset" (
-  echo Existing local Jupiter workspace found.
-  echo Keeping it in place and refreshing patches/assets only.
-  goto :patch
+  echo Existing local Jupiter dependency workspace found.
+  echo Keeping it in place and refreshing engine compatibility/assets only.
+  goto :dependencies
 )
 
 for %%F in ("release.zip" "sealhunter.zip" "EngineMissing.zip") do (
@@ -43,31 +43,26 @@ if not exist "%LOCAL%\imports\engine\sdk\inc\iltclient.h" (
   goto :fail
 )
 
-:patch
+:dependencies
 echo [3/4] Checking expanded Jupiter engine source...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\refresh-engine-import.ps1" -RepoRoot "%CD%" -LocalRoot "%LOCAL%"
 if errorlevel 1 goto :fail
 
-echo [3/4] Applying current Fireteam patches...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-legacy-source.ps1" -LocalRoot "%LOCAL%"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-game-source.ps1" -LocalRoot "%LOCAL%"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-weapon-source.ps1" -LocalRoot "%LOCAL%"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-systems-source.ps1" -LocalRoot "%LOCAL%"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-diagnostics-v2.ps1" -LocalRoot "%LOCAL%"
+echo [3/4] Applying local Jupiter engine compatibility...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-engine-compat.ps1" -LocalRoot "%LOCAL%"
 if errorlevel 1 goto :fail
 
 echo [4/4] Refreshing optional local assets...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-local-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%LOCAL%"
 if errorlevel 1 goto :fail
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-ak-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%LOCAL%"
+if errorlevel 1 goto :fail
 
 echo.
-echo Local workspace is ready.
-echo Future changes normally only require build.cmd.
-echo Use setup-local.cmd --reset only if you want a clean re-extraction.
+echo Local dependency workspace is ready.
+echo Fireteam game source is committed under src\ and is not generated here.
+echo Future changes normally only require git pull --ff-only and build.cmd.
+echo Use setup-local.cmd --reset only if you want a clean dependency re-extraction.
 echo.
 pause
 exit /b 0
