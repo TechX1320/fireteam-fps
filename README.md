@@ -78,7 +78,10 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - Cabin Fever `PoisonGas` volumes are registered as damaging containers and apply a simple client poison tint while the player is inside.
 - Cabin Fever `Spawner` objects are recognized, but bring-up is deliberately capped: only outside perimeter `Spawner_01_01N` is active so testing cannot reproduce the old mass-spawn crash.
 - That single outside spawner creates three human-scale `FireteamZombie` placeholders as an AI/melee validation step. They use temporary HARM-guard visuals while Combat Arms infected assets are brought online. All other imported spawners remain inert.
-- Cabin Fever's map-authored navigation metadata is now preserved: `AIRegion`, `AIVolume` fields, and `AINodePatrol` objects load instead of being discarded. The current step logs the region/node graph; Fireteam-specific volume pathfinding comes next.
+- Cabin Fever's map-authored navigation metadata is preserved: `AIRegion`, `AIVolume` fields, and `AINodePatrol` objects load instead of being discarded.
+- Placeholder infected now path through the authored AIVolume network using an NOLF2-inspired volume search and shared-opening gate lanes. They periodically repath, switch gate lanes when stuck, and apply local separation so groups do not march shoulder-to-shoulder.
+- Cabin Fever now has a temporary development round loop using all discovered `Spawner_01_*` perimeter points: staggered randomized spawns, a max-alive cap, round-clear intermission, and simple increasing DEV counts. These values are explicitly temporary until authentic GMS round data is recovered.
+- A 2% bonus crawler easter egg can spawn an original SealHunter seal from a perimeter point. Bonus seals do not count toward round completion.
 - Bowie melee keeps the Combat Arms 135-unit range during bring-up and can damage `FireteamZombie` objects. The old SealHunter single-OBB assumption is patched structurally so persistent local source trees are upgraded correctly.
 - Player damage is real again. The earlier respawn loop was caused by stale PoisonGas hazard code surviving in the local generated source; the build now replaces that function body explicitly. Environmental PoisonGas damage remains disabled until Combat Arms safe/outside volume semantics are reproduced.
 
