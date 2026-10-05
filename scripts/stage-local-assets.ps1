@@ -214,6 +214,298 @@ if (Test-Path -LiteralPath $charZip) {
 $gunsZip = Join-Path $assetRoot "Guns.zip"
 $gunsHHZip = Join-Path $assetRoot "GunsHH.zip"
 
+function Stage-CombatArmsAK47([string]$ZipPath) {
+    if (-not (Test-Path -LiteralPath $ZipPath)) {
+        return $false
+    }
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
+
+    try {
+        $akPattern = '(?i)AK[-_ ]?47'
+
+        $pvModels = @(
+            $zip.Entries |
+                Where-Object {
+                    $_.FullName -match '(?i)GUNS_M_PV' -and
+                    $_.Name -match $akPattern -and
+                    $_.Name -match '(?i)\.LTB
+    Write-Host "[UPDATE] Staging Combat Arms Bowie knife player-view assets..."
+    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_pv\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/ANI_G_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_pv\ANI_G_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_T_PV_MELEE/PV_ML_DF_BOWIEKNIFE_BC.DTX" "Weapons\melee_t\PV_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/FIRE.WAV" "Weapons\melee_snd\BOWIE_KNIFE\FIRE.WAV" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/SELECT.WAV" "Weapons\melee_snd\BOWIE_KNIFE\SELECT.WAV" | Out-Null
+
+    Write-Host "[UPDATE] Discovering/staging Combat Arms AK-47 player-view assets..."
+    Stage-CombatArmsAK47 $gunsZip | Out-Null
+} else {
+    Write-Host "[SKIP] Guns.zip not present - Bowie player-view model will be unavailable"
+}
+
+if (Test-Path -LiteralPath $gunsHHZip) {
+    Write-Host "[UPDATE] Staging Combat Arms Bowie knife world assets..."
+    Extract-ZipEntry "GunsHH.zip" "GUNS_M_HH/HH_ML_DF_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_hh\HH_ML_DF_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "GunsHH.zip" "GUNS_T_HH/HH_ML_DF_BOWIEKNIFE_BC.DTX" "Weapons\melee_t\HH_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
+
+    Write-Host "[UPDATE] Staging Combat Arms AK-47 world assets..."
+    Extract-ZipEntry "GunsHH.zip" "GUNS_M_HH/HH_AK-47.LTB" "Weapons\primary_m_hh\HH_AK-47.LTB" | Out-Null
+    Extract-ZipEntry "GunsHH.zip" "GUNS_T_HH/HH_AK-47.DTX" "Weapons\primary_t\HH_AK-47.DTX" | Out-Null
+} else {
+    Write-Host "[SKIP] GunsHH.zip not present - Bowie world model will be unavailable"
+}
+
+
+$bowieSoundZip = Join-Path $assetRoot "BOWIE_KNIFE.zip"
+if (Test-Path -LiteralPath $bowieSoundZip) {
+    Write-Host "[UPDATE] Staging dedicated Bowie sound archive..."
+    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/FIRE.WAV" "Weapons\melee_snd\BOWIE_KNIFE\FIRE.WAV" | Out-Null
+    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/SELECT.WAV" "Weapons\melee_snd\BOWIE_KNIFE\SELECT.WAV" | Out-Null
+}
+
+# Combat Arms LTBs also carry bare texture names. Keep aliases at the resource
+# root and ModelTextures root in addition to our organized Bowie directory.
+$pvTex = Join-Path $rezRoot "Weapons\melee_t\PV_ML_DF_BOWIEKNIFE_BC.DTX"
+if (Test-Path -LiteralPath $pvTex) {
+    Copy-Item -LiteralPath $pvTex -Destination (Join-Path $rezRoot "PV_ML_DF_BowieKnife_BC.dtx") -Force
+    $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
+    New-Item -ItemType Directory -Force -Path $modelTexturesRoot | Out-Null
+    Copy-Item -LiteralPath $pvTex -Destination (Join-Path $modelTexturesRoot "PV_ML_DF_BowieKnife_BC.dtx") -Force
+}
+
+$hhTex = Join-Path $rezRoot "Weapons\melee_t\HH_ML_DF_BOWIEKNIFE_BC.DTX"
+if (Test-Path -LiteralPath $hhTex) {
+    Copy-Item -LiteralPath $hhTex -Destination (Join-Path $rezRoot "HH_ML_DF_BowieKnife_BC.dtx") -Force
+    $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
+    New-Item -ItemType Directory -Force -Path $modelTexturesRoot | Out-Null
+    Copy-Item -LiteralPath $hhTex -Destination (Join-Path $modelTexturesRoot "HH_ML_DF_BowieKnife_BC.dtx") -Force
+}
+
+
+$clientFxDll = Join-Path $assetRoot "ClientFx.fxd"
+$stagedClientFxDll = Join-Path $rezRoot "ClientFx.fxd"
+
+# Combat Arms' ClientFx.fxd is NOT ABI-safe to drop into the SealHunter/Jupiter
+# runtime. Keep it in assets-local as reverse-engineering/reference material only.
+if (Test-Path -LiteralPath $stagedClientFxDll) {
+    Remove-Item -LiteralPath $stagedClientFxDll -Force
+    Write-Host "[CLEAN] Removed previously staged Combat Arms ClientFx.fxd"
+}
+
+if (Test-Path -LiteralPath $clientFxDll) {
+    Write-Host "[INFO] ClientFx.fxd found - reference only; using Fireteam/Jupiter ClientFX code"
+}
+
+Write-Host "[OK] Local game asset staging complete."
+
+                } |
+                Sort-Object FullName
+        )
+
+        $pvModel = @(
+            $pvModels |
+                Where-Object { $_.Name -notmatch '(?i)^ANI_' }
+        ) | Select-Object -First 1
+
+        if (-not $pvModel) {
+            Write-Host "[SKIP] Could not locate an AK-47 PV model inside Guns.zip"
+            return $false
+        }
+
+        function Copy-AKEntry($entry, [string]$DestinationRelative) {
+            if (-not $entry) {
+                return $false
+            }
+
+            $dest = Join-Path $rezRoot $DestinationRelative
+            $destDir = Split-Path -Parent $dest
+            New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $dest, $true)
+            Write-Host "[OK] AK-47: $($entry.FullName) -> $DestinationRelative"
+            return $true
+        }
+
+        $pvDestRel = "Weapons\primary_m_pv\AK47_PV.LTB"
+        Copy-AKEntry $pvModel $pvDestRel | Out-Null
+
+        # Find the animation child referenced by the PV model itself. CA weapon
+        # filenames vary by era, so reading the actual LTB is safer than guessing.
+        $pvDest = Join-Path $rezRoot $pvDestRel
+        $modelAscii = [System.Text.Encoding]::ASCII.GetString(
+            [System.IO.File]::ReadAllBytes($pvDest))
+
+        $aniMatch = [regex]::Match(
+            $modelAscii,
+            '(?i)ANI_[A-Za-z0-9_\-.]+\.LTB')
+
+        if ($aniMatch.Success) {
+            $aniLeaf = [System.IO.Path]::GetFileName($aniMatch.Value)
+            $aniEntry = $zip.Entries |
+                Where-Object { $_.Name -ieq $aniLeaf } |
+                Select-Object -First 1
+
+            if ($aniEntry) {
+                Copy-AKEntry $aniEntry "Weapons\primary_m_pv\AK47_ANI.LTB" | Out-Null
+            }
+        }
+
+        $pvTexture = $zip.Entries |
+            Where-Object {
+                $_.FullName -match '(?i)GUNS_T_PV' -and
+                $_.Name -match $akPattern -and
+                $_.Name -match '(?i)\.DTX
+    Write-Host "[UPDATE] Staging Combat Arms Bowie knife player-view assets..."
+    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_pv\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/ANI_G_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_pv\ANI_G_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_T_PV_MELEE/PV_ML_DF_BOWIEKNIFE_BC.DTX" "Weapons\melee_t\PV_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/FIRE.WAV" "Weapons\melee_snd\BOWIE_KNIFE\FIRE.WAV" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/SELECT.WAV" "Weapons\melee_snd\BOWIE_KNIFE\SELECT.WAV" | Out-Null
+} else {
+    Write-Host "[SKIP] Guns.zip not present - Bowie player-view model will be unavailable"
+}
+
+if (Test-Path -LiteralPath $gunsHHZip) {
+    Write-Host "[UPDATE] Staging Combat Arms Bowie knife world assets..."
+    Extract-ZipEntry "GunsHH.zip" "GUNS_M_HH/HH_ML_DF_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_hh\HH_ML_DF_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "GunsHH.zip" "GUNS_T_HH/HH_ML_DF_BOWIEKNIFE_BC.DTX" "Weapons\melee_t\HH_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
+} else {
+    Write-Host "[SKIP] GunsHH.zip not present - Bowie world model will be unavailable"
+}
+
+
+$bowieSoundZip = Join-Path $assetRoot "BOWIE_KNIFE.zip"
+if (Test-Path -LiteralPath $bowieSoundZip) {
+    Write-Host "[UPDATE] Staging dedicated Bowie sound archive..."
+    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/FIRE.WAV" "Weapons\melee_snd\BOWIE_KNIFE\FIRE.WAV" | Out-Null
+    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/SELECT.WAV" "Weapons\melee_snd\BOWIE_KNIFE\SELECT.WAV" | Out-Null
+}
+
+# Combat Arms LTBs also carry bare texture names. Keep aliases at the resource
+# root and ModelTextures root in addition to our organized Bowie directory.
+$pvTex = Join-Path $rezRoot "Weapons\melee_t\PV_ML_DF_BOWIEKNIFE_BC.DTX"
+if (Test-Path -LiteralPath $pvTex) {
+    Copy-Item -LiteralPath $pvTex -Destination (Join-Path $rezRoot "PV_ML_DF_BowieKnife_BC.dtx") -Force
+    $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
+    New-Item -ItemType Directory -Force -Path $modelTexturesRoot | Out-Null
+    Copy-Item -LiteralPath $pvTex -Destination (Join-Path $modelTexturesRoot "PV_ML_DF_BowieKnife_BC.dtx") -Force
+}
+
+$hhTex = Join-Path $rezRoot "Weapons\melee_t\HH_ML_DF_BOWIEKNIFE_BC.DTX"
+if (Test-Path -LiteralPath $hhTex) {
+    Copy-Item -LiteralPath $hhTex -Destination (Join-Path $rezRoot "HH_ML_DF_BowieKnife_BC.dtx") -Force
+    $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
+    New-Item -ItemType Directory -Force -Path $modelTexturesRoot | Out-Null
+    Copy-Item -LiteralPath $hhTex -Destination (Join-Path $modelTexturesRoot "HH_ML_DF_BowieKnife_BC.dtx") -Force
+}
+
+
+$clientFxDll = Join-Path $assetRoot "ClientFx.fxd"
+$stagedClientFxDll = Join-Path $rezRoot "ClientFx.fxd"
+
+# Combat Arms' ClientFx.fxd is NOT ABI-safe to drop into the SealHunter/Jupiter
+# runtime. Keep it in assets-local as reverse-engineering/reference material only.
+if (Test-Path -LiteralPath $stagedClientFxDll) {
+    Remove-Item -LiteralPath $stagedClientFxDll -Force
+    Write-Host "[CLEAN] Removed previously staged Combat Arms ClientFx.fxd"
+}
+
+if (Test-Path -LiteralPath $clientFxDll) {
+    Write-Host "[INFO] ClientFx.fxd found - reference only; using Fireteam/Jupiter ClientFX code"
+}
+
+Write-Host "[OK] Local game asset staging complete."
+
+            } |
+            Sort-Object FullName |
+            Select-Object -First 1
+
+        if ($pvTexture) {
+            Copy-AKEntry $pvTexture "Weapons\primary_t\AK47_PV.DTX" | Out-Null
+        }
+
+        foreach($soundName in @("FIRE", "SELECT", "RELOAD")) {
+            $soundEntry = $zip.Entries |
+                Where-Object {
+                    $_.FullName -match $akPattern -and
+                    $_.Name -match ('(?i)^' + $soundName + '.*\.WAV
+    Write-Host "[UPDATE] Staging Combat Arms Bowie knife player-view assets..."
+    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_pv\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/ANI_G_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_pv\ANI_G_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_T_PV_MELEE/PV_ML_DF_BOWIEKNIFE_BC.DTX" "Weapons\melee_t\PV_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/FIRE.WAV" "Weapons\melee_snd\BOWIE_KNIFE\FIRE.WAV" | Out-Null
+    Extract-ZipEntry "Guns.zip" "GUNS_SND_MELEE/BOWIE_KNIFE/SELECT.WAV" "Weapons\melee_snd\BOWIE_KNIFE\SELECT.WAV" | Out-Null
+} else {
+    Write-Host "[SKIP] Guns.zip not present - Bowie player-view model will be unavailable"
+}
+
+if (Test-Path -LiteralPath $gunsHHZip) {
+    Write-Host "[UPDATE] Staging Combat Arms Bowie knife world assets..."
+    Extract-ZipEntry "GunsHH.zip" "GUNS_M_HH/HH_ML_DF_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_hh\HH_ML_DF_BOWIEKNIFE_CH.LTB" | Out-Null
+    Extract-ZipEntry "GunsHH.zip" "GUNS_T_HH/HH_ML_DF_BOWIEKNIFE_BC.DTX" "Weapons\melee_t\HH_ML_DF_BOWIEKNIFE_BC.DTX" | Out-Null
+} else {
+    Write-Host "[SKIP] GunsHH.zip not present - Bowie world model will be unavailable"
+}
+
+
+$bowieSoundZip = Join-Path $assetRoot "BOWIE_KNIFE.zip"
+if (Test-Path -LiteralPath $bowieSoundZip) {
+    Write-Host "[UPDATE] Staging dedicated Bowie sound archive..."
+    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/FIRE.WAV" "Weapons\melee_snd\BOWIE_KNIFE\FIRE.WAV" | Out-Null
+    Extract-ZipEntry "BOWIE_KNIFE.zip" "BOWIE_KNIFE/SELECT.WAV" "Weapons\melee_snd\BOWIE_KNIFE\SELECT.WAV" | Out-Null
+}
+
+# Combat Arms LTBs also carry bare texture names. Keep aliases at the resource
+# root and ModelTextures root in addition to our organized Bowie directory.
+$pvTex = Join-Path $rezRoot "Weapons\melee_t\PV_ML_DF_BOWIEKNIFE_BC.DTX"
+if (Test-Path -LiteralPath $pvTex) {
+    Copy-Item -LiteralPath $pvTex -Destination (Join-Path $rezRoot "PV_ML_DF_BowieKnife_BC.dtx") -Force
+    $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
+    New-Item -ItemType Directory -Force -Path $modelTexturesRoot | Out-Null
+    Copy-Item -LiteralPath $pvTex -Destination (Join-Path $modelTexturesRoot "PV_ML_DF_BowieKnife_BC.dtx") -Force
+}
+
+$hhTex = Join-Path $rezRoot "Weapons\melee_t\HH_ML_DF_BOWIEKNIFE_BC.DTX"
+if (Test-Path -LiteralPath $hhTex) {
+    Copy-Item -LiteralPath $hhTex -Destination (Join-Path $rezRoot "HH_ML_DF_BowieKnife_BC.dtx") -Force
+    $modelTexturesRoot = Join-Path $rezRoot "ModelTextures"
+    New-Item -ItemType Directory -Force -Path $modelTexturesRoot | Out-Null
+    Copy-Item -LiteralPath $hhTex -Destination (Join-Path $modelTexturesRoot "HH_ML_DF_BowieKnife_BC.dtx") -Force
+}
+
+
+$clientFxDll = Join-Path $assetRoot "ClientFx.fxd"
+$stagedClientFxDll = Join-Path $rezRoot "ClientFx.fxd"
+
+# Combat Arms' ClientFx.fxd is NOT ABI-safe to drop into the SealHunter/Jupiter
+# runtime. Keep it in assets-local as reverse-engineering/reference material only.
+if (Test-Path -LiteralPath $stagedClientFxDll) {
+    Remove-Item -LiteralPath $stagedClientFxDll -Force
+    Write-Host "[CLEAN] Removed previously staged Combat Arms ClientFx.fxd"
+}
+
+if (Test-Path -LiteralPath $clientFxDll) {
+    Write-Host "[INFO] ClientFx.fxd found - reference only; using Fireteam/Jupiter ClientFX code"
+}
+
+Write-Host "[OK] Local game asset staging complete."
+)
+                } |
+                Sort-Object FullName |
+                Select-Object -First 1
+
+            if ($soundEntry) {
+                Copy-AKEntry $soundEntry ("Weapons\primary_snd\AK47\" + $soundName + ".WAV") | Out-Null
+            }
+        }
+
+        return $true
+    }
+    finally {
+        $zip.Dispose()
+    }
+}
+
 if (Test-Path -LiteralPath $gunsZip) {
     Write-Host "[UPDATE] Staging Combat Arms Bowie knife player-view assets..."
     Extract-ZipEntry "Guns.zip" "GUNS_M_PV_MELEE/CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" "Weapons\melee_m_pv\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB" | Out-Null
