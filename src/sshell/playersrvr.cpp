@@ -368,22 +368,21 @@ uint32 CPlayerSrvr::InitialUpdate(void *pData, float fData)
     ocs.m_ObjectType = OT_MODEL;
     ocs.m_Flags = FLAG_VISIBLE | FLAG_FORCECLIENTUPDATE | FLAG_SHADOW;
     ocs.m_Flags2 = FLAG2_DISABLEPREDICTION;
-    float fRand = g_pLTServer->Random(1.0f, 100.0f);
+    const FTWeaponDef *pInitialWeapon =
+        FT_GetWeaponDef(
+            m_WeaponDefs,
+            m_nWeaponSlot);
 
-    if(fRand < 33.0f)
+    if(pInitialWeapon)
     {
-        strncpy(ocs.m_Filename, "Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB", 127);
-        strncpy(ocs.m_SkinName , "Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX", 127);
-    }
-    else if(fRand < 66.0f)
-    {
-        strncpy(ocs.m_Filename, "Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB", 127);
-        strncpy(ocs.m_SkinName , "Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX", 127);
-    }
-    else
-    {
-        strncpy(ocs.m_Filename, "Weapons/melee_m_hh/HH_ML_DF_BOWIEKNIFE_CH.LTB", 127);
-        strncpy(ocs.m_SkinName , "Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX", 127);
+        FT_CopyWeaponString(
+            ocs.m_Filename,
+            sizeof(ocs.m_Filename),
+            pInitialWeapon->sHHModel);
+        FT_CopyWeaponString(
+            ocs.m_SkinName,
+            sizeof(ocs.m_SkinName),
+            pInitialWeapon->sHHTexture);
     }
 
     BaseClass *pClubObj = (BaseClass*)g_pLTServer->CreateObject(hClass, &ocs);
