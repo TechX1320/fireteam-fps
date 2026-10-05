@@ -201,14 +201,47 @@ function Extract-ZipEntry([string]$ZipName, [string]$EntryName, [string]$Destina
 }
 
 
+function Extract-OptionalZipEntry([string]$ZipName, [string]$EntryName, [string]$DestinationRelative) {
+    try {
+        return Extract-ZipEntry $ZipName $EntryName $DestinationRelative
+    }
+    catch {
+        Write-Host "[INFO] Optional asset not present: $ZipName::$EntryName"
+        return $false
+    }
+}
+
+
 $charZip = Join-Path $assetRoot "CharModels-Textur.zip"
 if (Test-Path -LiteralPath $charZip) {
-    Write-Host "[UPDATE] Staging Combat Arms Specialist character test assets..."
+    Write-Host "[UPDATE] Staging Combat Arms character / infected test assets..."
+
+    # Existing Specialist references.
     Extract-ZipEntry "CharModels-Textur.zip" "CHARS_M_BODY/CM_BODY_NM_SPECIAL_BC.LTB" "Characters\male\body\CM_BODY_NM_SPECIAL_BC.LTB" | Out-Null
     Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_BODY/CM_BODY_NM_SPECIAL_BC.DTX" "Characters\male\textures\CM_BODY_NM_SPECIAL_BC.DTX" | Out-Null
     Extract-ZipEntry "CharModels-Textur.zip" "CHARS_M_FACE/CM_FC_NM_SPECIAL_BC.LTB" "Characters\male\face\CM_FC_NM_SPECIAL_BC.LTB" | Out-Null
     Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_FACE/CM_FC_NM_SPECIAL_BC.DTX" "Characters\male\textures\CM_FC_NM_SPECIAL_BC.DTX" | Out-Null
     Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_HAND/CM_HND_NM_SPECIAL_BC.DTX" "Characters\male\hands\CM_HND_NM_SPECIAL_BC.DTX" | Out-Null
+
+    # Combat Arms male shared animation child. Body LTBs reference this exact
+    # leaf name internally, so preserve the original filename beside the body.
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_M_BODY/ST_M_CHILD.LTB" "Characters\infected\body\ST_M_CHILD.LTB" | Out-Null
+
+    # Authentic Normal_Infecter_Common_D data uses MT_AR_BODY + the virus face.
+    # Some character packs omit MT_AR_BODY.LTB even though they include its
+    # textures, so stage it opportunistically and keep a CA-body fallback.
+    Extract-OptionalZipEntry "CharModels-Textur.zip" "CHARS_M_BODY/MT_AR_BODY.LTB" "Characters\infected\body\MT_AR_BODY.LTB" | Out-Null
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_BODY/MT_AR_BODY.DTX" "Characters\infected\body\MT_AR_BODY.DTX" | Out-Null
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_BODY/MT_MG_LEG.DTX" "Characters\infected\body\MT_MG_LEG.DTX" | Out-Null
+
+    # Temporary CA male-body fallback used only when MT_AR_BODY.LTB is absent.
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_M_BODY/MT_SP_BODY.LTB" "Characters\infected\body\MT_SP_BODY.LTB" | Out-Null
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_BODY/MT_SP_BODY.DTX" "Characters\infected\body\MT_SP_BODY.DTX" | Out-Null
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_BODY/MT_SP_LEG.DTX" "Characters\infected\body\MT_SP_LEG.DTX" | Out-Null
+
+    # Authentic infected common face from MODELBUTES AIFace8.
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_M_FACE/CM_FC_NM_VIRUS_HM.LTB" "Characters\infected\face\CM_FC_NM_VIRUS_HM.LTB" | Out-Null
+    Extract-ZipEntry "CharModels-Textur.zip" "CHARS_T_FACE/CM_FC_NM_VIRUS_HM.DTX" "Characters\infected\face\CM_FC_NM_VIRUS_HM.DTX" | Out-Null
 }
 
 $gunsZip = Join-Path $assetRoot "Guns.zip"
