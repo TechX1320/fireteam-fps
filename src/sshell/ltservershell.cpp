@@ -314,7 +314,8 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
                     vDirection);
             }
         }
-        break;    case MSG_CS_ANIM:
+        break;
+    case MSG_CS_ANIM:
         {
             char sAnimName[128];
             pMessage->ReadString(sAnimName, 128);
@@ -354,7 +355,16 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
                     pMessage->Readuint8());
             }
         }
-        break;    case MSG_CS_SCORE:
+        break;
+    case MSG_CS_RELOAD:
+        {
+            if(pPlayerClass)
+            {
+                pPlayerClass->ReloadWeapon();
+            }
+        }
+        break;
+    case MSG_CS_SCORE:
         {
             bool bShowStats = pMessage->Readbool();
 
