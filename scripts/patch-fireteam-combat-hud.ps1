@@ -551,15 +551,29 @@ if(-not $text.Contains('case MSG_SC_AMMO:'))
 
 if(-not $text.Contains('FT_RenderWeaponHud('))
 {
-    $anchor = '        FT_RenderHealthHud();'
-    if(-not $text.Contains($anchor))
+    # Hook into the active in-world GUI render path rather than depending on
+    # the exact health-HUD line. Persistent .local trees may have that block
+    # reformatted by earlier UI migrations, but chat rendering remains the
+    # stable client-shell anchor.
+    $anchor = 'm_pChatGui->Render();'
+    $index = $text.IndexOf($anchor)
+
+    if($index -lt 0)
     {
-        throw "Could not locate health HUD render hook."
+        throw "Could not locate active in-world GUI render anchor."
+    }
+
+    $lineStart = $text.LastIndexOf([Environment]::NewLine, $index)
+    if($lineStart -lt 0)
+    {
+        $lineStart = 0
+    }
+    else
+    {
+        $lineStart += [Environment]::NewLine.Length
     }
 
     $render = @"
-        FT_RenderHealthHud();
-
         if(m_pPlayer &&
            m_pCamera &&
            !FT_SettingsIsOpen())
@@ -568,9 +582,10 @@ if(-not $text.Contains('FT_RenderWeaponHud('))
                 m_pPlayer->GetWeaponSlot(),
                 m_pCamera->IsFirstPerson());
         }
+
 "@
 
-    $text = $text.Replace($anchor, $render)
+    $text = $text.Insert($lineStart, $render)
 }
 
 Write-Source $clientShell $text
