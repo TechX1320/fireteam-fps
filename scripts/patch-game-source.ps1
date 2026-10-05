@@ -75,18 +75,10 @@ public:
     $text = $text.Replace($marker, $stub + $marker)
     Write-Source $aiHeader $text
 }
-# Upgrade older generated workspaces from the inert compatibility stub to a
-# lightweight navigation-volume representation that preserves the NOLF2/CA
-# map-authored fields used by Cabin Fever.
+# Upgrade older generated workspaces from any previous AIVolume compatibility
+# declaration to the current navigation-volume representation. Do not depend on
+# exact whitespace/body text because .local is intentionally persistent.
 $text = Read-Source $aiHeader
-$oldCompatStub = @"
-class AIVolume : public BaseClass
-{
-public:
-    AIVolume() {}
-    ~AIVolume() {}
-};
-"@
 $newCompatStub = @"
 class AIVolume : public BaseClass
 {
@@ -114,11 +106,50 @@ private:
     bool     m_bPreferredPath;
 };
 "@
-if ($text.Contains($oldCompatStub)) {
-    $text = $text.Replace($oldCompatStub, $newCompatStub)
+
+if (-not $text.Contains("void ReadNavigationProps(ObjectCreateStruct *pOCS);")) {
+    $classStart = $text.IndexOf("class AIVolume : public BaseClass")
+    if ($classStart -lt 0) {
+        throw "Could not locate Fireteam AIVolume compatibility class."
+    }
+
+    $braceStart = $text.IndexOf("{", $classStart)
+    if ($braceStart -lt 0) {
+        throw "Could not locate AIVolume class opening brace."
+    }
+
+    $depth = 0
+    $braceEnd = -1
+    for ($i = $braceStart; $i -lt $text.Length; ++$i) {
+        if ($text[$i] -eq '{') {
+            ++$depth
+        }
+        elseif ($text[$i] -eq '}') {
+            --$depth
+            if ($depth -eq 0) {
+                $braceEnd = $i
+                break
+            }
+        }
+    }
+
+    if ($braceEnd -lt 0) {
+        throw "Could not locate AIVolume class closing brace."
+    }
+
+    $classEnd = $braceEnd + 1
+    while ($classEnd -lt $text.Length -and [char]::IsWhiteSpace($text[$classEnd])) {
+        ++$classEnd
+    }
+    if ($classEnd -lt $text.Length -and $text[$classEnd] -eq ';') {
+        ++$classEnd
+    }
+
+    $text = $text.Substring(0, $classStart) +
+        $newCompatStub +
+        $text.Substring($classEnd)
+
     Write-Source $aiHeader $text
-} elseif (-not $text.Contains("ReadNavigationProps")) {
-    throw "Could not locate Fireteam AIVolume compatibility stub."
 }
 Write-Host "[OK] AIVolume header split into ZombieSpawner + navigation AIVolume"
 
@@ -147,14 +178,8 @@ END_CLASS_DEFAULT_FLAGS(AIVolume, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
     Write-Source $aiCpp $text
 }
 # Preserve the NOLF2/Combat Arms navigation properties on the compatibility
-# AIVolume class. Older generated trees only registered Target + Dims.
+# AIVolume class. Structurally replace any older registration variant.
 $text = Read-Source $aiCpp
-$oldCompatRegistration = @"
-BEGIN_CLASS(AIVolume)
-ADD_STRINGPROP_FLAG(Target, "", PF_OBJECTLINK)
-ADD_VECTORPROP_FLAG(Dims, PF_DIMS)
-END_CLASS_DEFAULT_FLAGS(AIVolume, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
-"@
 $newCompatRegistration = @"
 BEGIN_CLASS(AIVolume)
 ADD_VECTORPROP_VAL_FLAG(Dims, 32.0f, 8.0f, 32.0f, PF_DIMS)
@@ -164,14 +189,20 @@ ADD_STRINGPROP_FLAG(LightSwitchNode, "", PF_OBJECTLINK)
 ADD_BOOLPROP(PreferredPath, LTFALSE)
 END_CLASS_DEFAULT_FLAGS(AIVolume, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
 "@
-if ($text.Contains($oldCompatRegistration)) {
-    $text = $text.Replace($oldCompatRegistration, $newCompatRegistration)
+
+if (-not $text.Contains('ADD_STRINGPROP_FLAG(Region, "", PF_OBJECTLINK)')) {
+    $registrationPattern = '(?s)BEGIN_CLASS\(AIVolume\).*?END_CLASS_DEFAULT_FLAGS\(AIVolume\s*,\s*BaseClass\s*,\s*LTNULL\s*,\s*LTNULL\s*,\s*CF_ALWAYSLOAD\)'
+    $registrationMatch = [regex]::Match($text, $registrationPattern)
+    if (-not $registrationMatch.Success) {
+        throw "Could not locate Fireteam AIVolume compatibility registration."
+    }
+
+    $text = $text.Substring(0, $registrationMatch.Index) +
+        $newCompatRegistration +
+        $text.Substring($registrationMatch.Index + $registrationMatch.Length)
 }
 
 if (-not $text.Contains("void AIVolume::ReadNavigationProps")) {
-    if (-not $text.Contains($newCompatRegistration)) {
-        throw "Could not locate Fireteam AIVolume compatibility registration."
-    }
 
     $compatImpl = @"
 
