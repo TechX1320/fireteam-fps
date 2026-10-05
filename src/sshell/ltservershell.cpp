@@ -170,7 +170,12 @@ LPBASECLASS CLTServerShell::OnClientEnterWorld(HCLIENT hClient)
     objCreateStruct.m_Flags2 |= FLAG2_PLAYERCOLLIDE;
 
     FTPlayerDef playerDef;
-    if(FT_LoadPlayerDef("config/player.cfg", playerDef))
+    const bool bPlayerDefLoaded =
+        FT_LoadPlayerDef(
+            "config/player.cfg",
+            playerDef);
+
+    if(bPlayerDefLoaded)
     {
         FT_CopyPlayerString(
             objCreateStruct.m_Filenames[0],
@@ -226,10 +231,27 @@ LPBASECLASS CLTServerShell::OnClientEnterWorld(HCLIENT hClient)
         sprintf(name, "Player %d", clientID);
         pClientObj->SetPlayerName(name);
 
-        // Set up our physics dimensions
+        // Player dimensions are external content too, keeping server/client
+        // collision consistent and mod-friendly.
         LTVector vDims;
-        g_pLTSCommon->GetModelAnimUserDims(hClientHandle, &vDims, g_pLTServer->GetModelAnimation(hClientHandle));
-		g_pLTSPhysics->SetObjectDims(hClientHandle, &vDims, 0);
+        if(bPlayerDefLoaded)
+        {
+            vDims.Init(
+                playerDef.fCollisionX,
+                playerDef.fCollisionY,
+                playerDef.fCollisionZ);
+        }
+        else
+        {
+            g_pLTSCommon->GetModelAnimUserDims(
+                hClientHandle,
+                &vDims,
+                g_pLTServer->GetModelAnimation(hClientHandle));
+        }
+        g_pLTSPhysics->SetObjectDims(
+            hClientHandle,
+            &vDims,
+            0);
 
         pClientObj->SetClient(hClient);
 
