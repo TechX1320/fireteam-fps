@@ -193,6 +193,23 @@ void WorldProperties::ReadProps(ObjectCreateStruct* pStruct)
 	*/
 	g_pLTServer->GetPropReal("SkyScale", &m_fSkyScale);
 
+    g_pLTServer->CPrint(
+        "Fireteam worldprops(server): FarZ=%u Background=%.1f %.1f %.1f Fog=%u color=%.1f %.1f %.1f near=%u far=%u SkyFog=%u near=%u far=%u SkyScale=%.2f",
+        (uint32)m_nFarZ,
+        m_vBackgroundColor.x,
+        m_vBackgroundColor.y,
+        m_vBackgroundColor.z,
+        m_bFogEnable ? 1u : 0u,
+        m_vFogColor.x,
+        m_vFogColor.y,
+        m_vFogColor.z,
+        (uint32)m_nFogNearZ,
+        (uint32)m_nFogFarZ,
+        m_bSkyFogEnable ? 1u : 0u,
+        (uint32)m_nSkyFogNearZ,
+        (uint32)m_nSkyFogFarZ,
+        m_fSkyScale);
+
 }
 
 
@@ -226,7 +243,7 @@ void WorldProperties::SendToClient(HCLIENT hClient)
 		pMsg->WriteLTVector(m_vFogColor);
 		pMsg->Writeuint32(m_nFogNearZ);
 		pMsg->Writeuint32(m_nFogFarZ);
-		pMsg->Writebool(m_bSkyPanEnable);
+		pMsg->Writebool(m_bSkyFogEnable);
 		pMsg->Writeuint32(m_nSkyFogNearZ);
 		pMsg->Writeuint32(m_nSkyFogFarZ);
 		/*
