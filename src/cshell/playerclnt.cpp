@@ -474,11 +474,10 @@ bool CPlayerClnt::Attack()
                 (char*)"fire_0");
         }
 
-        PlayViewWeaponAnimation(
+        m_bViewWeaponAction = PlayViewWeaponAnimation(
             hFire != INVALID_MODEL_ANIM ? "fire_0" : "fire",
             false);
         PlayViewWeaponSound("FIRE.WAV");
-        m_bViewWeaponAction = true;
         return true;
     }
 
@@ -489,9 +488,9 @@ bool CPlayerClnt::Attack()
 
     PlayAttackAnimation("UMFi", m_idUpperBodyTracker);
     m_bAttacking = true;
-    PlayViewWeaponAnimation("fire_0", false);
+    m_bViewWeaponAction =
+        PlayViewWeaponAnimation("fire_0", false);
     PlayViewWeaponSound("FIRE.WAV");
-    m_bViewWeaponAction = true;
     return true;
 }
 
@@ -512,9 +511,9 @@ bool CPlayerClnt::AltAttack()
     PlayAttackAnimation("UMFi", m_idUpperBodyTracker);
     m_bAttacking = true;
 
-    PlayViewWeaponAnimation("fire_1", false);
+    m_bViewWeaponAction =
+        PlayViewWeaponAnimation("fire_1", false);
     PlayViewWeaponSound("FIRE.WAV");
-    m_bViewWeaponAction = true;
 
     return true;
 }
@@ -613,11 +612,10 @@ bool CPlayerClnt::ReloadWeapon()
             (char*)"reload");
     }
 
-    PlayViewWeaponAnimation(
+    m_bViewWeaponAction = PlayViewWeaponAnimation(
         hReload != INVALID_MODEL_ANIM ? "reload" : "reload_0",
         false);
     PlayViewWeaponSound("RELOAD.WAV");
-    m_bViewWeaponAction = true;
     return true;
 }
 
@@ -947,29 +945,41 @@ void CPlayerClnt::CreateViewWeapon()
         m_hViewWeaponObject,
         (char*)"select");
 
-    PlayViewWeaponAnimation(
+    m_bViewWeaponAction = PlayViewWeaponAnimation(
         hSelect != INVALID_MODEL_ANIM ? "select" : "select_0",
         false);
     PlayViewWeaponSound("SELECT.WAV");
-    m_bViewWeaponAction = true;
 }
 
-void CPlayerClnt::PlayViewWeaponAnimation(const char* sAnimName, bool bLooping)
+bool CPlayerClnt::PlayViewWeaponAnimation(const char* sAnimName, bool bLooping)
 {
     if(!m_hViewWeaponObject || !sAnimName)
     {
-        return;
+        return false;
     }
 
-    HMODELANIM hAnim = g_pLTClient->GetAnimIndex(m_hViewWeaponObject, (char*)sAnimName);
+    HMODELANIM hAnim =
+        g_pLTClient->GetAnimIndex(
+            m_hViewWeaponObject,
+            (char*)sAnimName);
+
     if(hAnim == INVALID_MODEL_ANIM)
     {
-        g_pLTClient->CPrint("Fireteam: weapon animation missing: %s", sAnimName);
-        return;
+        g_pLTClient->CPrint(
+            "Fireteam: weapon animation missing: %s",
+            sAnimName);
+        return false;
     }
 
-    g_pLTCModel->SetCurAnim(m_hViewWeaponObject, MAIN_TRACKER, hAnim);
-    g_pLTCModel->SetLooping(m_hViewWeaponObject, MAIN_TRACKER, bLooping ? LTTRUE : LTFALSE);
+    g_pLTCModel->SetCurAnim(
+        m_hViewWeaponObject,
+        MAIN_TRACKER,
+        hAnim);
+    g_pLTCModel->SetLooping(
+        m_hViewWeaponObject,
+        MAIN_TRACKER,
+        bLooping ? LTTRUE : LTFALSE);
+    return true;
 }
 
 void CPlayerClnt::PlayViewWeaponSound(const char* sFilename)
