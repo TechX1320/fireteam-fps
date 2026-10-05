@@ -559,8 +559,17 @@ void CPlayerSrvr::CreateAttachment(HATTACHMENT &hAttachment, HOBJECT hChildObjec
 //-----------------------------------------------------------------------------
 void CPlayerSrvr::CheckForHit()
 {
+    const FTWeaponDef *pDef = FT_GetWeaponDef(
+        m_WeaponDefs,
+        m_nWeaponSlot);
+
+    if(!pDef || pDef->eType != FT_WEAPON_MELEE)
+    {
+        return;
+    }
+
     IntersectQuery qInfo;
-	IntersectInfo iInfo;
+    IntersectInfo iInfo;
 
     LTVector vPos;
     LTRotation rRot;
@@ -568,81 +577,65 @@ void CPlayerSrvr::CheckForHit()
     g_pLTServer->GetObjectPos(m_hObject, &vPos);
     g_pLTServer->GetObjectRotation(m_hObject, &rRot);
 
-	LTVector vForward = rRot.Forward();
+    LTVector vForward = rRot.Forward();
+    vPos.y -= 30.0f;
 
-	vPos.y -= 30.0f;
+    qInfo.m_From = vPos + vForward;
+    qInfo.m_To   = vPos + (vForward * pDef->fRange);
+    qInfo.m_Flags = INTERSECT_OBJECTS;
 
-	qInfo.m_From = vPos + vForward;
-	qInfo.m_To   = vPos + (vForward * 135.0f);
+    if(!g_pLTServer->IntersectSegment(&qInfo, &iInfo) ||
+       !iInfo.m_hObject ||
+       g_pLTSPhysics->IsWorldObject(iInfo.m_hObject) == LT_YES)
+    {
+        return;
+    }
 
-	qInfo.m_Flags =  INTERSECT_OBJECTS;// | INTERSECT_HPOLY;
+    HCLASS hTarget = g_pLTServer->GetObjectClass(iInfo.m_hObject);
+    HCLASS hClassSeal = g_pLTServer->GetClass("Seal");
+    HCLASS hClassSnowman = g_pLTServer->GetClass("Snowman");
+    HCLASS hClassZombie = g_pLTServer->GetClass("FireteamZombie");
 
-    if(g_pLTServer->IntersectSegment(&qInfo, &iInfo))
-	{
-		if(iInfo.m_hObject)
-		{
-			if(g_pLTSPhysics->IsWorldObject( iInfo.m_hObject ) == LT_YES)
-			{
+    const bool bSeal =
+        hClassSeal && hTarget &&
+        g_pLTServer->IsKindOf(hTarget, hClassSeal);
 
-			}
-			else
-			{
-                //Is it a seal?
-                HCLASS hClassSeal = g_pLTServer->GetClass("Seal");
-                HCLASS hClassSnowman = g_pLTServer->GetClass("Snowman");
-                HCLASS hClassZombie = g_pLTServer->GetClass("FireteamZombie");
-                HCLASS hTarget = g_pLTServer->GetObjectClass(iInfo.m_hObject);
+    const bool bSnowman =
+        hClassSnowman && hTarget &&
+        g_pLTServer->IsKindOf(hTarget, hClassSnowman);
 
-                //Yes
-                // Make a sound
-                if( g_pLTServer->IsKindOf(hClassSeal, hTarget))
-                {
-                    PlaySound(1);
+    const bool bZombie =
+        hClassZombie && hTarget &&
+        g_pLTServer->IsKindOf(hTarget, hClassZombie);
 
-                    // Send damage message to seal
-                    ILTMessage_Write *pMsg;
-                    g_pLTSCommon->CreateMessage(pMsg);
-                    pMsg->IncRef();
-                    pMsg->Writeuint32(OBJ_MID_DAMAGE);
-                    pMsg->Writeuint8(5); //DMG
-                    g_pLTServer->SendToObject(pMsg->Read(), m_hObject, iInfo.m_hObject, 0);
-                    pMsg->DecRef();
-                }
-                else
-                if(g_pLTServer->IsKindOf(hClassSnowman, hTarget))
-                {
-                    PlaySound(2);
+    if(!bSeal && !bSnowman && !bZombie)
+    {
+        // Fireteam co-op: friendly fire is permanently disabled.
+        return;
+    }
 
-                    // Send damage message to snowman
-                    ILTMessage_Write *pMsg;
-                    g_pLTSCommon->CreateMessage(pMsg);
-                    pMsg->IncRef();
-                    pMsg->Writeuint32(OBJ_MID_DAMAGE);
-                    pMsg->Writeuint8(5); //DMG
-                    g_pLTServer->SendToObject(pMsg->Read(), m_hObject, iInfo.m_hObject, 0);
-                    pMsg->DecRef();                    
-                }
-                else
-                {
-                    if(hClassZombie && g_pLTServer->IsKindOf(hClassZombie, hTarget))
-                    {
-                        // Fireteam placeholder zombie melee damage.
-                        ILTMessage_Write *pMsg;
-                        g_pLTSCommon->CreateMessage(pMsg);
-                        pMsg->IncRef();
-                        pMsg->Writeuint32(OBJ_MID_DAMAGE);
-                        pMsg->Writeuint8(20);
-                        g_pLTServer->SendToObject(pMsg->Read(), m_hObject, iInfo.m_hObject, 0);
-                        pMsg->DecRef();
-                    }
-                    else
-                    {
-                        // Co-op mode: friendly fire is permanently disabled.
-                    }
-                }
-            }
-		}
-	}
+    if(bSeal)
+    {
+        PlaySound(1);
+    }
+    else if(bSnowman)
+    {
+        PlaySound(2);
+    }
+
+    ILTMessage_Write *pMsg = LTNULL;
+    if(g_pLTSCommon->CreateMessage(pMsg) == LT_OK && pMsg)
+    {
+        pMsg->IncRef();
+        pMsg->Writeuint32(OBJ_MID_DAMAGE);
+        pMsg->Writeuint8(pDef->nDamage);
+        g_pLTServer->SendToObject(
+            pMsg->Read(),
+            m_hObject,
+            iInfo.m_hObject,
+            0);
+        pMsg->DecRef();
+    }
 }
 
 
