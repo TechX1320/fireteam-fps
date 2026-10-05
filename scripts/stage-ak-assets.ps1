@@ -54,46 +54,53 @@ if (Test-Path -LiteralPath $gunsPath) {
     try {
         $pvModel = $zip.Entries |
             Where-Object {
-                $_.FullName -match '(?i)GUNS_M_PV' -and
-                $_.Name -match $akPattern -and
-                $_.Name -match '(?i)\.LTB$' -and
-                $_.Name -notmatch '(?i)^ANI_'
+                ($_.FullName.Replace('\','/') -ieq 'GUNS_M_PV_AR/PV_AR_AK47_SH.LTB')
             } |
-            Sort-Object FullName |
             Select-Object -First 1
 
+        if (-not $pvModel) {
+            $candidates = @(
+                $zip.Entries |
+                    Where-Object {
+                        $_.FullName -match '(?i)GUNS_M_PV_AR' -and
+                        $_.Name -match $akPattern -and
+                        $_.Name -match '(?i)\.LTB$' -and
+                        $_.Name -notmatch '(?i)ANIBASE' -and
+                        $_.Name -notmatch '(?i)^ANI_'
+                    } |
+                    Sort-Object FullName
+            )
+
+            if ($candidates.Count -gt 0) {
+                Write-Host "[INFO] Exact PV_AR_AK47_SH.LTB missing; AK PV candidates:"
+                foreach($candidate in $candidates) {
+                    Write-Host "       $($candidate.FullName)"
+                }
+                $pvModel = $candidates[0]
+            }
+        }
+
         if ($pvModel) {
-            $pvRelative = "Weapons\primary_m_pv\AK47_PV.LTB"
+            $pvRelative = "Weapons\primary_m_pv\PV_AR_AK47_SH.LTB"
             Copy-ZipEntry -Zip $zip -Entry $pvModel -DestinationRelative $pvRelative
 
             $pvPath = Join-Path $rezRoot $pvRelative
             $modelAscii = [System.Text.Encoding]::ASCII.GetString(
                 [System.IO.File]::ReadAllBytes($pvPath))
 
-            $aniEntry = $null
-            $aniMatch = [regex]::Match(
-                $modelAscii,
-                '(?i)ANI_[A-Za-z0-9_.\-]+\.LTB')
-
-            if ($aniMatch.Success) {
-                $aniEntry = Find-ArchiveEntryByLeaf -Zip $zip -LeafName $aniMatch.Value
-            }
-
-            if (-not $aniEntry) {
-                $aniEntry = $zip.Entries |
-                    Where-Object {
-                        $_.Name -match '(?i)^ANI_.*\.LTB$' -and
-                        $_.FullName -match $akPattern
-                    } |
-                    Sort-Object FullName |
-                    Select-Object -First 1
-            }
+            # Combat Arms Weapon12 uses PV_AR_AK47_SH.ltb and the archive
+            # carries AK47_ANIBASE.LTB as the animation/base companion.
+            $aniEntry = $zip.Entries |
+                Where-Object {
+                    ($_.FullName.Replace('\','/') -ieq 'GUNS_M_PV_AR/AK47_ANIBASE.LTB')
+                } |
+                Select-Object -First 1
 
             if ($aniEntry) {
-                Copy-ZipEntry -Zip $zip -Entry $aniEntry -DestinationRelative "Weapons\primary_m_pv\AK47_ANI.LTB"
+                Copy-ZipEntry -Zip $zip -Entry $aniEntry -DestinationRelative "Weapons\primary_m_pv\AK47_ANIBASE.LTB"
             }
             else {
-                Write-Host "[SKIP] AK-47 animation child was not found in Guns.zip"
+                Write-Host "[SKIP] AK47_ANIBASE.LTB was not found in Guns.zip"
             }
 
             $pvTexture = $zip.Entries |
@@ -195,5 +202,10 @@ if (Test-Path -LiteralPath $gunsHHPath) {
 else {
     Write-Host "[SKIP] GunsHH.zip not present - AK-47 world assets unavailable"
 }
+
+$stalePv = Join-Path $rezRoot "Weapons\primary_m_pv\AK47_PV.LTB"
+$staleAni = Join-Path $rezRoot "Weapons\primary_m_pv\AK47_ANI.LTB"
+if (Test-Path -LiteralPath $stalePv) { Remove-Item -LiteralPath $stalePv -Force }
+if (Test-Path -LiteralPath $staleAni) { Remove-Item -LiteralPath $staleAni -Force }
 
 Write-Host "[OK] AK-47 local asset staging complete."
