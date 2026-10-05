@@ -1142,8 +1142,20 @@ void CPlayerSrvr::SpawnExplosiveProjectile(
         vDir,
         LTVector(0.0f, 1.0f, 0.0f));
 
-    if(def.eType == FT_WEAPON_GRENADE)
+    if(def.sProjectileModel[0])
     {
+        FT_CopyWeaponString(
+            ocs.m_Filename,
+            sizeof(ocs.m_Filename),
+            def.sProjectileModel);
+        FT_CopyWeaponString(
+            ocs.m_SkinName,
+            sizeof(ocs.m_SkinName),
+            def.sProjectileTexture);
+    }
+    else
+    {
+        // Definition fallback for older configs.
         FT_CopyWeaponString(
             ocs.m_Filename,
             sizeof(ocs.m_Filename),
@@ -1152,19 +1164,6 @@ void CPlayerSrvr::SpawnExplosiveProjectile(
             ocs.m_SkinName,
             sizeof(ocs.m_SkinName),
             def.sHHTexture);
-    }
-    else
-    {
-        // Temporary visible rocket body until the CA projectile model is
-        // identified separately from the hand-held LAW model.
-        FT_CopyWeaponString(
-            ocs.m_Filename,
-            sizeof(ocs.m_Filename),
-            "Models/GenCan.ltb");
-        FT_CopyWeaponString(
-            ocs.m_SkinName,
-            sizeof(ocs.m_SkinName),
-            "ModelTextures/GenCan1.dtx");
     }
 
     FireteamExplosiveProjectile *pProjectile =
@@ -1181,10 +1180,19 @@ void CPlayerSrvr::SpawnExplosiveProjectile(
         return;
     }
 
+    LTVector vProjectileScale(
+        def.fProjectileScale,
+        def.fProjectileScale,
+        def.fProjectileScale);
+    g_pLTServer->ScaleObject(
+        pProjectile->m_hObject,
+        &vProjectileScale);
+
     g_pLTServer->CPrint(
-        "Fireteam explosive: spawned %s projectile model=%s",
+        "Fireteam explosive: spawned %s projectile model=%s scale=%.2f",
         def.sName,
-        ocs.m_Filename);
+        ocs.m_Filename,
+        def.fProjectileScale);
 
     pProjectile->Configure(
         m_hObject,
