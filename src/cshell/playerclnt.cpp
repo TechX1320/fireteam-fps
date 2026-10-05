@@ -54,6 +54,7 @@ m_nViewAttackVariant(0),
 m_nWeaponSlot(3),
 m_fNextPrimaryClientShot(0.0f),
 m_bSemiAutoTriggerHeld(false),
+m_bPlayerDefLoaded(false),
 m_bIsJumping(false),
 m_fCurrentJumpRadians(0.0f),
 m_fJumpTimeRemaining(0.0f),
@@ -64,6 +65,17 @@ m_fLeashingDelay(0.0f)
     if(!FT_LoadWeaponDefs("config/weapons.cfg", m_WeaponDefs))
     {
         g_pLTClient->CPrint("Fireteam: failed to load config/weapons.cfg.");
+    }
+
+    m_bPlayerDefLoaded =
+        FT_LoadPlayerDef(
+            "config/player.cfg",
+            m_PlayerDef);
+
+    if(!m_bPlayerDefLoaded)
+    {
+        g_pLTClient->CPrint(
+            "Fireteam: failed to load config/player.cfg.");
     }
 }
 
@@ -128,10 +140,25 @@ void CPlayerClnt::CreatePlayer()
     objCreateStruct.m_Pos = vPos;
     objCreateStruct.m_Rotation = rRot;
 
-    strcpy(objCreateStruct.m_Filenames[0], "Models\\HARMGuard.ltb");
-    strcpy(objCreateStruct.m_Filenames[1], "Models\\playerbase.ltb");
-    strcpy(objCreateStruct.m_SkinNames[0], "ModelTextures\\HARMPurple.dtx");
-    strcpy(objCreateStruct.m_SkinNames[1], "ModelTextures\\HARMHeadW1.dtx");
+    if(m_bPlayerDefLoaded)
+    {
+        FT_CopyPlayerString(
+            objCreateStruct.m_Filenames[0],
+            MAX_CS_FILENAME_LEN,
+            m_PlayerDef.sBodyModel);
+        FT_CopyPlayerString(
+            objCreateStruct.m_Filenames[1],
+            MAX_CS_FILENAME_LEN,
+            m_PlayerDef.sAnimationModel);
+        FT_CopyPlayerString(
+            objCreateStruct.m_SkinNames[0],
+            MAX_CS_FILENAME_LEN,
+            m_PlayerDef.sSkin0);
+        FT_CopyPlayerString(
+            objCreateStruct.m_SkinNames[1],
+            MAX_CS_FILENAME_LEN,
+            m_PlayerDef.sSkin1);
+    }
 
     m_hObject = g_pLTClient->CreateObject(&objCreateStruct);
 
@@ -345,10 +372,19 @@ void CPlayerClnt::UpdateMovement()
 //-----------------------------------------------------------------------------
 void CPlayerClnt::RecalculateBoundingBox()
 {
-    // Fireteam fixed player collision dimensions.
-    // LithTech dims are half-extents: ~32 wide x 76 tall overall.
-    LTVector vDims(16.0f, 38.0f, 16.0f);
-    g_pLTCPhysics->SetObjectDims(m_hObject, &vDims, 0);
+    if(!m_bPlayerDefLoaded)
+    {
+        return;
+    }
+
+    LTVector vDims(
+        m_PlayerDef.fCollisionX,
+        m_PlayerDef.fCollisionY,
+        m_PlayerDef.fCollisionZ);
+    g_pLTCPhysics->SetObjectDims(
+        m_hObject,
+        &vDims,
+        0);
 }
 
 
@@ -938,10 +974,14 @@ void CPlayerClnt::CreateViewWeapon()
         }
     }
 
-    FT_CopyWeaponString(
-        ocs.m_SkinNames[0],
-        MAX_CS_FILENAME_LEN,
-        "Characters\\male\\hands\\CM_HND_NM_SPECIAL_BC.DTX");
+    if(m_bPlayerDefLoaded &&
+       m_PlayerDef.sFirstPersonHandTexture[0])
+    {
+        FT_CopyWeaponString(
+            ocs.m_SkinNames[0],
+            MAX_CS_FILENAME_LEN,
+            m_PlayerDef.sFirstPersonHandTexture);
+    }
 
     for(uint32 nSkin = 1; nSkin < MAX_MODEL_TEXTURES; ++nSkin)
     {
