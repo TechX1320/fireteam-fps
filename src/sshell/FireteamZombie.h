@@ -2,6 +2,7 @@
 #define __FIRETEAM_ZOMBIE_H__
 
 #include <ltengineobjects.h>
+#include "FireteamInfectedDefs.h"
 #include <vector>
 
 class FireteamZombie : public BaseClass
@@ -31,7 +32,9 @@ private:
 
     HOBJECT m_hFace;
     HATTACHMENT m_hFaceAttachment;
-    bool m_bUsingExactCommonBody;
+
+    FTInfectedDef m_Def;
+    bool m_bDefLoaded;
 };
 
 #endif
