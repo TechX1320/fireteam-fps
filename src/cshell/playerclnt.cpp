@@ -52,6 +52,7 @@ m_bViewWeaponAction(false),
 m_nViewAttackVariant(0),
 m_nWeaponSlot(3),
 m_fNextPrimaryClientShot(0.0f),
+m_bSemiAutoTriggerHeld(false),
 m_bIsJumping(false),
 m_fCurrentJumpRadians(0.0f),
 m_fJumpTimeRemaining(0.0f),
@@ -459,9 +460,14 @@ bool CPlayerClnt::Attack()
             return false;
         }
 
-        if(!pDef->bAutomatic && m_bViewWeaponAction)
+        if(!pDef->bAutomatic && m_bSemiAutoTriggerHeld)
         {
             return false;
+        }
+
+        if(!pDef->bAutomatic)
+        {
+            m_bSemiAutoTriggerHeld = true;
         }
 
         m_fNextPrimaryClientShot = fNow + pDef->fFireInterval;
@@ -539,6 +545,7 @@ bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
     m_nWeaponSlot = nSlot;
     m_bAttacking = false;
     m_bViewWeaponAction = false;
+    m_bSemiAutoTriggerHeld = false;
     m_fNextPrimaryClientShot = 0.0f;
 
     CreateViewWeapon();
