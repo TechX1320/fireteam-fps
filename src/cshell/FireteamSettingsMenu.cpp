@@ -36,7 +36,8 @@ static bool s_bOpen = false;
 static bool s_bWindowed = true;
 static uint32 s_nResolution = 1;
 static uint32 s_nSelected = 0;
-static float s_fSensitivity = 0.004625f;
+static float s_fSensitivityX = 0.004625f;
+static float s_fSensitivityY = 0.004625f;
 
 static float FTClamp(float fValue, float fMin, float fMax)
 {
@@ -88,13 +89,13 @@ static void FTApplySensitivity()
     sprintf(
         szCommand,
         "scale \"##mouse\" \"##x-axis\" %.6f",
-        s_fSensitivity);
+        s_fSensitivityX);
     g_pLTClient->RunConsoleString(szCommand);
 
     sprintf(
         szCommand,
         "scale \"##mouse\" \"##y-axis\" %.6f",
-        s_fSensitivity);
+        s_fSensitivityY);
     g_pLTClient->RunConsoleString(szCommand);
 }
 
@@ -108,8 +109,9 @@ static void FTSaveSettings()
 
     fprintf(
         pFile,
-        "%.6f %u %u %u\n",
-        s_fSensitivity,
+        "%.6f %.6f %u %u %u\n",
+        s_fSensitivityX,
+        s_fSensitivityY,
         s_aResolutions[s_nResolution].nWidth,
         s_aResolutions[s_nResolution].nHeight,
         s_bWindowed ? 1 : 0);
@@ -125,20 +127,52 @@ static void FTLoadSettings()
         return;
     }
 
-    float fSensitivity = s_fSensitivity;
+    char szLine[256];
+    if(!fgets(szLine, sizeof(szLine), pFile))
+    {
+        fclose(pFile);
+        return;
+    }
+
+    float fSensitivityX = s_fSensitivityX;
+    float fSensitivityY = s_fSensitivityY;
     uint32 nWidth = 0;
     uint32 nHeight = 0;
     uint32 nWindowed = 1;
 
-    if(fscanf(
-        pFile,
-        "%f %u %u %u",
-        &fSensitivity,
+    int nRead = sscanf(
+        szLine,
+        "%f %f %u %u %u",
+        &fSensitivityX,
+        &fSensitivityY,
         &nWidth,
         &nHeight,
-        &nWindowed) == 4)
+        &nWindowed);
+
+    if(nRead != 5)
     {
-        s_fSensitivity = FTClamp(fSensitivity, 0.001000f, 0.020000f);
+        // Backward compatibility with the old single-sensitivity file.
+        float fLegacySensitivity = s_fSensitivityX;
+        if(sscanf(
+            szLine,
+            "%f %u %u %u",
+            &fLegacySensitivity,
+            &nWidth,
+            &nHeight,
+            &nWindowed) == 4)
+        {
+            fSensitivityX = fLegacySensitivity;
+            fSensitivityY = fLegacySensitivity;
+            nRead = 5;
+        }
+    }
+
+    if(nRead == 5)
+    {
+        s_fSensitivityX =
+            FTClamp(fSensitivityX, 0.000500f, 0.020000f);
+        s_fSensitivityY =
+            FTClamp(fSensitivityY, 0.000500f, 0.020000f);
 
         for(uint32 i = 0; i < s_nResolutionCount; ++i)
         {
@@ -309,13 +343,13 @@ bool FT_SettingsHandleKey(int nKey)
 
     if(nKey == VK_UP)
     {
-        s_nSelected = (s_nSelected == 0) ? 5 : (s_nSelected - 1);
+        s_nSelected = (s_nSelected == 0) ? 6 : (s_nSelected - 1);
         return true;
     }
 
     if(nKey == VK_DOWN)
     {
-        s_nSelected = (s_nSelected + 1) % 6;
+        s_nSelected = (s_nSelected + 1) % 7;
         return true;
     }
 
@@ -325,15 +359,25 @@ bool FT_SettingsHandleKey(int nKey)
 
         if(s_nSelected == 0)
         {
-            s_fSensitivity = FTClamp(
-                s_fSensitivity + (0.000500f * (float)nDirection),
-                0.001000f,
+            s_fSensitivityX = FTClamp(
+                s_fSensitivityX + (0.000500f * (float)nDirection),
+                0.000500f,
                 0.020000f);
 
             FTApplySensitivity();
             FTSaveSettings();
         }
         else if(s_nSelected == 1)
+        {
+            s_fSensitivityY = FTClamp(
+                s_fSensitivityY + (0.000500f * (float)nDirection),
+                0.000500f,
+                0.020000f);
+
+            FTApplySensitivity();
+            FTSaveSettings();
+        }
+        else if(s_nSelected == 2)
         {
             int nNew = (int)s_nResolution + nDirection;
 
@@ -344,7 +388,7 @@ bool FT_SettingsHandleKey(int nKey)
 
             s_nResolution = (uint32)nNew;
         }
-        else if(s_nSelected == 2)
+        else if(s_nSelected == 3)
         {
             s_bWindowed = !s_bWindowed;
         }
@@ -354,16 +398,16 @@ bool FT_SettingsHandleKey(int nKey)
 
     if(nKey == VK_RETURN)
     {
-        if(s_nSelected == 3)
+        if(s_nSelected == 4)
         {
             FTApplyVideo();
         }
-        else if(s_nSelected == 4)
+        else if(s_nSelected == 5)
         {
             s_bOpen = false;
             g_pLTClient->ClearInput();
         }
-        else if(s_nSelected == 5)
+        else if(s_nSelected == 6)
         {
             g_pLTClient->Shutdown();
         }
@@ -389,7 +433,7 @@ void FT_SettingsRender()
         &nScreenH);
 
     const float fWidth = 560.0f;
-    const float fHeight = 330.0f;
+    const float fHeight = 355.0f;
     const float fX = ((float)nScreenW - fWidth) * 0.5f;
     const float fY = ((float)nScreenH - fHeight) * 0.5f;
 
@@ -412,27 +456,31 @@ void FT_SettingsRender()
     g_pLTCDrawPrim->EndDrawPrim();
 
     char szBody[1024];
-    float fMultiplier = s_fSensitivity / 0.004625f;
+    float fMultiplierX = s_fSensitivityX / 0.004625f;
+    float fMultiplierY = s_fSensitivityY / 0.004625f;
 
     sprintf(
         szBody,
-        "%s Mouse Sensitivity    %.2fx\n"
-        "%s Resolution           %u x %u\n"
-        "%s Display              %s\n"
+        "%s Horizontal Sensitivity  %.2fx\n"
+        "%s Vertical Sensitivity    %.2fx\n"
+        "%s Resolution              %u x %u\n"
+        "%s Display                 %s\n"
         "%s Apply Video\n"
         "%s Resume\n"
         "%s Quit\n\n"
         "Arrow keys: navigate/change     Enter: select     Esc: resume",
         s_nSelected == 0 ? ">" : " ",
-        fMultiplier,
+        fMultiplierX,
         s_nSelected == 1 ? ">" : " ",
+        fMultiplierY,
+        s_nSelected == 2 ? ">" : " ",
         s_aResolutions[s_nResolution].nWidth,
         s_aResolutions[s_nResolution].nHeight,
-        s_nSelected == 2 ? ">" : " ",
-        s_bWindowed ? "Windowed" : "Fullscreen",
         s_nSelected == 3 ? ">" : " ",
+        s_bWindowed ? "Windowed" : "Fullscreen",
         s_nSelected == 4 ? ">" : " ",
-        s_nSelected == 5 ? ">" : " ");
+        s_nSelected == 5 ? ">" : " ",
+        s_nSelected == 6 ? ">" : " ");
 
     s_pTitle->SetText("FIRETEAM  -  SETTINGS");
     s_pTitle->SetPosition(fX + 32.0f, fY + 28.0f);
