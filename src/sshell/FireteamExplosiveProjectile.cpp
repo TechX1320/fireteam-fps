@@ -83,41 +83,65 @@ uint32 FireteamExplosiveProjectile::EngineMessageFn(
     {
         case MID_PRECREATE:
         {
-            ObjectCreateStruct *pOCS = (ObjectCreateStruct*)pData;
+            BaseClass::EngineMessageFn(
+                messageID,
+                pData,
+                fData);
+
+            ObjectCreateStruct *pOCS =
+                (ObjectCreateStruct*)pData;
+
             if(pOCS)
             {
                 pOCS->m_ObjectType = OT_MODEL;
                 pOCS->m_Flags |= FLAG_VISIBLE |
                                  FLAG_SOLID |
                                  FLAG_TOUCH_NOTIFY |
-                                 FLAG_FORCECLIENTUPDATE;
+                                 FLAG_FORCECLIENTUPDATE |
+                                 FLAG_REMOVEIFOUTSIDE;
             }
+
+            return 1;
         }
-        break;
 
         case MID_INITIALUPDATE:
         {
             LTVector vDims(4.0f, 4.0f, 4.0f);
-            g_pLTSPhysics->SetObjectDims(m_hObject, &vDims, 0);
-            g_pLTSPhysics->SetForceIgnoreLimit(m_hObject, 0.0f);
-            g_pLTServer->SetNextUpdate(m_hObject, 0.05f);
+            g_pLTSPhysics->SetObjectDims(
+                m_hObject,
+                &vDims,
+                0);
+            g_pLTSPhysics->SetForceIgnoreLimit(
+                m_hObject,
+                0.0f);
+            g_pLTServer->SetNextUpdate(
+                m_hObject,
+                0.05f);
+            return 1;
         }
-        break;
 
         case MID_UPDATE:
             UpdateProjectile();
-            g_pLTServer->SetNextUpdate(m_hObject, 0.05f);
-            break;
+            if(!m_bExploded)
+            {
+                g_pLTServer->SetNextUpdate(
+                    m_hObject,
+                    0.05f);
+            }
+            return 1;
 
         case MID_TOUCHNOTIFY:
             HandleTouch((HOBJECT)pData);
-            break;
+            return 1;
 
         default:
             break;
     }
 
-    return BaseClass::EngineMessageFn(messageID, pData, fData);
+    return BaseClass::EngineMessageFn(
+        messageID,
+        pData,
+        fData);
 }
 
 void FireteamExplosiveProjectile::UpdateProjectile()
