@@ -16,6 +16,7 @@
 
 #include "ltclientshell.h"
 #include "FireteamWeaponDefs.h"
+#include "FireteamPlayerDefs.h"
 
 // Engine includes
 #include <ltbasedefs.h>
@@ -101,6 +102,8 @@ private:
     float               m_fNextPrimaryClientShot;
     bool                m_bSemiAutoTriggerHeld;
     FTWeaponDef         m_WeaponDefs[6];
+    FTPlayerDef         m_PlayerDef;
+    bool                m_bPlayerDefLoaded;
 
     uint32          	m_iScore;
     float           	m_fMoney;
