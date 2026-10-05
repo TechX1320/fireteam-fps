@@ -26,6 +26,7 @@
 #include "FireteamSettingsMenu.h"
 #include "FireteamLightGroupClient.h"
 #include "FireteamHealthHud.h"
+#include "FireteamWeaponHud.h"
 // Client-side helper functions
 #include "clienthelper.h"
 
@@ -241,6 +242,7 @@ LTRESULT CLTClientShell::OnEngineInitialized(RMode *pMode, LTGUID *pAppGuid)
 
 
     FT_SettingsInit();
+    FT_WeaponHudInit();
 
 
 
@@ -603,6 +605,13 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             FT_QueueLightGroup(nLightGroupID, vAdjustment);
         }
         break;
+    case MSG_SC_AMMO:
+        {
+            uint16 nClip = pMessage->Readuint16();
+            uint16 nReserve = pMessage->Readuint16();
+            FT_SetPrimaryAmmo(nClip, nReserve);
+        }
+        break;
 	case MSG_WORLD_PROPS:
 		{
 			m_pWorldPropsClnt->UnpackWorldProps(pMessage);
@@ -769,6 +778,15 @@ LTRESULT CLTClientShell::Render()
             FT_RenderPoisonOverlay(m_pPlayer->GetPlayerObject());
         }
         FT_RenderHealthHud();
+
+        if(m_pPlayer &&
+           m_pCamera &&
+           !FT_SettingsIsOpen())
+        {
+            FT_RenderWeaponHud(
+                m_pPlayer->GetWeaponSlot(),
+                m_pCamera->IsFirstPerson());
+        }
     }
 
 	// Render the gui.
@@ -1339,28 +1357,11 @@ void CLTClientShell::OnKeyDown(int key, int rep)
            {
                m_pCamera->ToggleView();
            }
-           else if(VK_ESCAPE == key)
-           {
-               g_pLTClient->Shutdown();
-           }
         }
     }
-    else
-    if('1' == key)
-           {
-               m_pPlayer->SelectWeaponSlot(1);
-           }
-           else if('3' == key)
-           {
-               m_pPlayer->SelectWeaponSlot(3);
-           }
-           else if('C' == key)
-           {
-               m_pCamera->ToggleView();
-           }
-           else if(VK_ESCAPE == key)
+    else if(VK_ESCAPE == key)
     {
-       g_pLTClient->Shutdown();
+        g_pLTClient->Shutdown();
     }
 }
 
@@ -1555,6 +1556,7 @@ void CLTClientShell::OnEngineTerm()
 
     // Dispose of the Chat gui
     assert(m_pChatGui);
+    FT_WeaponHudTerm();
     FT_SettingsTerm();
     m_pChatGui->Term();
     delete m_pChatGui;
