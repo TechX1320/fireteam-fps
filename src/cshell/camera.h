@@ -36,6 +36,7 @@ public:
 	HOBJECT 		GetCamera()		{ return m_hObject; }
 
     void    		UpdatePosition(HOBJECT hObject);
+    void            RefreshViewport();
     void    		UpdatePitch(float pitch);
     void    		UpdateZoom(float zoom);
     void            ToggleView();
@@ -47,6 +48,8 @@ private:
     float     		m_fPitch;
     float     		m_fZoom;
     bool            m_bFirstPerson;
+    uint32          m_nViewportWidth;
+    uint32          m_nViewportHeight;
 };
 
 
