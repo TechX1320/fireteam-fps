@@ -237,22 +237,18 @@ static void FTSetupQuad(
     poly.verts[0].x = x;
     poly.verts[0].y = y;
     poly.verts[0].z = SCREEN_NEAR_Z;
-    poly.verts[0].rhw = 1.0f;
 
     poly.verts[1].x = x + width;
     poly.verts[1].y = y;
     poly.verts[1].z = SCREEN_NEAR_Z;
-    poly.verts[1].rhw = 1.0f;
 
     poly.verts[2].x = x + width;
     poly.verts[2].y = y + height;
     poly.verts[2].z = SCREEN_NEAR_Z;
-    poly.verts[2].rhw = 1.0f;
 
     poly.verts[3].x = x;
     poly.verts[3].y = y + height;
     poly.verts[3].z = SCREEN_NEAR_Z;
-    poly.verts[3].rhw = 1.0f;
 }
 
 void FT_SettingsInit()
