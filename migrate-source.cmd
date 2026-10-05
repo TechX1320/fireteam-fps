@@ -79,6 +79,27 @@ del /q "%SRC%\sshell\*.vcproj" >nul 2>nul
 del /q "%SRC%\cres\*.vcproj" >nul 2>nul
 del /q "%SRC%\sres\*.vcproj" >nul 2>nul
 
+for %%F in (
+  "%SRC%\cshell\ltclientshell.cpp"
+  "%SRC%\cshell\playerclnt.cpp"
+  "%SRC%\cshell\FireteamSettingsMenu.cpp"
+  "%SRC%\cshell\FireteamWeaponHud.cpp"
+  "%SRC%\sshell\playersrvr.cpp"
+  "%SRC%\sshell\FireteamZombie.cpp"
+  "%SRC%\sshell\FireteamNavigation.cpp"
+  "%SRC%\shared\msgids.h"
+  "%SRC%\shared\fireteamtrace.h"
+  "%SRC%\cres\main.cpp"
+  "%SRC%\sres\main.cpp"
+) do (
+  if not exist "%%~F" (
+    echo [ERROR] Source migration sanity check failed: %%~F is missing.
+    goto :fail
+  )
+)
+
+echo [OK] Canonical source sanity check passed.
+
 echo [2/4] Removing obsolete game-source patch scripts from the tracked project...
 for %%F in (
   patch-diagnostics-source.ps1
