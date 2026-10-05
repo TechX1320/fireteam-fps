@@ -93,6 +93,7 @@ private:
     bool                m_bViewWeaponAction;
     uint32              m_nViewAttackVariant;
     uint8               m_nWeaponSlot;
+    float               m_fNextPrimaryClientShot;
 
     uint32          	m_iScore;
     float           	m_fMoney;
