@@ -18,7 +18,6 @@
 #include <iltphysics.h>
 #include <iltcommon.h>
 #include <iltmodel.h>
-#include "FireteamWeaponHud.h"
 #include <iltsoundmgr.h>
 #include <stdio.h>
 
@@ -52,6 +51,7 @@ m_hViewWeaponObject(NULL),
 m_bViewWeaponAction(false),
 m_nViewAttackVariant(0),
 m_nWeaponSlot(3),
+m_fNextPrimaryClientShot(0.0f),
 m_bIsJumping(false),
 m_fCurrentJumpRadians(0.0f),
 m_fJumpTimeRemaining(0.0f),
@@ -441,18 +441,20 @@ void CPlayerClnt::UpdateJump()
 //-----------------------------------------------------------------------------
 bool CPlayerClnt::Attack()
 {
-    if(m_bAttacking)
-    {
-        return false;
-    }
-
-    PlayAttackAnimation("UMFi", m_idUpperBodyTracker);
-    m_bAttacking = true;
-
     if(m_nWeaponSlot == 1)
     {
-        HMODELANIM hFire = INVALID_MODEL_ANIM;
+        const float fNow = g_pLTClient->GetTime();
 
+        // Combat Arms AK-47 bring-up: 600 RPM client cadence. The server
+        // independently enforces the same cadence and owns ammo/damage.
+        if(fNow < m_fNextPrimaryClientShot)
+        {
+            return false;
+        }
+
+        m_fNextPrimaryClientShot = fNow + 0.10f;
+
+        HMODELANIM hFire = INVALID_MODEL_ANIM;
         if(m_hViewWeaponObject)
         {
             hFire = g_pLTClient->GetAnimIndex(
@@ -463,16 +465,22 @@ bool CPlayerClnt::Attack()
         PlayViewWeaponAnimation(
             hFire != INVALID_MODEL_ANIM ? "fire_0" : "fire",
             false);
+        PlayViewWeaponSound("FIRE.WAV");
+        m_bViewWeaponAction = true;
+        return true;
+    }
 
-        PlayViewWeaponSound("FIRE.WAV");
-        m_bViewWeaponAction = true;
-    }
-    else
+    if(m_bAttacking)
     {
-        PlayViewWeaponAnimation("fire_0", false);
-        PlayViewWeaponSound("FIRE.WAV");
-        m_bViewWeaponAction = true;
+        return false;
     }
+
+    PlayAttackAnimation("UMFi", m_idUpperBodyTracker);
+    m_bAttacking = true;
+
+    PlayViewWeaponAnimation("fire_0", false);
+    PlayViewWeaponSound("FIRE.WAV");
+    m_bViewWeaponAction = true;
 
     return true;
 }
