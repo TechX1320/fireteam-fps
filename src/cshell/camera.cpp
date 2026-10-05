@@ -29,7 +29,9 @@
 CCamera::CCamera() :
 m_fPitch(0.0f),
 m_fZoom(MIN_ZOOM),
-m_bFirstPerson(true)
+m_bFirstPerson(true),
+m_nViewportWidth(0),
+m_nViewportHeight(0)
 {
 }
 
@@ -44,7 +46,7 @@ LTRESULT CCamera::CreateCamera()
 	uint32 nWidth, nHeight;
 	ObjectCreateStruct objCreate;
 
-	//	Get our screen dimensions, for the camera rectangle
+	//	Get our screen dimensions, for the initial camera rectangle
 	g_pLTClient->GetSurfaceDims(g_pLTClient->GetScreenSurface(), &nWidth, &nHeight);
 
 	//	Initialize our object creation structure
@@ -55,12 +57,9 @@ LTRESULT CCamera::CreateCamera()
 	if (NULL == m_hObject)
 		return LT_ERROR;
 
-	g_pLTClient->SetCameraRect(m_hObject, false, 0, 0, nWidth, nHeight);
-
-	//	This is an fov of 90 degrees
-	float fFovX = MATH_PI/2.0f;
-	float fFovY = (fFovX * nHeight) / nWidth;
-	g_pLTClient->SetCameraFOV(m_hObject, fFovX, fFovY);
+    m_nViewportWidth = 0;
+    m_nViewportHeight = 0;
+    RefreshViewport();
 
 	return LT_OK;
 }
@@ -71,8 +70,63 @@ LTRESULT CCamera::CreateCamera()
 // CCamera::UpdatePosition(HOBJECT hObject)
 //
 //----------------------------------------------------------------------------
+void CCamera::RefreshViewport()
+{
+    if(!m_hObject)
+    {
+        return;
+    }
+
+    uint32 nWidth = 0;
+    uint32 nHeight = 0;
+    g_pLTClient->GetSurfaceDims(
+        g_pLTClient->GetScreenSurface(),
+        &nWidth,
+        &nHeight);
+
+    if(nWidth == 0 || nHeight == 0 ||
+       (nWidth == m_nViewportWidth &&
+        nHeight == m_nViewportHeight))
+    {
+        return;
+    }
+
+    g_pLTClient->SetCameraRect(
+        m_hObject,
+        false,
+        0,
+        0,
+        nWidth,
+        nHeight);
+
+    const float fFovX = MATH_PI / 2.0f;
+    const float fFovY =
+        (fFovX * (float)nHeight) /
+        (float)nWidth;
+
+    g_pLTClient->SetCameraFOV(
+        m_hObject,
+        fFovX,
+        fFovY);
+
+    m_nViewportWidth = nWidth;
+    m_nViewportHeight = nHeight;
+
+    g_pLTClient->CPrint(
+        "Fireteam video: camera viewport %ux%u",
+        nWidth,
+        nHeight);
+}
+
+
+//----------------------------------------------------------------------------
+// CCamera::UpdatePosition(HOBJECT hObject)
+//
+//----------------------------------------------------------------------------
 void CCamera::UpdatePosition(HOBJECT hObject)
 {
+    RefreshViewport();
+
     LTVector vPos;
     LTRotation rRot;
 
@@ -107,18 +161,18 @@ void CCamera::UpdatePosition(HOBJECT hObject)
 //----------------------------------------------------------------------------
 void CCamera::UpdatePitch(float pitch)
 {
-    if ((m_fPitch + pitch) < -MAX_PITCH)
+    float fNewPitch = m_fPitch + pitch;
+
+    if(fNewPitch < -MAX_PITCH)
     {
-        m_fPitch = -MAX_PITCH;
+        fNewPitch = -MAX_PITCH;
     }
-    else if ((m_fPitch + pitch) > MAX_PITCH)
+    else if(fNewPitch > MAX_PITCH)
     {
-        m_fPitch = MAX_PITCH;
+        fNewPitch = MAX_PITCH;
     }
-    else
-    {
-		m_fPitch += pitch * 5.0f;
-    }
+
+    m_fPitch = fNewPitch;
 }
 
 
