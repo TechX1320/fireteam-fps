@@ -861,6 +861,23 @@ void CPlayerClnt::CreateViewWeapon()
         return;
     }
 
+    char sLocalModelPath[256];
+    sprintf(
+        sLocalModelPath,
+        "rez/%s",
+        pDef->sPVModel);
+
+    FILE *pModelFile = fopen(sLocalModelPath, "rb");
+    if(!pModelFile)
+    {
+        g_pLTClient->CPrint(
+            "Fireteam: missing staged PV model for %s: %s",
+            pDef->sName,
+            pDef->sPVModel);
+        return;
+    }
+    fclose(pModelFile);
+
     ObjectCreateStruct ocs;
     ocs.Clear();
     ocs.m_ObjectType = OT_MODEL;
@@ -875,10 +892,27 @@ void CPlayerClnt::CreateViewWeapon()
 
     if(pDef->sPVAnim[0])
     {
-        FT_CopyWeaponString(
-            ocs.m_Filenames[1],
-            MAX_CS_FILENAME_LEN,
+        char sLocalAnimPath[256];
+        sprintf(
+            sLocalAnimPath,
+            "rez/%s",
             pDef->sPVAnim);
+
+        FILE *pAnimFile = fopen(sLocalAnimPath, "rb");
+        if(pAnimFile)
+        {
+            fclose(pAnimFile);
+            FT_CopyWeaponString(
+                ocs.m_Filenames[1],
+                MAX_CS_FILENAME_LEN,
+                pDef->sPVAnim);
+        }
+        else
+        {
+            g_pLTClient->CPrint(
+                "Fireteam: %s has no staged animation companion; using model animations only.",
+                pDef->sName);
+        }
     }
 
     FT_CopyWeaponString(
