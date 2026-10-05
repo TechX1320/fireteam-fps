@@ -63,7 +63,7 @@ private:
     void        		PlayMovementAnimation(const char* sAnimName, uint8 nTracker);
     void        		PlayAttackAnimation(const char* sAnimName, uint8 nTracker);
     void                CreateViewWeapon();
-    void                PlayViewWeaponAnimation(const char* sAnimName, bool bLooping);
+    bool                PlayViewWeaponAnimation(const char* sAnimName, bool bLooping);
     void                UpdateViewWeaponAnimation();
     void                PlayViewWeaponSound(const char* sFilename);
 
