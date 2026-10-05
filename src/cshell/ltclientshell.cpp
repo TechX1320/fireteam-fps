@@ -783,9 +783,14 @@ LTRESULT CLTClientShell::Render()
            m_pCamera &&
            !FT_SettingsIsOpen())
         {
+            const FTWeaponDef *pHudWeapon =
+                m_pPlayer->GetCurrentWeaponDef();
+
             FT_RenderWeaponHud(
                 m_pPlayer->GetWeaponSlot(),
-                m_pCamera->IsFirstPerson());
+                m_pCamera->IsFirstPerson(),
+                pHudWeapon ? pHudWeapon->bShowCrosshair : true,
+                pHudWeapon ? (pHudWeapon->nClipSize > 0) : false);
         }
     }
 
