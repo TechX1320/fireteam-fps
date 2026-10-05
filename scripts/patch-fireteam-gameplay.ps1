@@ -204,7 +204,7 @@ static bool FTGetConnection(
 {
     const float kSlack = 18.0f;
     const float kVerticalSlack = 96.0f;
-    const float kMinOpening = 24.0f;
+    const float kMinOpening = 48.0f;
 
     float aMinX = a.vCenter.x - a.vDims.x;
     float aMaxX = a.vCenter.x + a.vDims.x;
@@ -244,12 +244,15 @@ static bool FTGetConnection(
         return false;
     }
 
-    float fLane = 0.5f;
-    if((nLane % 3) == 0) fLane = 0.28f;
-    else if((nLane % 3) == 2) fLane = 0.72f;
-
+    // NOLF2's AIVolumeNeighbor divides a connection into 48-unit gates and
+    // places each gate at 24 + 48*n along the shared opening. This guarantees
+    // enough clearance for its default 24-unit human half-width.
     if(gapX <= kSlack && overlapZ >= kMinOpening)
     {
+        uint32 nGates = (uint32)(overlapZ / 48.0f);
+        if(nGates == 0) return false;
+        uint32 nGate = nLane % nGates;
+
         if(overlapX >= 0.0f)
             pOut->x = (overlapXMin + overlapXMax) * 0.5f;
         else if(a.vCenter.x < b.vCenter.x)
@@ -257,13 +260,17 @@ static bool FTGetConnection(
         else
             pOut->x = (bMaxX + aMinX) * 0.5f;
 
-        pOut->z = overlapZMin + ((overlapZMax - overlapZMin) * fLane);
+        pOut->z = overlapZMin + 24.0f + (48.0f * (float)nGate);
         pOut->y = (a.vCenter.y + b.vCenter.y) * 0.5f;
         return true;
     }
 
     if(gapZ <= kSlack && overlapX >= kMinOpening)
     {
+        uint32 nGates = (uint32)(overlapX / 48.0f);
+        if(nGates == 0) return false;
+        uint32 nGate = nLane % nGates;
+
         if(overlapZ >= 0.0f)
             pOut->z = (overlapZMin + overlapZMax) * 0.5f;
         else if(a.vCenter.z < b.vCenter.z)
@@ -271,15 +278,35 @@ static bool FTGetConnection(
         else
             pOut->z = (bMaxZ + aMinZ) * 0.5f;
 
-        pOut->x = overlapXMin + ((overlapXMax - overlapXMin) * fLane);
+        pOut->x = overlapXMin + 24.0f + (48.0f * (float)nGate);
         pOut->y = (a.vCenter.y + b.vCenter.y) * 0.5f;
         return true;
     }
 
-    if(overlapX > kMinOpening && overlapZ > kMinOpening)
+    if(overlapX >= kMinOpening && overlapZ >= kMinOpening)
     {
-        pOut->x = overlapXMin + ((overlapXMax - overlapXMin) * fLane);
-        pOut->z = overlapZMin + ((overlapZMax - overlapZMin) * (1.0f - fLane));
+        // Fully overlapping volumes: treat the dominant center separation as
+        // the crossing direction and allocate gates on the other axis.
+        float dxCenter = (float)fabs(a.vCenter.x - b.vCenter.x);
+        float dzCenter = (float)fabs(a.vCenter.z - b.vCenter.z);
+
+        if(dxCenter >= dzCenter)
+        {
+            uint32 nGates = (uint32)(overlapZ / 48.0f);
+            if(nGates == 0) return false;
+            uint32 nGate = nLane % nGates;
+            pOut->x = (overlapXMin + overlapXMax) * 0.5f;
+            pOut->z = overlapZMin + 24.0f + (48.0f * (float)nGate);
+        }
+        else
+        {
+            uint32 nGates = (uint32)(overlapX / 48.0f);
+            if(nGates == 0) return false;
+            uint32 nGate = nLane % nGates;
+            pOut->x = overlapXMin + 24.0f + (48.0f * (float)nGate);
+            pOut->z = (overlapZMin + overlapZMax) * 0.5f;
+        }
+
         pOut->y = (a.vCenter.y + b.vCenter.y) * 0.5f;
         return true;
     }
@@ -818,9 +845,31 @@ void FireteamZombie::UpdateZombie()
         LTRotation rLook(vSteer, LTVector(0.0f, 1.0f, 0.0f));
         g_pLTServer->SetObjectRotation(m_hObject, &rLook);
 
-        LTVector vVelocity = vSteer * kMoveSpeed;
-        vVelocity.y = -80.0f;
-        g_pLTSPhysics->SetVelocity(m_hObject, &vVelocity);
+        // NOLF2's cheap human movement advances the desired X/Z position,
+        // finds the floor beneath it, then uses MoveObject. This handles stairs
+        // and small height changes much better than forcing a horizontal velocity.
+        LTVector vDesired = vPos + (vSteer * (kMoveSpeed * kUpdate));
+
+        IntersectQuery floorQuery;
+        IntersectInfo floorInfo;
+        floorQuery.m_From = LTVector(vDesired.x, vPos.y + 80.0f, vDesired.z);
+        floorQuery.m_To   = LTVector(vDesired.x, vPos.y - 530.0f, vDesired.z);
+        floorQuery.m_Flags = INTERSECT_OBJECTS | IGNORE_NONSOLID | INTERSECT_HPOLY;
+
+        if(g_pLTServer->IntersectSegment(&floorQuery, &floorInfo) &&
+           floorInfo.m_hObject &&
+           g_pLTSPhysics->IsWorldObject(floorInfo.m_hObject) == LT_YES)
+        {
+            vDesired.y = floorInfo.m_Point.y + 53.0f;
+        }
+        else
+        {
+            vDesired.y = vPos.y;
+        }
+
+        LTVector vZero(0.0f, 0.0f, 0.0f);
+        g_pLTSPhysics->SetVelocity(m_hObject, &vZero);
+        g_pLTServer->MoveObject(m_hObject, &vDesired);
     }
 
     LTVector vMoved = vPos - m_vLastPos;
@@ -875,13 +924,12 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
             {
                 g_pLTSModel->SetCurAnim(m_hObject, MAIN_TRACKER, hAnim);
                 g_pLTSModel->SetLooping(m_hObject, MAIN_TRACKER, LTTRUE);
-
-                LTVector vDims;
-                if(g_pLTSCommon->GetModelAnimUserDims(m_hObject, &vDims, hAnim) == LT_OK)
-                {
-                    g_pLTSPhysics->SetObjectDims(m_hObject, &vDims, 0);
-                }
             }
+
+            // NOLF2 CAIHuman's authored default half-dimensions are 24 x 53 x 24.
+            // Do not inherit the HARMGuard animation's collision box on a CA map.
+            LTVector vHumanDims(24.0f, 53.0f, 24.0f);
+            g_pLTSPhysics->SetObjectDims(m_hObject, &vHumanDims, 0);
 
             g_pLTServer->GetObjectPos(m_hObject, &m_vLastPos);
             g_pLTServer->SetNextUpdate(m_hObject, 0.10f);
