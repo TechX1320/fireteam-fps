@@ -1,5 +1,6 @@
 #include "FireteamWeaponHud.h"
 #include "clientinterfaces.h"
+#include "FireteamWeaponDefs.h"
 
 #include <iltclient.h>
 #include <iltdrawprim.h>
@@ -8,6 +9,8 @@
 
 static CUIFont *s_pAmmoFont = LTNULL;
 static CUIFormattedPolyString *s_pAmmoText = LTNULL;
+static CUIFormattedPolyString *s_pWeaponName = LTNULL;
+static FTWeaponDef s_WeaponDefs[6];
 
 static uint16 s_nPrimaryClip = 30;
 static uint16 s_nPrimaryReserve = 90;
@@ -66,6 +69,8 @@ void FT_WeaponHudInit()
         return;
     }
 
+    FT_LoadWeaponDefs("config/weapons.cfg", s_WeaponDefs);
+
     s_pAmmoFont = g_pLTCFontManager->CreateFont(
         "fonts/SQR721B.TTF",
         "Square721 BT",
@@ -90,10 +95,25 @@ void FT_WeaponHudInit()
     {
         s_pAmmoText->SetColor(0xFFFFFFFF);
     }
+
+    s_pWeaponName = g_pLTCFontManager->CreateFormattedPolyString(
+        s_pAmmoFont,
+        "Weapon");
+
+    if(s_pWeaponName)
+    {
+        s_pWeaponName->SetColor(0xFFFFFFFF);
+    }
 }
 
 void FT_WeaponHudTerm()
 {
+    if(s_pWeaponName)
+    {
+        g_pLTCFontManager->DestroyPolyString(s_pWeaponName);
+        s_pWeaponName = LTNULL;
+    }
+
     if(s_pAmmoText)
     {
         g_pLTCFontManager->DestroyPolyString(s_pAmmoText);
@@ -178,6 +198,18 @@ void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson)
     g_pLTCDrawPrim->BeginDrawPrim();
     g_pLTCDrawPrim->DrawPrim(crosshair, 4);
     g_pLTCDrawPrim->EndDrawPrim();
+
+    const FTWeaponDef *pDef =
+        FT_GetWeaponDef(s_WeaponDefs, nWeaponSlot);
+
+    if(s_pWeaponName && pDef)
+    {
+        s_pWeaponName->SetText(pDef->sName);
+        s_pWeaponName->SetPosition(
+            (float)nScreenW - 210.0f,
+            (float)nScreenH - 102.0f);
+        s_pWeaponName->Render();
+    }
 
     if(nWeaponSlot == 3)
     {
