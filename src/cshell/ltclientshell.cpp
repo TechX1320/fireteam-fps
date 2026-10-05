@@ -1029,36 +1029,32 @@ LTRESULT CLTClientShell::PollInput()
         dwMoveFlags |= MOVE_BACKWARD;
     }
 
-	// shoot
+	// Fireteam weapon fire. The client only sends an action + view ray;
+    // the server owns weapon type, ammo, fire timing and damage.
     if (g_pLTClient->IsCommandOn(COMMAND_SHOOT))
     {
+        const FTWeaponDef *pWeaponDef = m_pPlayer->GetCurrentWeaponDef();
+
         if(m_pPlayer->Attack() &&
-           m_pPlayer->GetWeaponSlot() == 1)
+           pWeaponDef &&
+           pWeaponDef->eType != FT_WEAPON_MELEE)
         {
             HLOCALOBJ hFireCamera = m_pCamera->GetCamera();
             LTVector vFirePos;
             LTRotation rFireRot;
 
-            g_pLTClient->GetObjectPos(
-                hFireCamera,
-                &vFirePos);
-            g_pLTClient->GetObjectRotation(
-                hFireCamera,
-                &rFireRot);
-
+            g_pLTClient->GetObjectPos(hFireCamera, &vFirePos);
+            g_pLTClient->GetObjectRotation(hFireCamera, &rFireRot);
             LTVector vFireDir = rFireRot.Forward();
 
-            ILTMessage_Write *pMessage;
-            if(g_pLTCCommon->CreateMessage(pMessage) == LT_OK &&
-               pMessage)
+            ILTMessage_Write *pMessage = LTNULL;
+            if(g_pLTCCommon->CreateMessage(pMessage) == LT_OK && pMessage)
             {
                 pMessage->IncRef();
                 pMessage->Writeuint8(MSG_CS_SHOOT);
                 pMessage->WriteLTVector(vFirePos);
                 pMessage->WriteLTVector(vFireDir);
-                g_pLTClient->SendToServer(
-                    pMessage->Read(),
-                    0);
+                g_pLTClient->SendToServer(pMessage->Read(), 0);
                 pMessage->DecRef();
             }
         }
@@ -1345,13 +1341,13 @@ void CLTClientShell::OnKeyDown(int key, int rep)
         }
         else
         {
-           if('1' == key)
+           if(key >= '1' && key <= '5')
            {
-               m_pPlayer->SelectWeaponSlot(1);
+               m_pPlayer->SelectWeaponSlot((uint8)(key - '0'));
            }
-           else if('3' == key)
+           else if('R' == key)
            {
-               m_pPlayer->SelectWeaponSlot(3);
+               m_pPlayer->ReloadWeapon();
            }
            else if('C' == key)
            {
