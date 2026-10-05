@@ -17,18 +17,20 @@ set "BIN_DIR=%BUILD_DIR%\bin"
 set "BUILT_DIR=%CD%\BUILT"
 set "RELEASE_DIR=%CD%\.local\imports\release"
 set "SEAL_DIR=%CD%\.local\imports\sealhunter"
+set "SOURCE_DIR=%CD%\src"
 set "ASSET_REZ=%CD%\.local\gameassets\rez"
 
 echo Build configuration: %CONFIG%
 echo Project directory:   %CD%
 echo.
 
-echo [CHECK] Looking for SealHunter source...
-if not exist "%SEAL_DIR%\cshell\src\ltclientshell.cpp" (
-  echo [ERROR] Local source is not prepared. Run setup-local.cmd first.
+echo [CHECK] Looking for committed Fireteam source...
+if not exist "%SOURCE_DIR%\cshell\ltclientshell.cpp" (
+  echo [ERROR] Committed Fireteam source is not present yet.
+  echo Run migrate-source.cmd once, then run build.cmd again.
   goto :fail
 )
-echo [OK] SealHunter source found.
+echo [OK] Fireteam source found in src\.
 
 echo.
 echo [UPDATE] Checking expanded Jupiter engine source...
@@ -36,24 +38,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\refresh-engine
 if errorlevel 1 goto :fail
 
 echo.
-echo [UPDATE] Applying current source patches...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-legacy-source.ps1" -LocalRoot "%CD%\.local"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-game-source.ps1" -LocalRoot "%CD%\.local"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-weapon-source.ps1" -LocalRoot "%CD%\.local"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-systems-source.ps1" -LocalRoot "%CD%\.local"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-fireteam-gameplay.ps1" -LocalRoot "%CD%\.local"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-fireteam-ui.ps1" -LocalRoot "%CD%\.local"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-fireteam-loadout.ps1" -LocalRoot "%CD%\.local"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-fireteam-combat-hud.ps1" -LocalRoot "%CD%\.local"
-if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-diagnostics-v2.ps1" -LocalRoot "%CD%\.local"
+echo [UPDATE] Applying local Jupiter engine compatibility...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\patch-engine-compat.ps1" -LocalRoot "%CD%\.local"
 if errorlevel 1 goto :fail
 
 echo.
