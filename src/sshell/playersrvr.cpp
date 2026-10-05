@@ -210,7 +210,7 @@ uint32 CPlayerSrvr::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
                 HCLASS hSenderClass = hSender ? g_pLTServer->GetObjectClass(hSender) : LTNULL;
 
                 // Co-op invariant: damage sent directly by another player is ignored.
-                if(hPlayerClass && hSenderClass && g_pLTServer->IsKindOf(hPlayerClass, hSenderClass))
+                if(hPlayerClass && hSenderClass && g_pLTServer->IsKindOf(hSenderClass, hPlayerClass))
                 {
                     break;
                 }
@@ -794,6 +794,7 @@ void CPlayerSrvr::SetWeaponSlot(uint8 nSlot)
     }
 
     m_nWeaponSlot = nSlot;
+    SendPrimaryAmmo();
 
     if(!m_hClub)
     {
@@ -839,17 +840,28 @@ void CPlayerSrvr::FirePrimary(
         return;
     }
 
-    float fNow = g_pLTServer->GetTime();
+    const float fNow = g_pLTServer->GetTime();
     if(fNow < m_fNextPrimaryShot)
     {
         return;
     }
 
+    if(m_nPrimaryAmmoInClip == 0)
+    {
+        SendPrimaryAmmo();
+        return;
+    }
+
+    // Combat Arms Weapon12 AK-47 bring-up values:
+    // 30-round magazine, 48 close damage, 3500 maximum effect range.
     m_fNextPrimaryShot = fNow + 0.10f;
+    --m_nPrimaryAmmoInClip;
+    SendPrimaryAmmo();
 
     LTVector vDir = vDirection;
     if(vDir.MagSqr() < 0.0001f)
     {
+        g_pLTServer->CPrint("Fireteam gun: rejected zero-length AK-47 direction.");
         return;
     }
     vDir.Normalize();
@@ -868,7 +880,7 @@ void CPlayerSrvr::FirePrimary(
     IntersectInfo info;
 
     query.m_From = vStart + (vDir * 4.0f);
-    query.m_To = vStart + (vDir * 20000.0f);
+    query.m_To = query.m_From + (vDir * 3500.0f);
     query.m_Flags =
         INTERSECT_OBJECTS |
         IGNORE_NONSOLID |
@@ -881,9 +893,25 @@ void CPlayerSrvr::FirePrimary(
     query.m_FilterFn = FTFireFilter;
     query.m_pUserData = &filterData;
 
-    if(!g_pLTServer->IntersectSegment(&query, &info) ||
-       !info.m_hObject)
+    if(!g_pLTServer->IntersectSegment(&query, &info))
     {
+        g_pLTServer->CPrint(
+            "Fireteam gun: AK-47 no hit (%u/%u)",
+            (uint32)m_nPrimaryAmmoInClip,
+            (uint32)m_nPrimaryAmmoReserve);
+        return;
+    }
+
+    const float fDistance = (info.m_Point - query.m_From).Mag();
+
+    if(!info.m_hObject ||
+       g_pLTSPhysics->IsWorldObject(info.m_hObject) == LT_YES)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam gun: AK-47 world hit %.1f (%u/%u)",
+            fDistance,
+            (uint32)m_nPrimaryAmmoInClip,
+            (uint32)m_nPrimaryAmmoReserve);
         return;
     }
 
@@ -891,7 +919,7 @@ void CPlayerSrvr::FirePrimary(
     HCLASS hZombie = g_pLTServer->GetClass("FireteamZombie");
     HCLASS hSeal = g_pLTServer->GetClass("Seal");
 
-    bool bDamage =
+    const bool bDamage =
         (hZombie && hTarget &&
          g_pLTServer->IsKindOf(hTarget, hZombie)) ||
         (hSeal && hTarget &&
@@ -899,27 +927,68 @@ void CPlayerSrvr::FirePrimary(
 
     if(!bDamage)
     {
-        // Fireteam never damages another player.
+        // Co-op invariant: firearm damage is only sent to Fireteam enemies.
+        g_pLTServer->CPrint(
+            "Fireteam gun: AK-47 non-enemy hit %.1f (%u/%u)",
+            fDistance,
+            (uint32)m_nPrimaryAmmoInClip,
+            (uint32)m_nPrimaryAmmoReserve);
         return;
     }
 
-    ILTMessage_Write *pDamage;
-    if(g_pLTSCommon->CreateMessage(pDamage) == LT_OK &&
-       pDamage)
+    uint8 nDamage = 48;
+    if(fDistance > 3000.0f)
+    {
+        nDamage = 17;
+    }
+    else if(fDistance > 2500.0f)
+    {
+        nDamage = 34;
+    }
+
+    ILTMessage_Write *pDamage = LTNULL;
+    if(g_pLTSCommon->CreateMessage(pDamage) == LT_OK && pDamage)
     {
         pDamage->IncRef();
         pDamage->Writeuint32(OBJ_MID_DAMAGE);
-
-        // Temporary DEV damage until the AK-47 attribute record is wired
-        // directly into Fireteam's weapon data.
-        pDamage->Writeuint8(12);
-
+        pDamage->Writeuint8(nDamage);
         g_pLTServer->SendToObject(
             pDamage->Read(),
             m_hObject,
             info.m_hObject,
             0);
-
         pDamage->DecRef();
+
+        g_pLTServer->CPrint(
+            "Fireteam gun: AK-47 infected hit damage=%u distance=%.1f (%u/%u)",
+            (uint32)nDamage,
+            fDistance,
+            (uint32)m_nPrimaryAmmoInClip,
+            (uint32)m_nPrimaryAmmoReserve);
     }
+}
+
+
+void CPlayerSrvr::SendPrimaryAmmo()
+{
+    if(!m_hClient)
+    {
+        return;
+    }
+
+    ILTMessage_Write *pMsg = LTNULL;
+    if(g_pLTSCommon->CreateMessage(pMsg) != LT_OK || !pMsg)
+    {
+        return;
+    }
+
+    pMsg->IncRef();
+    pMsg->Writeuint8(MSG_SC_AMMO);
+    pMsg->Writeuint16(m_nPrimaryAmmoInClip);
+    pMsg->Writeuint16(m_nPrimaryAmmoReserve);
+    g_pLTServer->SendToClient(
+        pMsg->Read(),
+        m_hClient,
+        MESSAGE_GUARANTEED);
+    pMsg->DecRef();
 }
