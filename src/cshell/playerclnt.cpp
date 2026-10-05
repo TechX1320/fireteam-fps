@@ -998,6 +998,16 @@ void CPlayerClnt::UpdateWeaponView(bool bFirstPerson)
 
         if(bFirstPerson)
         {
+            // FLAG_REALLYCLOSE models use camera-relative coordinates. NOLF2
+            // updates the player-view weapon position continuously; do the same
+            // so the authored Combat Arms PV offset is not lost after creation.
+            LTVector vViewPos(0.0f, 0.0f, 0.0f);
+            if(m_nWeaponSlot == 1)
+            {
+                vViewPos.Init(0.3f, -0.6f, 1.2f);
+            }
+
+            g_pLTClient->SetObjectPos(m_hViewWeaponObject, &vViewPos);
             UpdateViewWeaponAnimation();
         }
     }
