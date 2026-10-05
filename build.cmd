@@ -148,6 +148,8 @@ copy /y "config\weapons.cfg" "%BUILT_DIR%\config\weapons.cfg" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\infected.cfg" "%BUILT_DIR%\config\infected.cfg" >nul
 if errorlevel 1 goto :copyfail
+copy /y "config\player.cfg" "%BUILT_DIR%\config\player.cfg" >nul
+if errorlevel 1 goto :copyfail
 
 echo.
 echo [4/5] Installing freshly built modules...
