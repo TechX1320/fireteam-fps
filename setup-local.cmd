@@ -55,7 +55,7 @@ if errorlevel 1 goto :fail
 echo [4/4] Refreshing optional local assets...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-local-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%LOCAL%"
 if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-ak-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%LOCAL%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-weapon-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%LOCAL%"
 if errorlevel 1 goto :fail
 
 echo.
