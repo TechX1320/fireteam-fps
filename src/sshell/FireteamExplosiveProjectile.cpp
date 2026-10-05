@@ -195,13 +195,18 @@ void FireteamExplosiveProjectile::Explode()
     HCLASS hZombieClass = g_pLTServer->GetClass("FireteamZombie");
     HCLASS hSealClass = g_pLTServer->GetClass("Seal");
 
-    for(HOBJECT hObject = g_pLTServer->GetNextObject(LTNULL);
-        hObject;
-        hObject = g_pLTServer->GetNextObject(hObject))
+    HOBJECT hObject = g_pLTServer->GetNextObject(LTNULL);
+    while(hObject)
     {
+        // Damage can destroy an infected immediately. Capture the iterator
+        // successor before sending damage so object removal cannot invalidate
+        // the server object walk.
+        HOBJECT hNextObject = g_pLTServer->GetNextObject(hObject);
+
         HCLASS hClass = g_pLTServer->GetObjectClass(hObject);
         if(!hClass)
         {
+            hObject = hNextObject;
             continue;
         }
 
@@ -211,6 +216,7 @@ void FireteamExplosiveProjectile::Explode()
 
         if(!bEnemy)
         {
+            hObject = hNextObject;
             continue;
         }
 
@@ -220,6 +226,7 @@ void FireteamExplosiveProjectile::Explode()
 
         if(fDistance > m_fSplashRadius)
         {
+            hObject = hNextObject;
             continue;
         }
 
@@ -252,6 +259,8 @@ void FireteamExplosiveProjectile::Explode()
                 0);
             pDamage->DecRef();
         }
+
+        hObject = hNextObject;
     }
 
     PlayClientFX("CanImpact", m_hObject, LTNULL, LTNULL, 0);
