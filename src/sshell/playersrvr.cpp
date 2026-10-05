@@ -961,20 +961,25 @@ void CPlayerSrvr::FirePrimary(
         return;
     }
 
-    uint8 nDamage = pDef->nDamage;
+    float fDamageMult = pDef->fDamageMult0;
 
-    // Keep the researched Combat Arms AK-47 falloff until the generalized
-    // falloff fields are imported from decrypted weapon data.
-    if(_stricmp(pDef->sId, "ak47") == 0)
+    if(pDef->fEffectRange1 > 0.0f &&
+       fDistance > pDef->fEffectRange1)
     {
-        if(fDistance > 3000.0f)
-        {
-            nDamage = 17;
-        }
-        else if(fDistance > 2500.0f)
-        {
-            nDamage = 34;
-        }
+        fDamageMult = pDef->fDamageMult2;
+    }
+    else if(pDef->fEffectRange0 > 0.0f &&
+            fDistance > pDef->fEffectRange0)
+    {
+        fDamageMult = pDef->fDamageMult1;
+    }
+
+    uint8 nDamage =
+        (uint8)((float)pDef->nDamage * fDamageMult + 0.5f);
+
+    if(nDamage == 0 && pDef->nDamage > 0)
+    {
+        nDamage = 1;
     }
 
     ILTMessage_Write *pDamage = LTNULL;
