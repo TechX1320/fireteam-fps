@@ -9,11 +9,11 @@ if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "LithTech Jupiter requires a 32-bit build. Configure with -A Win32.")
 endif()
 
-set(SEAL_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.local/imports/sealhunter")
+set(GAME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(ENGINE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.local/imports/engine")
 
-if(NOT EXISTS "${SEAL_ROOT}/cshell/src/ltclientshell.cpp")
-    message(FATAL_ERROR "Local SealHunter source is missing. Run setup-local.cmd first.")
+if(NOT EXISTS "${GAME_ROOT}/cshell/ltclientshell.cpp")
+    message(FATAL_ERROR "Committed Fireteam source is missing. Run migrate-source.cmd once, then pull the resulting commit.")
 endif()
 if(NOT EXISTS "${ENGINE_ROOT}/sdk/inc/iltclient.h")
     message(FATAL_ERROR "Local Jupiter SDK source is missing. Run setup-local.cmd first.")
@@ -34,9 +34,13 @@ add_compile_options(/MP /W3)
 set(SDK_DIR "${ENGINE_ROOT}/sdk/inc")
 set(CLIENTFX_ROOT "${ENGINE_ROOT}/clientfx")
 set(CLIENTFX_SHARED_DIR "${CLIENTFX_ROOT}/Shared")
-set(GAME_SHARED_DIR "${SEAL_ROOT}/shared/src")
+set(GAME_SHARED_DIR "${GAME_ROOT}/shared")
+set(CSHELL_ROOT "${GAME_ROOT}/cshell")
+set(SSHELL_ROOT "${GAME_ROOT}/sshell")
+set(CRES_ROOT "${GAME_ROOT}/cres")
+set(SRES_ROOT "${GAME_ROOT}/sres")
 
-file(GLOB CSHELL_GAME_SOURCES CONFIGURE_DEPENDS "${SEAL_ROOT}/cshell/src/*.cpp" "${SEAL_ROOT}/cshell/src/*.h")
+file(GLOB CSHELL_GAME_SOURCES CONFIGURE_DEPENDS "${CSHELL_ROOT}/*.cpp" "${CSHELL_ROOT}/*.h")
 set(CSHELL_ENGINE_SOURCES
     "${SDK_DIR}/iltbaseclass.cpp"
     "${SDK_DIR}/ltmodule.cpp"
@@ -50,11 +54,11 @@ set(CSHELL_ENGINE_SOURCES
 add_library(cshell SHARED ${CSHELL_GAME_SOURCES} ${CSHELL_ENGINE_SOURCES})
 target_compile_definitions(cshell PRIVATE _CLIENTBUILD)
 target_compile_options(cshell PRIVATE /FIfireteamtrace.h)
-target_include_directories(cshell PRIVATE "${SEAL_ROOT}/cshell/src" "${GAME_SHARED_DIR}" "${SDK_DIR}" "${CLIENTFX_ROOT}" "${CLIENTFX_SHARED_DIR}")
+target_include_directories(cshell PRIVATE "${CSHELL_ROOT}" "${GAME_SHARED_DIR}" "${SDK_DIR}" "${CLIENTFX_ROOT}" "${CLIENTFX_SHARED_DIR}")
 target_link_libraries(cshell PRIVATE odbc32 odbccp32)
 set_target_properties(cshell PROPERTIES OUTPUT_NAME "cshell" PREFIX "")
 
-file(GLOB SSHELL_GAME_SOURCES CONFIGURE_DEPENDS "${SEAL_ROOT}/sshell/src/*.cpp" "${SEAL_ROOT}/sshell/src/*.h")
+file(GLOB SSHELL_GAME_SOURCES CONFIGURE_DEPENDS "${SSHELL_ROOT}/*.cpp" "${SSHELL_ROOT}/*.h")
 set(SSHELL_ENGINE_SOURCES
     "${SDK_DIR}/iltbaseclass.cpp"
     "${SDK_DIR}/ltengineobjects.cpp"
@@ -63,15 +67,15 @@ set(SSHELL_ENGINE_SOURCES
     "${CLIENTFX_SHARED_DIR}/ParsedMsg.cpp"
 )
 add_library(object_module SHARED ${SSHELL_GAME_SOURCES} ${SSHELL_ENGINE_SOURCES})
-target_include_directories(object_module PRIVATE "${SEAL_ROOT}/sshell/src" "${GAME_SHARED_DIR}" "${SDK_DIR}" "${CLIENTFX_SHARED_DIR}")
+target_include_directories(object_module PRIVATE "${SSHELL_ROOT}" "${GAME_SHARED_DIR}" "${SDK_DIR}" "${CLIENTFX_SHARED_DIR}")
 target_link_libraries(object_module PRIVATE odbc32 odbccp32)
 set_target_properties(object_module PROPERTIES OUTPUT_NAME "object" PREFIX "" SUFFIX ".lto")
 
 # The original resource scripts contain no game resources but include old MFC headers.
 # Minimal DLL stubs avoid requiring the MFC workload for the first build gate.
-add_library(cres SHARED "${SEAL_ROOT}/cres/src/main.cpp")
+add_library(cres SHARED "${CRES_ROOT}/main.cpp")
 set_target_properties(cres PROPERTIES OUTPUT_NAME "cres" PREFIX "")
-add_library(sres SHARED "${SEAL_ROOT}/sres/src/main.cpp")
+add_library(sres SHARED "${SRES_ROOT}/main.cpp")
 set_target_properties(sres PROPERTIES OUTPUT_NAME "sres" PREFIX "")
 
 
@@ -114,6 +118,7 @@ if(EXISTS "${CLIENTFX_ROOT}/clientfx.cpp")
         "${CLIENTFX_ROOT}"
         "${CLIENTFX_ROOT}/Shared"
         "${SDK_DIR}"
+        "${GAME_SHARED_DIR}"
     )
     target_link_libraries(clientfx_fxd PRIVATE odbc32 odbccp32)
     set_target_properties(clientfx_fxd PROPERTIES
