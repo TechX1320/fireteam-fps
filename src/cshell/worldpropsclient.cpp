@@ -80,6 +80,23 @@ void CWorldPropsClnt::UnpackWorldProps(ILTMessage_Read *pMsgProps)
 	m_nSkyFogFarZ = pMsgProps->Readuint32();
 	m_fSkyScale = pMsgProps->Readfloat();
 
+    g_pLTClient->CPrint(
+        "Fireteam worldprops(client): FarZ=%d Background=%.1f %.1f %.1f Fog=%u color=%.1f %.1f %.1f near=%u far=%u SkyFog=%u near=%u far=%u SkyScale=%.2f",
+        m_nFarZ,
+        m_vBackgroundColor.x,
+        m_vBackgroundColor.y,
+        m_vBackgroundColor.z,
+        m_bFogEnable ? 1u : 0u,
+        m_vFogColor.x,
+        m_vFogColor.y,
+        m_vFogColor.z,
+        m_nFogNearZ,
+        m_nFogFarZ,
+        m_bSkyFogEnable ? 1u : 0u,
+        m_nSkyFogNearZ,
+        m_nSkyFogFarZ,
+        m_fSkyScale);
+
 	this->ApplyWorldProps();
 }
 
