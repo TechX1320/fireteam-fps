@@ -151,9 +151,14 @@ $attackBody = @'
 
     if(m_nWeaponSlot == 1)
     {
-        HMODELANIM hFire = g_pLTClient->GetAnimIndex(
-            m_hViewWeaponObject,
-            (char*)"fire_0");
+        HMODELANIM hFire = INVALID_MODEL_ANIM;
+
+        if(m_hViewWeaponObject)
+        {
+            hFire = g_pLTClient->GetAnimIndex(
+                m_hViewWeaponObject,
+                (char*)"fire_0");
+        }
 
         PlayViewWeaponAnimation(
             hFire != INVALID_MODEL_ANIM ? "fire_0" : "fire",
