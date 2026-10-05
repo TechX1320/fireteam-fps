@@ -74,9 +74,9 @@ if(Test-Path -LiteralPath $gunsPath) {
   $zip = [System.IO.Compression.ZipFile]::OpenRead($gunsPath)
   try {
     Stage-PVWeapon $zip "AK-47" @("AK-47","AK47") @("PV_AR_AK47_SH.LTB") @("PV_AK-47.DTX") @("AK47_ANIBASE.LTB") "Weapons\primary_m_pv\PV_AR_AK47_SH.LTB" "Weapons\primary_t\AK47_PV.DTX" "Weapons\primary_m_pv\AK47_ANIBASE.LTB" "Weapons\primary_snd\AK47"
-    Stage-PVWeapon $zip "Beretta M92FS" @("Beretta_M92FS","M92FS") @("PV_PST_M92FS_SH.LTB") @("PV_Beretta_M92FS.DTX") @() "Weapons\secondary_m_pv\BERETTA_M92FS_PV.LTB" "Weapons\secondary_t\BERETTA_M92FS_PV.DTX" "Weapons\secondary_m_pv\BERETTA_M92FS_ANI.LTB" "Weapons\secondary_snd\BERETTA_M92FS"
-    Stage-PVWeapon $zip "M67" @("M67") @("PV_Throwing_M67Frag_SH.LTB") @("PV_M67.DTX") @() "Weapons\grenade_m_pv\M67_PV.LTB" "Weapons\grenade_t\M67_PV.DTX" "Weapons\grenade_m_pv\M67_ANI.LTB" "Weapons\grenade_snd\M67"
-    Stage-PVWeapon $zip "LAW" @("LAW") @("PV_LCH_LAW_SH.LTB") @("PV_LAW.DTX") @() "Weapons\special_m_pv\LAW_PV.LTB" "Weapons\special_t\LAW_PV.DTX" "Weapons\special_m_pv\LAW_ANI.LTB" "Weapons\special_snd\LAW"
+    Stage-PVWeapon $zip "Beretta M92FS" @("Beretta_M92FS","M92FS") @("PV_PST_M92FS_SH.LTB") @("PV_Beretta_M92FS.DTX") $null "Weapons\secondary_m_pv\BERETTA_M92FS_PV.LTB" "Weapons\secondary_t\BERETTA_M92FS_PV.DTX" "Weapons\secondary_m_pv\BERETTA_M92FS_ANI.LTB" "Weapons\secondary_snd\BERETTA_M92FS"
+    Stage-PVWeapon $zip "M67" @("M67") @("PV_Throwing_M67Frag_SH.LTB") @("PV_M67.DTX") $null "Weapons\grenade_m_pv\M67_PV.LTB" "Weapons\grenade_t\M67_PV.DTX" "Weapons\grenade_m_pv\M67_ANI.LTB" "Weapons\grenade_snd\M67"
+    Stage-PVWeapon $zip "LAW" @("LAW") @("PV_LCH_LAW_SH.LTB") @("PV_LAW.DTX") $null "Weapons\special_m_pv\LAW_PV.LTB" "Weapons\special_t\LAW_PV.DTX" "Weapons\special_m_pv\LAW_ANI.LTB" "Weapons\special_snd\LAW"
   } finally { $zip.Dispose() }
 } else { Write-Host "[SKIP] Guns.zip is not present in assets-local." }
 
