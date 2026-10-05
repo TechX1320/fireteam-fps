@@ -40,8 +40,12 @@ struct FTWeaponDef
     bool  bShowCrosshair;
 
     float fProjectileSpeed;
+    float fProjectileScale;
     float fSplashRadius;
     float fFuseSeconds;
+
+    char sProjectileModel[128];
+    char sProjectileTexture[128];
 
     float fViewX;
     float fViewY;
@@ -114,6 +118,7 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
         aDefs[nSlot].fDamageMult0 = 1.0f;
         aDefs[nSlot].fDamageMult1 = 1.0f;
         aDefs[nSlot].fDamageMult2 = 1.0f;
+        aDefs[nSlot].fProjectileScale = 1.0f;
         aDefs[nSlot].bShowCrosshair = true;
     }
 
@@ -189,7 +194,7 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     FT_CopyWeaponString(aDefs[3].sHHTexture, sizeof(aDefs[3].sHHTexture), "Weapons/melee_t/HH_ML_DF_BOWIEKNIFE_BC.DTX");
     FT_CopyWeaponString(aDefs[3].sSoundDir, sizeof(aDefs[3].sSoundDir), "Weapons/melee_snd/BOWIE_KNIFE");
 
-    // Combat Arms Weapon7 / Ammo9. Projectile speed/fuse are DEV timing.
+    // Combat Arms Weapon7 / Ammo9 / ProjectileFX G62.
     FT_CopyWeaponString(aDefs[4].sId, sizeof(aDefs[4].sId), "m67");
     FT_CopyWeaponString(aDefs[4].sName, sizeof(aDefs[4].sName), "M67 Frag Grenade");
     aDefs[4].eType = FT_WEAPON_GRENADE;
@@ -204,9 +209,12 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     aDefs[4].fDamageMult0 = 1.0f;
     aDefs[4].fDamageMult1 = 0.80f;
     aDefs[4].fDamageMult2 = 0.50f;
-    aDefs[4].fProjectileSpeed = 650.0f;
+    aDefs[4].fProjectileSpeed = 1550.0f;
+    aDefs[4].fProjectileScale = 2.0f;
     aDefs[4].fSplashRadius = 450.0f;
-    aDefs[4].fFuseSeconds = 3.0f;
+    aDefs[4].fFuseSeconds = 2.5f;
+    FT_CopyWeaponString(aDefs[4].sProjectileModel, sizeof(aDefs[4].sProjectileModel), "Weapons/grenade_m_hh/HH_M67.LTB");
+    FT_CopyWeaponString(aDefs[4].sProjectileTexture, sizeof(aDefs[4].sProjectileTexture), "Weapons/grenade_t/HH_M67.DTX");
     aDefs[4].fViewX = 0.50f;
     aDefs[4].fViewY = -0.90f;
     aDefs[4].fViewZ = 1.50f;
@@ -217,7 +225,7 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     FT_CopyWeaponString(aDefs[4].sHHTexture, sizeof(aDefs[4].sHHTexture), "Weapons/grenade_t/HH_M67.DTX");
     FT_CopyWeaponString(aDefs[4].sSoundDir, sizeof(aDefs[4].sSoundDir), "Weapons/grenade_snd/M67");
 
-    // Combat Arms Weapon29 / Ammo29. Projectile speed/reload timing are DEV.
+    // Combat Arms Weapon29 / Ammo29 / ProjectileFX Missile. Reload timing remains DEV.
     FT_CopyWeaponString(aDefs[5].sId, sizeof(aDefs[5].sId), "law");
     FT_CopyWeaponString(aDefs[5].sName, sizeof(aDefs[5].sName), "LAW");
     aDefs[5].eType = FT_WEAPON_ROCKET;
@@ -233,9 +241,12 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     aDefs[5].fDamageMult1 = 0.0f;
     aDefs[5].fDamageMult2 = 0.0f;
     aDefs[5].fReloadSeconds = 2.80f;
-    aDefs[5].fProjectileSpeed = 1600.0f;
+    aDefs[5].fProjectileSpeed = 1300.0f;
+    aDefs[5].fProjectileScale = 0.35f;
     aDefs[5].fSplashRadius = 550.0f;
-    aDefs[5].fFuseSeconds = 8.0f;
+    aDefs[5].fFuseSeconds = 10.0f;
+    FT_CopyWeaponString(aDefs[5].sProjectileModel, sizeof(aDefs[5].sProjectileModel), "Weapons/projectile_m/MISSILE.LTB");
+    FT_CopyWeaponString(aDefs[5].sProjectileTexture, sizeof(aDefs[5].sProjectileTexture), "Weapons/projectile_t/MISSILE.DTX");
     aDefs[5].fViewX = 0.30f;
     aDefs[5].fViewY = -0.60f;
     aDefs[5].fViewZ = 1.80f;
@@ -316,6 +327,9 @@ inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
         else if(_stricmp(pKey, "automatic") == 0) def.bAutomatic = atoi(pValue) != 0;
         else if(_stricmp(pKey, "show_crosshair") == 0) def.bShowCrosshair = atoi(pValue) != 0;
         else if(_stricmp(pKey, "projectile_speed") == 0) def.fProjectileSpeed = (float)atof(pValue);
+        else if(_stricmp(pKey, "projectile_scale") == 0) def.fProjectileScale = (float)atof(pValue);
+        else if(_stricmp(pKey, "projectile_model") == 0) FT_CopyWeaponString(def.sProjectileModel, sizeof(def.sProjectileModel), pValue);
+        else if(_stricmp(pKey, "projectile_texture") == 0) FT_CopyWeaponString(def.sProjectileTexture, sizeof(def.sProjectileTexture), pValue);
         else if(_stricmp(pKey, "splash_radius") == 0) def.fSplashRadius = (float)atof(pValue);
         else if(_stricmp(pKey, "fuse") == 0) def.fFuseSeconds = (float)atof(pValue);
         else if(_stricmp(pKey, "view_x") == 0) def.fViewX = (float)atof(pValue);
