@@ -142,6 +142,73 @@ $serverH = Join-Path $sealRoot 'sshell\src\playersrvr.h'
 $serverCpp = Join-Path $sealRoot 'sshell\src\playersrvr.cpp'
 
 # ---------------------------------------------------------------------------
+# Preflight the source state before changing anything. This avoids leaving a
+# persistent .local tree half-patched if an expected predecessor hook changes.
+# ---------------------------------------------------------------------------
+$preflightPlayerCpp = Read-Source $playerCpp
+$preflightClientShell = Read-Source $clientShell
+$preflightMsgIds = Read-Source $msgIds
+$preflightServerH = Read-Source $serverH
+$preflightServerCpp = Read-Source $serverCpp
+
+$missing = @()
+
+if(-not $preflightPlayerCpp.Contains('bool CPlayerClnt::Attack()')) {
+    $missing += 'CPlayerClnt::Attack()'
+}
+if(-not $preflightPlayerCpp.Contains('#include <iltsoundmgr.h>') -and
+   -not $preflightPlayerCpp.Contains('#include "FireteamWeaponHud.h"')) {
+    $missing += 'player client include anchor'
+}
+
+if(-not $preflightClientShell.Contains('m_pChatGui->Init();')) {
+    $missing += 'chat GUI Init'
+}
+if(-not $preflightClientShell.Contains('m_pChatGui->Term();')) {
+    $missing += 'chat GUI Term'
+}
+if(-not $preflightClientShell.Contains('case MSG_WORLD_PROPS:') -and
+   -not $preflightClientShell.Contains('case MSG_SC_AMMO:')) {
+    $missing += 'client message switch'
+}
+if(-not $preflightClientShell.Contains('LTRESULT CLTClientShell::Render()')) {
+    $missing += 'CLTClientShell::Render()'
+}
+if(-not $preflightClientShell.Contains('g_pLTClient->End3D(')) {
+    $missing += 'Render End3D'
+}
+
+if(-not $preflightMsgIds.Contains('MSG_SC_LIGHTGROUP') -and
+   -not $preflightMsgIds.Contains('MSG_SC_AMMO')) {
+    $missing += 'Fireteam shared message ids'
+}
+
+if(-not $preflightServerH.Contains('FirePrimary(const LTVector')) {
+    $missing += 'server FirePrimary declaration'
+}
+if(-not $preflightServerH.Contains('m_fNextPrimaryShot;')) {
+    $missing += 'server primary-shot state'
+}
+
+if(-not $preflightServerCpp.Contains('m_fNextPrimaryShot(0.0f)') -and
+   -not $preflightServerCpp.Contains('m_nPrimaryAmmoInClip(30)')) {
+    $missing += 'server primary-shot constructor state'
+}
+if(-not $preflightServerCpp.Contains('void CPlayerSrvr::SetWeaponSlot(uint8 nSlot)')) {
+    $missing += 'CPlayerSrvr::SetWeaponSlot'
+}
+if(-not $preflightServerCpp.Contains('void CPlayerSrvr::FirePrimary(')) {
+    $missing += 'CPlayerSrvr::FirePrimary'
+}
+
+if($missing.Count -gt 0) {
+    throw ('Fireteam combat HUD preflight failed before modifying source: ' +
+        [string]::Join(', ', $missing))
+}
+
+Write-Host "[OK] Fireteam combat HUD source preflight"
+
+# ---------------------------------------------------------------------------
 # NOLF2-style Fireteam crosshair + ammo HUD.
 #
 # The crosshair follows NOLF2's HUDCrosshair approach: screen-center geometry
