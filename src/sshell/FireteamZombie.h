@@ -8,6 +8,7 @@ class FireteamZombie : public BaseClass
 {
 public:
     FireteamZombie();
+    ~FireteamZombie();
 
 protected:
     uint32 EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData);
@@ -17,6 +18,7 @@ private:
     HOBJECT FindNearestPlayer();
     void UpdateZombie();
     void RebuildPath(const LTVector &vTarget);
+    void CreateInfectedFace();
 
     uint16 m_nHealth;
     float m_fAttackCooldown;
@@ -26,6 +28,10 @@ private:
     uint32 m_nWaypoint;
     LTVector m_vLastPos;
     std::vector<LTVector> m_aPath;
+
+    HOBJECT m_hFace;
+    HATTACHMENT m_hFaceAttachment;
+    bool m_bUsingExactCommonBody;
 };
 
 #endif
