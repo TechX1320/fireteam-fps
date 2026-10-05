@@ -116,7 +116,8 @@ void FT_SetPrimaryAmmo(uint16 nClip, uint16 nReserve)
 void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson)
 {
     if(!bFirstPerson ||
-       (nWeaponSlot != 1 && nWeaponSlot != 3) ||
+       nWeaponSlot < 1 ||
+       nWeaponSlot > 5 ||
        !g_pLTClient || !g_pLTCDrawPrim)
     {
         return;
@@ -178,7 +179,7 @@ void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson)
     g_pLTCDrawPrim->DrawPrim(crosshair, 4);
     g_pLTCDrawPrim->EndDrawPrim();
 
-    if(nWeaponSlot != 1)
+    if(nWeaponSlot == 3)
     {
         return;
     }
