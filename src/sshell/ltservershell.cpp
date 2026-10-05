@@ -31,6 +31,7 @@
 #include <iltcommon.h>
 
 #include "playersrvr.h"
+#include "FireteamPlayerDefs.h"
 #include "projectile.h"
 #include "statsmanager.h"
 
@@ -168,10 +169,31 @@ LPBASECLASS CLTServerShell::OnClientEnterWorld(HCLIENT hClient)
 
     objCreateStruct.m_Flags2 |= FLAG2_PLAYERCOLLIDE;
 
-    strcpy(objCreateStruct.m_Filenames[0], "Models\\HARMGuard.ltb");
-    strcpy(objCreateStruct.m_Filenames[1], "Models\\playerbase.ltb");
-    strcpy(objCreateStruct.m_SkinNames[0], "ModelTextures\\HARMPurple.dtx");
-    strcpy(objCreateStruct.m_SkinNames[1], "ModelTextures\\HARMHeadW1.dtx");
+    FTPlayerDef playerDef;
+    if(FT_LoadPlayerDef("config/player.cfg", playerDef))
+    {
+        FT_CopyPlayerString(
+            objCreateStruct.m_Filenames[0],
+            MAX_CS_FILENAME_LEN,
+            playerDef.sBodyModel);
+        FT_CopyPlayerString(
+            objCreateStruct.m_Filenames[1],
+            MAX_CS_FILENAME_LEN,
+            playerDef.sAnimationModel);
+        FT_CopyPlayerString(
+            objCreateStruct.m_SkinNames[0],
+            MAX_CS_FILENAME_LEN,
+            playerDef.sSkin0);
+        FT_CopyPlayerString(
+            objCreateStruct.m_SkinNames[1],
+            MAX_CS_FILENAME_LEN,
+            playerDef.sSkin1);
+    }
+    else
+    {
+        g_pLTServer->CPrint(
+            "Fireteam: failed to load config/player.cfg.");
+    }
 
 	// Set client's pos and rot according to the "StartPoint", if one exists.
 	this->FindStartPoint(vStartPos, rStartRot);
