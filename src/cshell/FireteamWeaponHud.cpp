@@ -201,18 +201,18 @@ void FT_RenderWeaponHud(uint8 nWeaponSlot, bool bFirstPerson, bool bShowCrosshai
         g_pLTCDrawPrim->DrawPrim(crosshair, 4);
         g_pLTCDrawPrim->EndDrawPrim();
 
-        const FTWeaponDef *pDef =
-            FT_GetWeaponDef(s_WeaponDefs, nWeaponSlot);
+    }
 
-        if(s_pWeaponName && pDef)
-        {
-            s_pWeaponName->SetText(pDef->sName);
-            s_pWeaponName->SetPosition(
-                (float)nScreenW - 210.0f,
-                (float)nScreenH - 102.0f);
-            s_pWeaponName->Render();
-        }
+    const FTWeaponDef *pDef =
+        FT_GetWeaponDef(s_WeaponDefs, nWeaponSlot);
 
+    if(s_pWeaponName && pDef)
+    {
+        s_pWeaponName->SetText(pDef->sName);
+        s_pWeaponName->SetPosition(
+            (float)nScreenW - 210.0f,
+            (float)nScreenH - 102.0f);
+        s_pWeaponName->Render();
     }
 
     if(!bShowAmmo)
