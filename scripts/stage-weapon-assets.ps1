@@ -134,6 +134,20 @@ if(Test-Path -LiteralPath $gunsPath) {
     Stage-PVWeapon $zip "Beretta M92FS" @("Beretta_M92FS","M92FS") @("PVMLA_BERETTA_M92FS.LTB") @("PV_BERETTA_M92FS.DTX") @("COLT_MEU_ANIBASE-1.LTB") "Weapons\secondary_m_pv\PVMLA_BERETTA_M92FS.LTB" "Weapons\secondary_t\PV_BERETTA_M92FS.DTX" "Weapons\secondary_m_pv\COLT_MEU_ANIBASE-1.LTB" "Weapons\secondary_snd\BERETTA_M92FS"
     Stage-PVWeapon $zip "M67" @("M67") @("PVMLA_M67.LTB") @("PV_M67.DTX") @("M67_ANIBASE-1.LTB") "Weapons\grenade_m_pv\PVMLA_M67.LTB" "Weapons\grenade_t\PV_M67.DTX" "Weapons\grenade_m_pv\M67_ANIBASE-1.LTB" "Weapons\grenade_snd\M67"
     Stage-PVWeapon $zip "LAW" @("LAW") @("PVMLA_LAW.LTB") @("PV_LAW.DTX") @("LAW_ANIBASE.LTB") "Weapons\special_m_pv\PVMLA_LAW.LTB" "Weapons\special_t\PV_LAW.DTX" "Weapons\special_m_pv\LAW_ANIBASE.LTB" "Weapons\special_snd\LAW"
+    Write-Host "[WEAPON] CA projectile assets"
+    $missileModel = $zip.Entries | Where-Object { $_.FullName -ieq "GUNS_PT/MODELS/MISSILE.LTB" } | Select-Object -First 1
+    Copy-ZipEntry $missileModel "Weapons\projectile_m\MISSILE.LTB" | Out-Null
+
+    $missileSkin = $zip.Entries | Where-Object { $_.FullName -ieq "GUNS_PT/SKINS/MISSILE.DTX" } | Select-Object -First 1
+    if(Copy-ZipEntry $missileSkin "Weapons\projectile_t\MISSILE.DTX") {
+      Add-TextureAliases "Weapons\projectile_t\MISSILE.DTX"
+    }
+
+    $projectileSound = $zip.Entries | Where-Object { $_.FullName -ieq "GUNS_PT/SND/GRENADE.WAV" } | Select-Object -First 1
+    Copy-ZipEntry $projectileSound "Weapons\projectile_snd\GRENADE.WAV" | Out-Null
+
+    $explosionSound = $zip.Entries | Where-Object { $_.FullName -ieq "GUNS_SND_IMPACTS/EXPLOSIONS/GREN.WAV" } | Select-Object -First 1
+    Copy-ZipEntry $explosionSound "Weapons\explosive_snd\GREN.WAV" | Out-Null
   } finally { $zip.Dispose() }
 } else { Write-Host "[SKIP] Guns.zip is not present in assets-local." }
 
