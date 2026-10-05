@@ -46,7 +46,7 @@ echo.
 echo [UPDATE] Refreshing local optional game assets...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-local-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%CD%\.local"
 if errorlevel 1 goto :fail
-powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-ak-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%CD%\.local"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-weapon-assets.ps1" -RepoRoot "%CD%" -LocalRoot "%CD%\.local"
 if errorlevel 1 goto :fail
 
 echo.
@@ -142,6 +142,9 @@ if errorlevel 1 goto :copyfail
 copy /y "config\run-normal.cmd" "%BUILT_DIR%\run-normal.cmd" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\run-cabinfever.cmd" "%BUILT_DIR%\run-cabinfever.cmd" >nul
+if errorlevel 1 goto :copyfail
+if not exist "%BUILT_DIR%\config" mkdir "%BUILT_DIR%\config" >nul
+copy /y "config\weapons.cfg" "%BUILT_DIR%\config\weapons.cfg" >nul
 if errorlevel 1 goto :copyfail
 
 echo.
