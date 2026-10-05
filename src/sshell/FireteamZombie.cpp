@@ -11,6 +11,7 @@
 #include <ltobjectcreate.h>
 #include <float.h>
 #include <string.h>
+#include <stdio.h>
 
 BEGIN_CLASS(FireteamZombie)
 END_CLASS_DEFAULT_FLAGS(FireteamZombie, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
@@ -23,9 +24,115 @@ FireteamZombie::FireteamZombie() :
     m_fRepathCooldown(0.0f),
     m_fStuckTime(0.0f),
     m_nPathLane((s_nZombieSerial++) % 3),
-    m_nWaypoint(0)
+    m_nWaypoint(0),
+    m_hFace(LTNULL),
+    m_hFaceAttachment(LTNULL),
+    m_bUsingExactCommonBody(false)
 {
     m_vLastPos.Init(0.0f, 0.0f, 0.0f);
+}
+
+FireteamZombie::~FireteamZombie()
+{
+    if(m_hFace)
+    {
+        g_pLTServer->RemoveObject(m_hFace);
+        m_hFace = LTNULL;
+        m_hFaceAttachment = LTNULL;
+    }
+}
+
+static bool FT_ZombieAssetExists(const char *pPath)
+{
+    FILE *pFile = fopen(pPath, "rb");
+    if(!pFile)
+    {
+        return false;
+    }
+
+    fclose(pFile);
+    return true;
+}
+
+void FireteamZombie::CreateInfectedFace()
+{
+    if(m_hFace)
+    {
+        return;
+    }
+
+    const char *pFaceModel =
+        "Characters/infected/face/CM_FC_NM_VIRUS_HM.LTB";
+    const char *pFaceSkin =
+        "Characters/infected/face/CM_FC_NM_VIRUS_HM.DTX";
+
+    if(!FT_ZombieAssetExists("rez/Characters/infected/face/CM_FC_NM_VIRUS_HM.LTB"))
+    {
+        g_pLTServer->CPrint(
+            "Fireteam infected: virus face asset is not staged.");
+        return;
+    }
+
+    HCLASS hBaseClass = g_pLTServer->GetClass("BaseClass");
+    if(!hBaseClass)
+    {
+        return;
+    }
+
+    ObjectCreateStruct ocs;
+    ocs.Clear();
+    ocs.m_ObjectType = OT_MODEL;
+    ocs.m_Flags = FLAG_VISIBLE |
+                  FLAG_FORCECLIENTUPDATE |
+                  FLAG_SHADOW;
+    strncpy(
+        ocs.m_Filename,
+        pFaceModel,
+        MAX_CS_FILENAME_LEN - 1);
+    strncpy(
+        ocs.m_SkinName,
+        pFaceSkin,
+        MAX_CS_FILENAME_LEN - 1);
+
+    BaseClass *pFace =
+        (BaseClass*)g_pLTServer->CreateObject(
+            hBaseClass,
+            &ocs);
+
+    if(!pFace)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam infected: failed to create virus face.");
+        return;
+    }
+
+    m_hFace = pFace->m_hObject;
+
+    LTVector vOffset(0.0f, 0.0f, 0.0f);
+    LTRotation rOffset;
+    rOffset.Init();
+
+    LTRESULT result =
+        g_pLTServer->CreateAttachment(
+            m_hObject,
+            m_hFace,
+            "Head",
+            &vOffset,
+            &rOffset,
+            &m_hFaceAttachment);
+
+    if(result != LT_OK)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam infected: Head socket face attachment failed.");
+        g_pLTServer->RemoveObject(m_hFace);
+        m_hFace = LTNULL;
+        m_hFaceAttachment = LTNULL;
+        return;
+    }
+
+    g_pLTServer->CPrint(
+        "Fireteam infected: attached INFECTED_VIRUS_FACE on Head socket.");
 }
 
 HOBJECT FireteamZombie::FindNearestPlayer()
@@ -270,24 +377,98 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                                  FLAG_YROTATION | FLAG_FORCECLIENTUPDATE | FLAG_SHADOW;
                 pOCS->m_Flags2 |= FLAG2_PLAYERCOLLIDE;
 
-                strncpy(pOCS->m_Filenames[0], "Models\\HARMGuard.ltb", MAX_CS_FILENAME_LEN - 1);
-                strncpy(pOCS->m_Filenames[1], "Models\\playerbase.ltb", MAX_CS_FILENAME_LEN - 1);
-                strncpy(pOCS->m_SkinNames[0], "ModelTextures\\HARMPurple.dtx", MAX_CS_FILENAME_LEN - 1);
-                strncpy(pOCS->m_SkinNames[1], "ModelTextures\\HARMHeadW1.dtx", MAX_CS_FILENAME_LEN - 1);
+                // CA MODELBUTES AIModel11 (Normal_Infecter_Common_D)
+                // uses MT_AR_BODY + MT_MG_LEG and attaches INFECTED_VIRUS_FACE.
+                // The supplied character archive contains the textures/face and
+                // ST_M_CHILD, but not MT_AR_BODY.LTB itself. Prefer the exact
+                // model automatically when it becomes available; until then use
+                // MT_SP_BODY only to validate the CA body/child/face pipeline.
+                m_bUsingExactCommonBody =
+                    FT_ZombieAssetExists(
+                        "rez/Characters/infected/body/MT_AR_BODY.LTB");
+
+                const char *pBodyModel =
+                    m_bUsingExactCommonBody
+                    ? "Characters/infected/body/MT_AR_BODY.LTB"
+                    : "Characters/infected/body/MT_SP_BODY.LTB";
+                const char *pBodySkin =
+                    m_bUsingExactCommonBody
+                    ? "Characters/infected/body/MT_AR_BODY.DTX"
+                    : "Characters/infected/body/MT_SP_BODY.DTX";
+                const char *pLegSkin =
+                    m_bUsingExactCommonBody
+                    ? "Characters/infected/body/MT_MG_LEG.DTX"
+                    : "Characters/infected/body/MT_SP_LEG.DTX";
+
+                strncpy(
+                    pOCS->m_Filenames[0],
+                    pBodyModel,
+                    MAX_CS_FILENAME_LEN - 1);
+                strncpy(
+                    pOCS->m_Filenames[1],
+                    "Characters/infected/body/ST_M_CHILD.LTB",
+                    MAX_CS_FILENAME_LEN - 1);
+                strncpy(
+                    pOCS->m_SkinNames[0],
+                    pBodySkin,
+                    MAX_CS_FILENAME_LEN - 1);
+                strncpy(
+                    pOCS->m_SkinNames[1],
+                    pLegSkin,
+                    MAX_CS_FILENAME_LEN - 1);
             }
         }
         break;
 
         case MID_INITIALUPDATE:
         {
-            g_pLTServer->SetObjectColor(m_hObject, 0.45f, 0.90f, 0.45f, 1.0f);
+            g_pLTServer->SetObjectColor(
+                m_hObject,
+                1.0f,
+                1.0f,
+                1.0f,
+                1.0f);
 
-            HMODELANIM hAnim = g_pLTServer->GetAnimIndex(m_hObject, "LRF");
+            g_pLTServer->CPrint(
+                "Fireteam infected: CA body=%s",
+                m_bUsingExactCommonBody
+                    ? "MT_AR_BODY (Normal_Infecter_Common_D)"
+                    : "MT_SP_BODY temporary fallback");
+
+            // ST_M_CHILD is the shared male CA animation child. Use a known
+            // animation from that database as the first validation gate.
+            HMODELANIM hAnim =
+                g_pLTServer->GetAnimIndex(
+                    m_hObject,
+                    "K_idle_0");
+            if(hAnim == INVALID_MODEL_ANIM)
+            {
+                hAnim =
+                    g_pLTServer->GetAnimIndex(
+                        m_hObject,
+                        "C_idle_0");
+            }
+
             if(hAnim != INVALID_MODEL_ANIM)
             {
-                g_pLTSModel->SetCurAnim(m_hObject, MAIN_TRACKER, hAnim);
-                g_pLTSModel->SetLooping(m_hObject, MAIN_TRACKER, LTTRUE);
+                g_pLTSModel->SetCurAnim(
+                    m_hObject,
+                    MAIN_TRACKER,
+                    hAnim);
+                g_pLTSModel->SetLooping(
+                    m_hObject,
+                    MAIN_TRACKER,
+                    LTTRUE);
+                g_pLTServer->CPrint(
+                    "Fireteam infected: ST_M_CHILD animation resolved.");
             }
+            else
+            {
+                g_pLTServer->CPrint(
+                    "Fireteam infected: CA animation lookup failed.");
+            }
+
+            CreateInfectedFace();
 
             // NOLF2 CAIHuman's authored default half-dimensions are 24 x 53 x 24.
             // Do not inherit the HARMGuard animation's collision box on a CA map.
