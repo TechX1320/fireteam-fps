@@ -59,6 +59,10 @@ m_DebugSphere(NULL),
 m_bUseLeashing(true),
 m_fLeashingDelay(0.0f)
 {
+    if(!FT_LoadWeaponDefs("config/weapons.cfg", m_WeaponDefs))
+    {
+        g_pLTClient->CPrint("Fireteam: using built-in weapon definition fallback.");
+    }
 }
 
 
@@ -441,18 +445,26 @@ void CPlayerClnt::UpdateJump()
 //-----------------------------------------------------------------------------
 bool CPlayerClnt::Attack()
 {
-    if(m_nWeaponSlot == 1)
+    const FTWeaponDef *pDef = GetCurrentWeaponDef();
+    if(!pDef)
+    {
+        return false;
+    }
+
+    if(pDef->eType != FT_WEAPON_MELEE)
     {
         const float fNow = g_pLTClient->GetTime();
-
-        // Combat Arms AK-47 bring-up: 600 RPM client cadence. The server
-        // independently enforces the same cadence and owns ammo/damage.
         if(fNow < m_fNextPrimaryClientShot)
         {
             return false;
         }
 
-        m_fNextPrimaryClientShot = fNow + 0.10f;
+        if(!pDef->bAutomatic && m_bViewWeaponAction)
+        {
+            return false;
+        }
+
+        m_fNextPrimaryClientShot = fNow + pDef->fFireInterval;
 
         HMODELANIM hFire = INVALID_MODEL_ANIM;
         if(m_hViewWeaponObject)
@@ -477,11 +489,9 @@ bool CPlayerClnt::Attack()
 
     PlayAttackAnimation("UMFi", m_idUpperBodyTracker);
     m_bAttacking = true;
-
     PlayViewWeaponAnimation("fire_0", false);
     PlayViewWeaponSound("FIRE.WAV");
     m_bViewWeaponAction = true;
-
     return true;
 }
 
@@ -511,12 +521,13 @@ bool CPlayerClnt::AltAttack()
 
 
 //----------------------------------------------------------------------------
-// Fireteam loadout slots.
-// 1 = primary (AK-47), 3 = melee (Bowie). 2/4/5 intentionally empty.
+// Fireteam five-slot loadout.
+// 1 primary, 2 pistol, 3 melee, 4 grenade, 5 special.
 //----------------------------------------------------------------------------
 bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
 {
-    if(nSlot != 1 && nSlot != 3)
+    const FTWeaponDef *pDef = FT_GetWeaponDef(m_WeaponDefs, nSlot);
+    if(!pDef)
     {
         return false;
     }
@@ -529,10 +540,11 @@ bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
     m_nWeaponSlot = nSlot;
     m_bAttacking = false;
     m_bViewWeaponAction = false;
+    m_fNextPrimaryClientShot = 0.0f;
 
     CreateViewWeapon();
 
-    ILTMessage_Write *pMessage;
+    ILTMessage_Write *pMessage = LTNULL;
     if(g_pLTCCommon->CreateMessage(pMessage) == LT_OK && pMessage)
     {
         pMessage->IncRef();
@@ -547,7 +559,7 @@ bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
     g_pLTClient->CPrint(
         "Fireteam: weapon slot %u - %s",
         (uint32)m_nWeaponSlot,
-        m_nWeaponSlot == 1 ? "AK-47" : "Bowie");
+        pDef->sName);
 
     return true;
 }
@@ -559,7 +571,54 @@ void CPlayerClnt::CycleWeapon(int nDirection)
         return;
     }
 
-    SelectWeaponSlot(m_nWeaponSlot == 1 ? 3 : 1);
+    int nSlot = (int)m_nWeaponSlot;
+    for(int nTry = 0; nTry < 5; ++nTry)
+    {
+        nSlot += (nDirection > 0) ? 1 : -1;
+        if(nSlot > 5) nSlot = 1;
+        if(nSlot < 1) nSlot = 5;
+
+        if(FT_GetWeaponDef(m_WeaponDefs, (uint8)nSlot))
+        {
+            SelectWeaponSlot((uint8)nSlot);
+            return;
+        }
+    }
+}
+
+bool CPlayerClnt::ReloadWeapon()
+{
+    const FTWeaponDef *pDef = GetCurrentWeaponDef();
+    if(!pDef || pDef->nClipSize == 0 || pDef->eType == FT_WEAPON_MELEE)
+    {
+        return false;
+    }
+
+    ILTMessage_Write *pMessage = LTNULL;
+    if(g_pLTCCommon->CreateMessage(pMessage) == LT_OK && pMessage)
+    {
+        pMessage->IncRef();
+        pMessage->Writeuint8(MSG_CS_RELOAD);
+        g_pLTClient->SendToServer(
+            pMessage->Read(),
+            MESSAGE_GUARANTEED);
+        pMessage->DecRef();
+    }
+
+    HMODELANIM hReload = INVALID_MODEL_ANIM;
+    if(m_hViewWeaponObject)
+    {
+        hReload = g_pLTClient->GetAnimIndex(
+            m_hViewWeaponObject,
+            (char*)"reload");
+    }
+
+    PlayViewWeaponAnimation(
+        hReload != INVALID_MODEL_ANIM ? "reload" : "reload_0",
+        false);
+    PlayViewWeaponSound("RELOAD.WAV");
+    m_bViewWeaponAction = true;
+    return true;
 }
 
 //----------------------------------------------------------------------------
@@ -793,25 +852,13 @@ void CPlayerClnt::CreateViewWeapon()
     if(m_hViewWeaponObject)
     {
         g_pLTClient->RemoveObject(m_hViewWeaponObject);
-        m_hViewWeaponObject = NULL;
+        m_hViewWeaponObject = LTNULL;
     }
 
-    if(m_nWeaponSlot == 1)
+    const FTWeaponDef *pDef = GetCurrentWeaponDef();
+    if(!pDef)
     {
-        FILE *pAK = fopen(
-            "rez\\Weapons\\primary_m_pv\\PV_AR_AK47_SH.LTB",
-            "rb");
-
-        if(!pAK)
-        {
-            g_pLTClient->CPrint(
-                "Fireteam: AK-47 PV asset is not staged; falling back to Bowie.");
-            m_nWeaponSlot = 3;
-        }
-        else
-        {
-            fclose(pAK);
-        }
+        return;
     }
 
     ObjectCreateStruct ocs;
@@ -819,90 +866,56 @@ void CPlayerClnt::CreateViewWeapon()
     ocs.m_ObjectType = OT_MODEL;
     ocs.m_Flags = FLAG_VISIBLE | FLAG_REALLYCLOSE;
     ocs.m_Flags2 = FLAG2_DYNAMICDIRLIGHT;
-    ocs.m_Pos.Init(0.0f, 0.0f, 0.0f);
+    ocs.m_Pos.Init(pDef->fViewX, pDef->fViewY, pDef->fViewZ);
 
-    if(m_nWeaponSlot == 1)
+    FT_CopyWeaponString(
+        ocs.m_Filenames[0],
+        MAX_CS_FILENAME_LEN,
+        pDef->sPVModel);
+
+    if(pDef->sPVAnim[0])
     {
-        strcpy(
-            ocs.m_Filenames[0],
-            "Weapons\\primary_m_pv\\PV_AR_AK47_SH.LTB");
-
-        strcpy(
+        FT_CopyWeaponString(
             ocs.m_Filenames[1],
-            "Weapons\\primary_m_pv\\AK47_ANIBASE.LTB");
-
-        // Combat Arms Weapon12 player-view offset.
-        ocs.m_Pos.Init(0.3f, -0.6f, 1.2f);
-
-        strcpy(
-            ocs.m_SkinNames[0],
-            "Characters\\male\\hands\\CM_HND_NM_SPECIAL_BC.DTX");
-
-        for(uint32 nSkin = 1; nSkin < MAX_MODEL_TEXTURES; ++nSkin)
-        {
-            strcpy(
-                ocs.m_SkinNames[nSkin],
-                "Weapons\\primary_t\\AK47_PV.DTX");
-        }
-    }
-    else
-    {
-        strcpy(
-            ocs.m_Filenames[0],
-            "Weapons\\melee_m_pv\\CM_HND_NM_DF_BOWIEKNIFE_CH.LTB");
-        strcpy(
-            ocs.m_Filenames[1],
-            "Weapons\\melee_m_pv\\ANI_G_BOWIEKNIFE_CH.LTB");
-
-        strcpy(
-            ocs.m_SkinNames[0],
-            "Characters\\male\\hands\\CM_HND_NM_SPECIAL_BC.DTX");
-
-        for(uint32 nSkin = 1; nSkin < MAX_MODEL_TEXTURES; ++nSkin)
-        {
-            strcpy(
-                ocs.m_SkinNames[nSkin],
-                "Weapons\\melee_t\\PV_ML_DF_BOWIEKNIFE_BC.DTX");
-        }
+            MAX_CS_FILENAME_LEN,
+            pDef->sPVAnim);
     }
 
-    strcpy(
+    FT_CopyWeaponString(
+        ocs.m_SkinNames[0],
+        MAX_CS_FILENAME_LEN,
+        "Characters\\male\\hands\\CM_HND_NM_SPECIAL_BC.DTX");
+
+    for(uint32 nSkin = 1; nSkin < MAX_MODEL_TEXTURES; ++nSkin)
+    {
+        FT_CopyWeaponString(
+            ocs.m_SkinNames[nSkin],
+            MAX_CS_FILENAME_LEN,
+            pDef->sPVTexture);
+    }
+
+    FT_CopyWeaponString(
         ocs.m_RenderStyleNames[0],
+        MAX_CS_FILENAME_LEN,
         "RenderStyles\\DEFAULT.LTB");
 
     m_hViewWeaponObject = g_pLTClient->CreateObject(&ocs);
-
-    if(!m_hViewWeaponObject && m_nWeaponSlot == 1)
-    {
-        g_pLTClient->CPrint(
-            "Fireteam: AK-47 model failed to create; reverting to Bowie.");
-        m_nWeaponSlot = 3;
-        CreateViewWeapon();
-        return;
-    }
-
     if(!m_hViewWeaponObject)
     {
         g_pLTClient->CPrint(
-            "Fireteam: view weapon model failed to load.");
+            "Fireteam: failed to create %s player-view model: %s",
+            pDef->sName,
+            pDef->sPVModel);
         return;
     }
 
-    if(m_nWeaponSlot == 1)
-    {
-        HMODELANIM hSelect = g_pLTClient->GetAnimIndex(
-            m_hViewWeaponObject,
-            (char*)"select");
+    HMODELANIM hSelect = g_pLTClient->GetAnimIndex(
+        m_hViewWeaponObject,
+        (char*)"select");
 
-        PlayViewWeaponAnimation(
-            hSelect != INVALID_MODEL_ANIM ? "select" : "select_0",
-            false);
-    }
-    else
-    {
-        PlayViewWeaponAnimation("select", false);
-    }
-
+    PlayViewWeaponAnimation(
+        hSelect != INVALID_MODEL_ANIM ? "select" : "select_0",
+        false);
     PlayViewWeaponSound("SELECT.WAV");
     m_bViewWeaponAction = true;
 }
@@ -932,26 +945,23 @@ void CPlayerClnt::PlayViewWeaponSound(const char* sFilename)
         return;
     }
 
+    const FTWeaponDef *pDef = GetCurrentWeaponDef();
+    if(!pDef || !pDef->sSoundDir[0])
+    {
+        return;
+    }
+
     PlaySoundInfo psi;
     PLAYSOUNDINFO_INIT(psi);
     psi.m_dwFlags = PLAYSOUND_LOCAL;
 
-    if(m_nWeaponSlot == 1)
-    {
-        sprintf(
-            psi.m_szSoundName,
-            "Weapons\\primary_snd\\AK47\\%s",
-            sFilename);
-    }
-    else
-    {
-        sprintf(
-            psi.m_szSoundName,
-            "Weapons\\melee_snd\\BOWIE_KNIFE\\%s",
-            sFilename);
-    }
+    sprintf(
+        psi.m_szSoundName,
+        "%s/%s",
+        pDef->sSoundDir,
+        sFilename);
 
-    HLTSOUND hSound = NULL;
+    HLTSOUND hSound = LTNULL;
     g_pLTCSoundMgr->PlaySound(&psi, hSound);
 }
 void CPlayerClnt::UpdateViewWeaponAnimation()
@@ -1002,9 +1012,13 @@ void CPlayerClnt::UpdateWeaponView(bool bFirstPerson)
             // updates the player-view weapon position continuously; do the same
             // so the authored Combat Arms PV offset is not lost after creation.
             LTVector vViewPos(0.0f, 0.0f, 0.0f);
-            if(m_nWeaponSlot == 1)
+            const FTWeaponDef *pDef = GetCurrentWeaponDef();
+            if(pDef)
             {
-                vViewPos.Init(0.3f, -0.6f, 1.2f);
+                vViewPos.Init(
+                    pDef->fViewX,
+                    pDef->fViewY,
+                    pDef->fViewZ);
             }
 
             g_pLTClient->SetObjectPos(m_hViewWeaponObject, &vViewPos);
