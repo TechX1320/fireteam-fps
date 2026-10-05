@@ -146,6 +146,8 @@ if errorlevel 1 goto :copyfail
 if not exist "%BUILT_DIR%\config" mkdir "%BUILT_DIR%\config" >nul
 copy /y "config\weapons.cfg" "%BUILT_DIR%\config\weapons.cfg" >nul
 if errorlevel 1 goto :copyfail
+copy /y "config\infected.cfg" "%BUILT_DIR%\config\infected.cfg" >nul
+if errorlevel 1 goto :copyfail
 
 echo.
 echo [4/5] Installing freshly built modules...
