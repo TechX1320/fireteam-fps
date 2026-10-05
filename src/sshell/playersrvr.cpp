@@ -1125,6 +1125,9 @@ void CPlayerSrvr::SpawnExplosiveProjectile(
 
     if(!hProjectileClass)
     {
+        g_pLTServer->CPrint(
+            "Fireteam explosive: class lookup failed for %s",
+            def.sName);
         return;
     }
 
@@ -1171,8 +1174,17 @@ void CPlayerSrvr::SpawnExplosiveProjectile(
 
     if(!pProjectile)
     {
+        g_pLTServer->CPrint(
+            "Fireteam explosive: failed to create projectile for %s (model=%s)",
+            def.sName,
+            ocs.m_Filename);
         return;
     }
+
+    g_pLTServer->CPrint(
+        "Fireteam explosive: spawned %s projectile model=%s",
+        def.sName,
+        ocs.m_Filename);
 
     pProjectile->Configure(
         m_hObject,
