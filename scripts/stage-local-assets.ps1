@@ -213,12 +213,16 @@ function Extract-OptionalZipEntry([string]$ZipName, [string]$EntryName, [string]
 
 
 $charZipName = $null
-foreach($candidate in @(
-    "Chars_Files_Updated.zip",
-    "CharModels-Textur.zip"
+foreach($pattern in @(
+    "Chars_Files_Updated*.zip",
+    "CharModels-Textur*.zip"
 )) {
-    if(Test-Path -LiteralPath (Join-Path $assetRoot $candidate)) {
-        $charZipName = $candidate
+    $candidate = Get-ChildItem -LiteralPath $assetRoot -Filter $pattern -File |
+        Sort-Object LastWriteTimeUtc -Descending |
+        Select-Object -First 1
+
+    if($candidate) {
+        $charZipName = $candidate.Name
         break
     }
 }
