@@ -107,7 +107,11 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - A 2% bonus crawler easter egg can spawn an original SealHunter seal from a perimeter point. Bonus seals do not count toward round completion.
 - Bowie melee keeps the Combat Arms 135-unit range during bring-up and can damage `FireteamZombie` objects. The old SealHunter single-OBB assumption is patched structurally so persistent local source trees are upgraded correctly.
 - Basic in-game settings are available from Escape: mouse sensitivity, resolution, windowed/fullscreen, Apply Video, Resume and Quit.
-- The first Fireteam loadout is `1 = AK-47`, `3 = Bowie`; slots 2/4/5 remain empty and the mouse wheel cycles occupied slots. The exact CA player-view model is `PV_AR_AK47_SH.LTB` with `AK47_ANIBASE.LTB` as its animation companion. Combat HUD/ammo work is the next direct-source task after the source-tree migration.
+- Fireteam now has a five-slot loadout: `1 = AK-47`, `2 = Beretta M92FS`, `3 = Bowie`, `4 = M67`, `5 = LAW`; number keys and the mouse wheel switch slots.
+- Weapon definitions live in `config/weapons.cfg`. The server owns ammo, damage, cadence, reload completion and explosive damage; clients only request actions and render the selected weapon/HUD.
+- Base AK-47, Beretta, Bowie, M67 and LAW ammo/damage/range values are grounded in the supplied decrypted Combat Arms weapon data. Fire/reload timing and projectile speed remain explicit development approximations where the decrypted data does not establish them.
+- `R` requests a server-authoritative reload. The HUD shows the selected weapon and server-synchronized ammo; crosshair visibility follows each weapon definition (the CA Bowie disables it).
+- Grenades and rockets are server-created projectiles. Splash damage is restricted to Fireteam enemies, preserving the no-friendly-fire rule. LAW currently uses a temporary projectile body until the CA `Missile` projectile visual is reproduced.
 - Player damage is real again. The earlier respawn loop was caused by stale PoisonGas hazard code surviving in the local generated source; the build now replaces that function body explicitly. Environmental PoisonGas damage remains disabled until Combat Arms safe/outside volume semantics are reproduced.
 
 ## Combat Arms compatibility work
