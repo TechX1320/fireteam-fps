@@ -44,6 +44,7 @@ public:
     void                CycleWeapon(int nDirection);
     bool                ReloadWeapon();
     void                ReleaseAttackTrigger() { m_bSemiAutoTriggerHeld = false; }
+    bool                IsMoving();
     uint8               GetWeaponSlot() const { return m_nWeaponSlot; }
     const FTWeaponDef*  GetCurrentWeaponDef() const { return FT_GetWeaponDef(m_WeaponDefs, m_nWeaponSlot); }
 
