@@ -8,8 +8,10 @@ public sealed class MainForm : Form
     private readonly ComboBox _mode = new();
     private readonly ComboBox _map = new();
     private readonly ComboBox _loadout = new();
+    private readonly ComboBox _difficulty = new();
     private readonly TextBox _playerName = new();
     private readonly TextBox _joinIp = new();
+    private readonly TextBox _commands = new();
 
     private readonly ComboBox _resolution = new();
     private readonly CheckBox _windowed = new();
@@ -29,8 +31,8 @@ public sealed class MainForm : Form
     {
         Text = "FIRETEAM Launcher";
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(760, 610);
-        Size = new Size(820, 650);
+        MinimumSize = new Size(780, 650);
+        Size = new Size(850, 700);
         BackColor = BackColorMain;
         ForeColor = ForeColorMain;
         Font = new Font("Segoe UI", 10F);
@@ -119,23 +121,39 @@ public sealed class MainForm : Form
         _map.SelectedIndex = 0;
         AddRow(layout, 3, "Map", _map);
 
+        _difficulty.DropDownStyle = ComboBoxStyle.DropDownList;
+        _difficulty.Items.AddRange([
+            "Easy",
+            "Normal",
+            "Hard",
+            "Extreme",
+            "Nightmare"
+        ]);
+        _difficulty.SelectedItem = "Normal";
+        AddRow(layout, 4, "Difficulty", _difficulty);
+
         _loadout.DropDownStyle = ComboBoxStyle.DropDownList;
         _loadout.Items.Add(
             "Rifleman - AK-47 / M92FS / Bowie / Colt MEU / L96A1");
         _loadout.SelectedIndex = 0;
-        AddRow(layout, 4, "Loadout", _loadout);
+        AddRow(layout, 5, "Loadout", _loadout);
+
+        _commands.PlaceholderText =
+            "+consoleenable 1 +SomeLithTechCommand value";
+        AddRow(layout, 6, "Commands", _commands);
 
         var note = new Label
         {
             Text =
-                "Normal difficulty is the active gameplay profile in this build. " +
-                "Hard/Extreme and additional loadouts will be data-driven launcher options next.",
+                "Commands are appended to the LithTech command line after the " +
+                "launcher defaults, so advanced users can pass normal Jupiter " +
+                "console/launch arguments directly.",
             AutoSize = true,
             MaximumSize = new Size(590, 0),
             ForeColor = Color.FromArgb(170, 175, 181),
             Margin = new Padding(4, 22, 4, 4)
         };
-        layout.Controls.Add(note, 1, 5);
+        layout.Controls.Add(note, 1, 7);
 
         page.Controls.Add(layout);
         return page;
@@ -281,7 +299,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             ColumnCount = 2,
-            RowCount = 8,
+            RowCount = 10,
             Padding = new Padding(18)
         };
 
@@ -401,6 +419,7 @@ public sealed class MainForm : Form
             }
 
             WriteSettings(gameDir);
+            WriteSession(gameDir);
 
             var exe = Path.Combine(gameDir, "Lithtech.exe");
             var start = new ProcessStartInfo(exe)
@@ -447,6 +466,10 @@ public sealed class MainForm : Form
             AddArg(start, "+consoleenable", "1");
             AddArg(start, "+numconsolelines", "0");
 
+            AppendCustomCommands(
+                start,
+                _commands.Text);
+
             _status.Text = mode switch
             {
                 "host" => "Starting 24-player FIRETEAM host...",
@@ -464,6 +487,73 @@ public sealed class MainForm : Form
                 "FIRETEAM Launcher",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
+        }
+    }
+
+    private void WriteSession(string gameDir)
+    {
+        var configDir =
+            Path.Combine(gameDir, "config");
+        Directory.CreateDirectory(configDir);
+
+        var difficulty =
+            (_difficulty.SelectedItem?.ToString()
+                ?? "Normal")
+            .Trim()
+            .ToLowerInvariant();
+
+        File.WriteAllText(
+            Path.Combine(configDir, "session.cfg"),
+            $"difficulty={difficulty}\n");
+    }
+
+    private static void AppendCustomCommands(
+        ProcessStartInfo start,
+        string? commandText)
+    {
+        if(string.IsNullOrWhiteSpace(commandText))
+        {
+            return;
+        }
+
+        foreach(var token in TokenizeCommandLine(commandText))
+        {
+            start.ArgumentList.Add(token);
+        }
+    }
+
+    private static IEnumerable<string> TokenizeCommandLine(
+        string text)
+    {
+        var current = new System.Text.StringBuilder();
+        var quoted = false;
+
+        for(var i = 0; i < text.Length; ++i)
+        {
+            var ch = text[i];
+
+            if(ch == '"')
+            {
+                quoted = !quoted;
+                continue;
+            }
+
+            if(char.IsWhiteSpace(ch) && !quoted)
+            {
+                if(current.Length > 0)
+                {
+                    yield return current.ToString();
+                    current.Clear();
+                }
+                continue;
+            }
+
+            current.Append(ch);
+        }
+
+        if(current.Length > 0)
+        {
+            yield return current.ToString();
         }
     }
 
