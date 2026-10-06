@@ -27,6 +27,7 @@
 #include "FireteamLightGroupClient.h"
 #include "FireteamHealthHud.h"
 #include "FireteamWeaponHud.h"
+#include "FireteamRoundHud.h"
 // Client-side helper functions
 #include "clienthelper.h"
 
@@ -243,6 +244,7 @@ LTRESULT CLTClientShell::OnEngineInitialized(RMode *pMode, LTGUID *pAppGuid)
 
     FT_SettingsInit();
     FT_WeaponHudInit();
+    FT_RoundHudInit();
 
 
 
@@ -636,6 +638,11 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             FT_QueueLightGroup(nLightGroupID, vAdjustment);
         }
         break;
+    case MSG_SC_ROUND:
+        {
+            FT_RoundHudHandleMessage(pMessage);
+        }
+        break;
     case MSG_SC_AMMO:
         {
             uint16 nClip = pMessage->Readuint16();
@@ -834,6 +841,7 @@ LTRESULT CLTClientShell::Render()
             FT_RenderPoisonOverlay(m_pPlayer->GetPlayerObject());
         }
         FT_RenderHealthHud();
+        FT_RenderRoundHud();
 
         if(m_pPlayer &&
            m_pCamera &&
@@ -1653,6 +1661,7 @@ void CLTClientShell::OnEngineTerm()
 
     // Dispose of the Chat gui
     assert(m_pChatGui);
+    FT_RoundHudTerm();
     FT_WeaponHudTerm();
     FT_SettingsTerm();
     m_pChatGui->Term();
