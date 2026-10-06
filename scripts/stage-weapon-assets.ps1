@@ -130,8 +130,8 @@ $gunsHHPath = Join-Path $assetRoot "GunsHH.zip"
 if(Test-Path -LiteralPath $gunsPath) {
   $zip = [System.IO.Compression.ZipFile]::OpenRead($gunsPath)
   try {
-    Stage-PVWeapon $zip "AK-47" @("AK-47","AK47") @("PV_AR_AK47_SH.LTB") @("PV_AK-47.DTX") @("AK47_ANIBASE.LTB") "Weapons\primary_m_pv\PV_AR_AK47_SH.LTB" "Weapons\primary_t\AK47_PV.DTX" "Weapons\primary_m_pv\AK47_ANIBASE.LTB" "Weapons\primary_snd\AK47"
-    Stage-PVWeapon $zip "Beretta M92FS" @("Beretta_M92FS","M92FS") @("PVMLA_BERETTA_M92FS.LTB") @("PV_BERETTA_M92FS.DTX") @("COLT_MEU_ANIBASE-1.LTB") "Weapons\secondary_m_pv\PVMLA_BERETTA_M92FS.LTB" "Weapons\secondary_t\BERETTA_M92FS_PV.DTX" "Weapons\secondary_m_pv\COLT_MEU_ANIBASE-1.LTB" "Weapons\secondary_snd\BERETTA_M92FS"
+    Stage-PVWeapon $zip "AK-47" @("AK-47","AK47") @("PVMLA_AK-47.LTB") @("PV_AK-47.DTX") @("AK47_ANIBASE.LTB") "Weapons\primary_m_pv\PVMLA_AK-47.LTB" "Weapons\primary_t\PV_AK-47.DTX" "Weapons\primary_m_pv\AK47_ANIBASE.LTB" "Weapons\primary_snd\AK47"
+    Stage-PVWeapon $zip "Beretta M92FS" @("BERETTA_M92FS","M92FS","BERETTA") @("PVMLA_BERETTA_M92FS.LTB") @("PV_BERETTA_M92FS.DTX") @("BERETTA_ANIBASE.LTB") "Weapons\secondary_m_pv\PVMLA_BERETTA_M92FS.LTB" "Weapons\secondary_t\PV_BERETTA_M92FS.DTX" "Weapons\secondary_m_pv\BERETTA_ANIBASE.LTB" "Weapons\secondary_snd\BERETTA_M92FS"
     Stage-PVWeapon $zip "Colt 1911A1 MEU" @("COLT_1911A1_MEU") @("PVMLA_COLT_1911A1_MEU.LTB") @("PV_COLT_1911A1_MEU.DTX") @("COLT_MEU_ANIBASE.LTB","COLT_MEU_ANIBASE-1.LTB") "Weapons\sidearm2_m_pv\PVMLA_COLT_1911A1_MEU.LTB" "Weapons\sidearm2_t\PV_COLT_1911A1_MEU.DTX" "Weapons\sidearm2_m_pv\COLT_MEU_ANIBASE.LTB" "Weapons\sidearm2_snd\COLT_1911A1_MEU"
     Stage-PVWeapon $zip "L96A1" @("L96A1") @("PVMLA_L96A1.LTB") @("PV_L96A1.DTX") @("L96A1_ANIBASE.LTB") "Weapons\sniper_m_pv\PVMLA_L96A1.LTB" "Weapons\sniper_t\PV_L96A1.DTX" "Weapons\sniper_m_pv\L96A1_ANIBASE.LTB" "Weapons\sniper_snd\L96A1"
   } finally { $zip.Dispose() }
