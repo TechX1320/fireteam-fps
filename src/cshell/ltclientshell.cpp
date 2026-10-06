@@ -798,7 +798,9 @@ void CLTClientShell::Update()
             m_pPlayer->Update();
 
             // Update our camera
-            m_pCamera->UpdatePosition(m_pPlayer->GetPlayerObject());
+            m_pCamera->UpdatePosition(
+                m_pPlayer->GetPlayerObject(),
+                m_pPlayer->GetEyeHeight());
 
             const FTWeaponDef *pViewWeapon =
                 m_pPlayer->GetCurrentWeaponDef();
@@ -1211,6 +1213,16 @@ LTRESULT CLTClientShell::PollInput()
         {
             m_pPlayer->AltAttack();
         }
+    }
+
+    if(g_pLTClient->IsCommandOn(COMMAND_CROUCH))
+    {
+        dwMoveFlags |= MOVE_CROUCH;
+    }
+
+    if(g_pLTClient->IsCommandOn(COMMAND_SPRINT))
+    {
+        dwMoveFlags |= MOVE_SPRINT;
     }
 
     // jump
