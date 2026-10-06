@@ -316,7 +316,7 @@ LTRESULT CStatsGui::HandleMessage(ILTMessage_Read* pMessage)
     {
         if(LTNULL != m_pScores)
         {
-            delete m_pScores;
+            delete[] m_pScores;
             m_pScores = NULL;
         }
 
