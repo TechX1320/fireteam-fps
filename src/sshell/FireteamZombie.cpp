@@ -30,6 +30,7 @@ FireteamZombie::FireteamZombie() :
     m_bDefLoaded(false)
 {
     m_vLastPos.Init(0.0f, 0.0f, 0.0f);
+    m_vCollisionDims.Init(24.0f, 53.0f, 24.0f);
 
     m_bDefLoaded =
         FT_LoadDefaultInfectedDef(
@@ -66,6 +67,12 @@ static bool FT_ZombieAssetExists(const char *pPath)
 
 void FireteamZombie::CreateInfectedFace()
 {
+    if(m_bDefLoaded &&
+       _stricmp(m_Def.sFaceMode, "child_model") == 0)
+    {
+        return;
+    }
+
     if(m_hFace ||
        !m_bDefLoaded ||
        !m_Def.sFaceModel[0] ||
@@ -215,13 +222,88 @@ HOBJECT FireteamZombie::FindNearestPlayer()
     return hBest;
 }
 
+struct FTZombieSightFilterData
+{
+    HOBJECT hZombie;
+    HOBJECT hTarget;
+};
+
+static bool FTZombieSightFilter(
+    HOBJECT hObject,
+    void *pUserData)
+{
+    FTZombieSightFilterData *pData =
+        (FTZombieSightFilterData*)pUserData;
+
+    if(!pData)
+    {
+        return true;
+    }
+
+    return hObject != pData->hZombie &&
+           hObject != pData->hTarget;
+}
+
+bool FireteamZombie::HasDirectPathToTarget(
+    HOBJECT hTarget,
+    const LTVector &vFrom,
+    const LTVector &vTarget)
+{
+    LTVector vEyeFrom = vFrom;
+    LTVector vEyeTarget = vTarget;
+
+    const float fProbeHeight =
+        m_vCollisionDims.y > 20.0f
+        ? m_vCollisionDims.y * 0.45f
+        : 12.0f;
+
+    vEyeFrom.y += fProbeHeight;
+    vEyeTarget.y += fProbeHeight;
+
+    IntersectQuery query;
+    IntersectInfo info;
+
+    query.m_From = vEyeFrom;
+    query.m_To = vEyeTarget;
+    query.m_Flags =
+        INTERSECT_OBJECTS |
+        IGNORE_NONSOLID |
+        INTERSECT_HPOLY;
+
+    FTZombieSightFilterData filterData;
+    filterData.hZombie = m_hObject;
+    filterData.hTarget = hTarget;
+
+    query.m_FilterFn = FTZombieSightFilter;
+    query.m_pUserData = &filterData;
+
+    // No blocking geometry/object between the infected and player means the
+    // player is directly reachable as the steering target. The AIVolume graph
+    // is then only needed when geometry actually blocks pursuit.
+    return !g_pLTServer->IntersectSegment(
+        &query,
+        &info);
+}
+
 void FireteamZombie::RebuildPath(const LTVector &vTarget)
 {
     LTVector vPos;
     g_pLTServer->GetObjectPos(m_hObject, &vPos);
 
     m_aPath.clear();
-    if(!FT_BuildNavigationPath(vPos, vTarget, m_nPathLane, m_aPath))
+
+    float fAgentHalfWidth = m_vCollisionDims.x;
+    if(m_vCollisionDims.z > fAgentHalfWidth)
+    {
+        fAgentHalfWidth = m_vCollisionDims.z;
+    }
+
+    if(!FT_BuildNavigationPath(
+        vPos,
+        vTarget,
+        fAgentHalfWidth,
+        m_nPathLane,
+        m_aPath))
     {
         m_aPath.push_back(vTarget);
     }
@@ -290,28 +372,50 @@ void FireteamZombie::UpdateZombie()
         return;
     }
 
-    if(m_fRepathCooldown <= 0.0f || m_aPath.empty() || m_nWaypoint >= m_aPath.size())
-    {
-        RebuildPath(vTarget);
-    }
+    const bool bDirectPursuit =
+        HasDirectPathToTarget(
+            hTarget,
+            vPos,
+            vTarget);
 
-    while(m_nWaypoint < m_aPath.size())
+    if(bDirectPursuit)
     {
-        LTVector vCheck = m_aPath[m_nWaypoint] - vPos;
-        vCheck.y = 0.0f;
-        if(vCheck.Mag() > kWaypointRadius)
+        m_aPath.clear();
+        m_nWaypoint = 0;
+    }
+    else
+    {
+        if(m_fRepathCooldown <= 0.0f ||
+           m_aPath.empty() ||
+           m_nWaypoint >= m_aPath.size())
         {
-            break;
+            RebuildPath(vTarget);
         }
-        ++m_nWaypoint;
+
+        while(m_nWaypoint < m_aPath.size())
+        {
+            LTVector vCheck = m_aPath[m_nWaypoint] - vPos;
+            vCheck.y = 0.0f;
+            if(vCheck.Mag() > kWaypointRadius)
+            {
+                break;
+            }
+            ++m_nWaypoint;
+        }
+
+        if(m_nWaypoint >= m_aPath.size())
+        {
+            RebuildPath(vTarget);
+        }
     }
 
-    if(m_nWaypoint >= m_aPath.size())
-    {
-        RebuildPath(vTarget);
-    }
+    LTVector vMoveTarget =
+        bDirectPursuit
+        ? vTarget
+        : ((m_nWaypoint < m_aPath.size())
+            ? m_aPath[m_nWaypoint]
+            : vTarget);
 
-    LTVector vMoveTarget = (m_nWaypoint < m_aPath.size()) ? m_aPath[m_nWaypoint] : vTarget;
     LTVector vMove = vMoveTarget - vPos;
     vMove.y = 0.0f;
 
@@ -348,7 +452,12 @@ void FireteamZombie::UpdateZombie()
     if(vMove.Mag() > 1.0f)
     {
         vMove.Normalize();
-        LTVector vSteer = vMove + (vSeparation * 0.85f);
+        // When the player is directly visible, favor the player ray strongly
+        // so crowd separation cannot push an infected sideways into a doorjamb.
+        const float fSeparationWeight =
+            bDirectPursuit ? 0.25f : 0.85f;
+        LTVector vSteer =
+            vMove + (vSeparation * fSeparationWeight);
 
         if(vSteer.Mag() > 0.1f) vSteer.Normalize();
         else vSteer = vMove;
@@ -363,7 +472,10 @@ void FireteamZombie::UpdateZombie()
 
         IntersectQuery floorQuery;
         IntersectInfo floorInfo;
-        floorQuery.m_From = LTVector(vDesired.x, vPos.y + 80.0f, vDesired.z);
+        floorQuery.m_From = LTVector(
+            vDesired.x,
+            vPos.y + m_vCollisionDims.y + 32.0f,
+            vDesired.z);
         floorQuery.m_To   = LTVector(vDesired.x, vPos.y - 530.0f, vDesired.z);
         floorQuery.m_Flags = INTERSECT_OBJECTS | IGNORE_NONSOLID | INTERSECT_HPOLY;
 
@@ -371,7 +483,9 @@ void FireteamZombie::UpdateZombie()
            floorInfo.m_hObject &&
            g_pLTSPhysics->IsWorldObject(floorInfo.m_hObject) == LT_YES)
         {
-            vDesired.y = floorInfo.m_Point.y + 53.0f;
+            vDesired.y =
+                floorInfo.m_Point.y +
+                m_vCollisionDims.y;
         }
         else
         {
@@ -446,6 +560,21 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                         pOCS->m_SkinNames[1],
                         MAX_CS_FILENAME_LEN,
                         m_Def.sBodyTexture1);
+
+                    if(_stricmp(
+                        m_Def.sFaceMode,
+                        "child_model") == 0 &&
+                       m_Def.sFaceModel[0])
+                    {
+                        FT_CopyInfectedString(
+                            pOCS->m_Filenames[2],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sFaceModel);
+                        FT_CopyInfectedString(
+                            pOCS->m_SkinNames[2],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sFaceTexture);
+                    }
                 }
             }
         }
@@ -501,10 +630,45 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                     m_Def.fCollisionX,
                     m_Def.fCollisionY,
                     m_Def.fCollisionZ);
+
+                if(_stricmp(
+                    m_Def.sCollisionMode,
+                    "model") == 0)
+                {
+                    LTVector vModelDims;
+                    if(g_pLTSCommon->GetModelAnimUserDims(
+                        m_hObject,
+                        &vModelDims,
+                        g_pLTServer->GetModelAnimation(m_hObject)) == LT_OK &&
+                       vModelDims.x > 1.0f &&
+                       vModelDims.y > 1.0f &&
+                       vModelDims.z > 1.0f &&
+                       vModelDims.x < 200.0f &&
+                       vModelDims.y < 300.0f &&
+                       vModelDims.z < 200.0f)
+                    {
+                        vHumanDims = vModelDims;
+                    }
+                }
+
+                m_vCollisionDims = vHumanDims;
+
                 g_pLTSPhysics->SetObjectDims(
                     m_hObject,
-                    &vHumanDims,
+                    &m_vCollisionDims,
                     0);
+
+                g_pLTServer->CPrint(
+                    "Fireteam infected: collision half-dims %.1f %.1f %.1f mode=%s face=%s",
+                    m_vCollisionDims.x,
+                    m_vCollisionDims.y,
+                    m_vCollisionDims.z,
+                    m_Def.sCollisionMode[0]
+                        ? m_Def.sCollisionMode
+                        : "config",
+                    m_Def.sFaceMode[0]
+                        ? m_Def.sFaceMode
+                        : "attachment");
             }
 
             g_pLTServer->GetObjectPos(m_hObject, &m_vLastPos);
