@@ -656,6 +656,71 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
 
             if(m_bDefLoaded)
             {
+                // NOLF2's CAI applies extra child models again after object
+                // creation with ILTCommon::SetObjectFilenames. Do the same
+                // here so the animation DB and CA face child are guaranteed
+                // to be composed onto the live server object before animation
+                // lookup and client replication.
+                ObjectCreateStruct modelOCS;
+                modelOCS.Clear();
+
+                FT_CopyInfectedString(
+                    modelOCS.m_Filenames[0],
+                    MAX_CS_FILENAME_LEN,
+                    m_Def.sBodyModel);
+                FT_CopyInfectedString(
+                    modelOCS.m_SkinNames[0],
+                    MAX_CS_FILENAME_LEN,
+                    m_Def.sBodyTexture0);
+                FT_CopyInfectedString(
+                    modelOCS.m_SkinNames[1],
+                    MAX_CS_FILENAME_LEN,
+                    m_Def.sBodyTexture1);
+
+                if(m_Def.sAnimationModel[0])
+                {
+                    HMODELDB hAnimationModel = LTNULL;
+                    if(g_pLTSModel->CacheModelDB(
+                        m_Def.sAnimationModel,
+                        hAnimationModel) == LT_OK)
+                    {
+                        FT_CopyInfectedString(
+                            modelOCS.m_Filenames[1],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sAnimationModel);
+                    }
+                }
+
+                if(_stricmp(
+                    m_Def.sFaceMode,
+                    "child_model") == 0 &&
+                   m_Def.sFaceModel[0])
+                {
+                    HMODELDB hFaceModel = LTNULL;
+                    if(g_pLTSModel->CacheModelDB(
+                        m_Def.sFaceModel,
+                        hFaceModel) == LT_OK)
+                    {
+                        FT_CopyInfectedString(
+                            modelOCS.m_Filenames[2],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sFaceModel);
+                        FT_CopyInfectedString(
+                            modelOCS.m_SkinNames[2],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sFaceTexture);
+                    }
+                }
+
+                LTRESULT nModelResult =
+                    g_pLTSCommon->SetObjectFilenames(
+                        m_hObject,
+                        &modelOCS);
+
+                g_pLTServer->CPrint(
+                    "Fireteam infected: post-create model composition %s.",
+                    nModelResult == LT_OK ? "OK" : "FAILED");
+
                 g_pLTServer->CPrint(
                     "Fireteam infected: content %s body=%s health=%u speed=%.1f",
                     m_Def.sId,
