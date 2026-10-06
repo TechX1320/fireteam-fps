@@ -101,6 +101,8 @@ private:
     uint8               m_nWeaponSlot;
     float               m_fNextPrimaryClientShot;
     bool                m_bSemiAutoTriggerHeld;
+    bool                m_bReloading;
+    float               m_fReloadComplete;
     FTWeaponDef         m_WeaponDefs[6];
     FTPlayerDef         m_PlayerDef;
     bool                m_bPlayerDefLoaded;
