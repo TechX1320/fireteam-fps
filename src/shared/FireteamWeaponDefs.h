@@ -37,6 +37,7 @@ struct FTWeaponDef
     float fDamageMult2;
     float fReloadSeconds;
     bool  bAutomatic;
+    bool  bAutoReload;
     bool  bShowCrosshair;
 
     // Optional first-person optic behavior. A zoom FOV <= 0 means no optic.
@@ -200,6 +201,7 @@ inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
         else if(_stricmp(pKey, "damage_mult2") == 0) def.fDamageMult2 = (float)atof(pValue);
         else if(_stricmp(pKey, "reload") == 0) def.fReloadSeconds = (float)atof(pValue);
         else if(_stricmp(pKey, "automatic") == 0) def.bAutomatic = atoi(pValue) != 0;
+        else if(_stricmp(pKey, "auto_reload") == 0) def.bAutoReload = atoi(pValue) != 0;
         else if(_stricmp(pKey, "show_crosshair") == 0) def.bShowCrosshair = atoi(pValue) != 0;
         else if(_stricmp(pKey, "zoom_fov") == 0) def.fZoomFovDegrees = (float)atof(pValue);
         else if(_stricmp(pKey, "zoom_hide_weapon") == 0) def.bZoomHideWeapon = atoi(pValue) != 0;
