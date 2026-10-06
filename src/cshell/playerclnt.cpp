@@ -28,8 +28,11 @@
 #include "FireteamWeaponHud.h"
 
 #define MOVEMENT_RATE 2000.0f
-#define JUMP_TIME 0.25f
-#define JUMP_VELOCITY 800.0f
+#define WALK_MAX_SPEED 435.0f
+#define SPRINT_MAX_SPEED 600.0f
+#define CROUCH_MAX_SPEED 190.0f
+#define JUMP_TIME 0.18f
+#define JUMP_VELOCITY 400.0f
 #define DEFAULT_LEASHTIME 2.0f
 
 
@@ -57,6 +60,7 @@ m_bSemiAutoTriggerHeld(false),
 m_bReloading(false),
 m_fReloadComplete(0.0f),
 m_bPlayerDefLoaded(false),
+m_bCrouching(false),
 m_bIsJumping(false),
 m_fCurrentJumpRadians(0.0f),
 m_fJumpTimeRemaining(0.0f),
@@ -288,9 +292,6 @@ void CPlayerClnt::Update()
 
 //----------------------------------------------------------------------------
 // void CPlayerClnt::UpdateMovement()
-//
-//----------------------------------------------------------------------------
-void CPlayerClnt::UpdateMovement()
 {
     LTVector vPos, vVel;
     LTRotation rRot;
@@ -298,81 +299,93 @@ void CPlayerClnt::UpdateMovement()
     g_pLTCPhysics->GetVelocity(m_hObject, &vVel);
     g_pLTClient->GetObjectRotation(m_hObject, &rRot);
 
-    float fFrameTime = g_pLTClient->GetFrameTime();
+    m_bCrouching =
+        (m_dwInputFlags & MOVE_CROUCH) != 0;
 
-    // Look at our input flags
-    if( m_dwInputFlags & MOVE_FORWARD)
+    float fForward = 0.0f;
+    float fRight = 0.0f;
+
+    if(m_dwInputFlags & MOVE_FORWARD)  fForward += 1.0f;
+    if(m_dwInputFlags & MOVE_BACKWARD) fForward -= 1.0f;
+    if(m_dwInputFlags & MOVE_RIGHT)    fRight += 1.0f;
+    if(m_dwInputFlags & MOVE_LEFT)     fRight -= 1.0f;
+
+    LTVector vMove =
+        (rRot.Forward() * fForward) +
+        (rRot.Right() * fRight);
+    vMove.y = 0.0f;
+
+    if(vMove.MagSqr() > 0.0001f)
     {
-		vVel += rRot.Forward() * MOVEMENT_RATE * fFrameTime;
+        vMove.Normalize();
 
-		PlayMovementAnimation("LRF", m_idLowerBodyTracker);
+        float fMaxSpeed = WALK_MAX_SPEED;
+        if(m_bCrouching)
+        {
+            fMaxSpeed = CROUCH_MAX_SPEED;
+        }
+        else if(m_dwInputFlags & MOVE_SPRINT)
+        {
+            fMaxSpeed = SPRINT_MAX_SPEED;
+        }
+
+        // Direct target velocity gives predictable modern WASD response and
+        // keeps diagonal movement at the same speed as straight movement.
+        vVel.x = vMove.x * fMaxSpeed;
+        vVel.z = vMove.z * fMaxSpeed;
+
+        if(fForward > 0.0f)
+            PlayMovementAnimation("LRF", m_idLowerBodyTracker);
+        else if(fForward < 0.0f)
+            PlayMovementAnimation("LRB", m_idLowerBodyTracker);
+        else if(fRight < 0.0f)
+            PlayMovementAnimation("LRL", m_idLowerBodyTracker);
+        else
+            PlayMovementAnimation("LRR", m_idLowerBodyTracker);
     }
-	else if( m_dwInputFlags & MOVE_BACKWARD)
+    else
     {
-		vVel += rRot.Forward() * -MOVEMENT_RATE * fFrameTime;
-		PlayMovementAnimation("LRB", m_idLowerBodyTracker);
+        vVel.x = 0.0f;
+        vVel.z = 0.0f;
+
+        if(!m_bIsJumping)
+        {
+            PlayMovementAnimation("LSt", m_idLowerBodyTracker);
+        }
+
+        if(!m_bAttacking)
+        {
+            PlayMovementAnimation("LSt", m_idUpperBodyTracker);
+        }
     }
-	else if( m_dwInputFlags & MOVE_LEFT)
+
+    if(m_dwInputFlags & MOVE_JUMP)
     {
-		vVel += rRot.Right() * -MOVEMENT_RATE * fFrameTime;
-		PlayMovementAnimation("LRL", m_idLowerBodyTracker);
+        if(!m_bIsJumping && !m_bCrouching)
+        {
+            CollisionInfo cInfo;
+            g_pLTCPhysics->GetStandingOn(m_hObject, &cInfo);
+            if(cInfo.m_hObject)
+            {
+                m_bIsJumping = true;
+                m_fJumpTimeRemaining = JUMP_TIME;
+                m_fCurrentJumpRadians = 0.0f;
+                PlayMovementAnimation("LJT", m_idLowerBodyTracker);
+            }
+        }
     }
-	else if( m_dwInputFlags & MOVE_RIGHT)
-    {
-		vVel += rRot.Right() * MOVEMENT_RATE * fFrameTime;
-		PlayMovementAnimation("LRR", m_idLowerBodyTracker);
-    }
-	else if(m_dwInputFlags & MOVE_JUMP)
-	{
-	}
-	else
-    {
-		if( !m_bIsJumping )
-		{
-			PlayMovementAnimation("LSt", m_idLowerBodyTracker);
-		}
-
-		if(!m_bAttacking)
-		{
-      		PlayMovementAnimation("LSt", m_idUpperBodyTracker);
-		}
-
-		vVel.x = vVel.z = 0.0f;
-    }
-
-	if(m_dwInputFlags & MOVE_JUMP)
-	{
-		if( !m_bIsJumping )
-		{
-			CollisionInfo cInfo;
-			g_pLTCPhysics->GetStandingOn(m_hObject, &cInfo);
-			if(cInfo.m_hObject)
-			{
-				m_bIsJumping = true;
-				m_fJumpTimeRemaining = JUMP_TIME;
-				m_fCurrentJumpRadians = 0.0f;
-				PlayMovementAnimation("LJT", m_idLowerBodyTracker);
-			}
-		}
-	}
-
-	// Clamp forward and right velocities..
-	vVel.x = LTCLAMP(vVel.x, -435.0f, 435.0f);
-	vVel.z = LTCLAMP(vVel.z, -435.0f, 435.0f);
 
     g_pLTCPhysics->SetVelocity(m_hObject, &vVel);
 
-    // Change the bounding box dims based on current animation
     RecalculateBoundingBox();
 
-	if( m_bIsJumping )
-	{
-		UpdateJump();
-	}
+    if(m_bIsJumping)
+    {
+        UpdateJump();
+    }
 
     RecalculatePosition();
 }
-
 
 
 //----------------------------------------------------------------------------
