@@ -231,8 +231,63 @@ LTRESULT CLTClientShell::OnEngineInitialized(RMode *pMode, LTGUID *pAppGuid)
     HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");
     if(hAutoStart && g_pLTClient->GetVarValueFloat(hAutoStart) != 0.0f)
     {
-        g_pLTClient->CPrint("Fireteam: auto-starting selected world...");
-        result = StartNormalGame();
+        const char *pMode = "single";
+        HCONSOLEVAR hMode =
+            g_pLTClient->GetConsoleVar("fireteammode");
+
+        if(hMode)
+        {
+            const char *pConfiguredMode =
+                g_pLTClient->GetVarValueString(hMode);
+
+            if(pConfiguredMode &&
+               pConfiguredMode[0])
+            {
+                pMode = pConfiguredMode;
+            }
+        }
+
+        g_pLTClient->CPrint(
+            "Fireteam: auto-starting mode=%s",
+            pMode);
+
+        if(_stricmp(pMode, "host") == 0)
+        {
+            result = StartMultiplayerServer();
+        }
+        else if(_stricmp(pMode, "join") == 0 ||
+                _stricmp(pMode, "client") == 0)
+        {
+            const char *pJoinIP = "127.0.0.1";
+            HCONSOLEVAR hJoinIP =
+                g_pLTClient->GetConsoleVar("joinip");
+
+            if(hJoinIP)
+            {
+                const char *pConfiguredIP =
+                    g_pLTClient->GetVarValueString(hJoinIP);
+
+                if(pConfiguredIP &&
+                   pConfiguredIP[0])
+                {
+                    pJoinIP = pConfiguredIP;
+                }
+            }
+
+            char szJoinIP[MAX_SGR_STRINGLEN];
+            strncpy(
+                szJoinIP,
+                pJoinIP,
+                sizeof(szJoinIP) - 1);
+            szJoinIP[sizeof(szJoinIP) - 1] = '\0';
+
+            result = JoinMultiplayerGame(
+                szJoinIP);
+        }
+        else
+        {
+            result = StartNormalGame();
+        }
     }
 
 
@@ -1278,26 +1333,63 @@ void CLTClientShell::SendVelPosAndRot(LTVector &vVel, LTVector &vPos, LTRotation
 //-----------------------------------------------------------------------------
 void CLTClientShell::SendPlayerName()
 {
-	ILTMessage_Write *pMessage;
-	LTRESULT nResult = g_pLTCCommon->CreateMessage(pMessage);
+    ILTMessage_Write *pMessage;
+    LTRESULT nResult =
+        g_pLTCCommon->CreateMessage(pMessage);
 
-	if( LT_OK == nResult)
-	{
+    if(LT_OK == nResult)
+    {
         char szName[32];
-        szName[31] = '\0';
-        unsigned long nSize = 16;
-        GetComputerName(szName, &nSize);
-        g_pLTClient->CPrint("Computer Name: %s", szName);
+        szName[0] = '\0';
 
-		//sprintf(szName, "Player %p", this);
+        HCONSOLEVAR hPlayerName =
+            g_pLTClient->GetConsoleVar("playername");
 
-		pMessage->IncRef();
-		pMessage->Writeuint8(MSG_CS_PLAYERNAME);
+        if(hPlayerName)
+        {
+            const char *pConfiguredName =
+                g_pLTClient->GetVarValueString(
+                    hPlayerName);
+
+            if(pConfiguredName &&
+               pConfiguredName[0])
+            {
+                strncpy(
+                    szName,
+                    pConfiguredName,
+                    sizeof(szName) - 1);
+                szName[sizeof(szName) - 1] = '\0';
+            }
+        }
+
+        if(!szName[0])
+        {
+            unsigned long nSize =
+                sizeof(szName) - 1;
+
+            if(!GetComputerName(
+                szName,
+                &nSize))
+            {
+                strcpy(
+                    szName,
+                    "Player");
+            }
+        }
+
+        g_pLTClient->CPrint(
+            "Fireteam player name: %s",
+            szName);
+
+        pMessage->IncRef();
+        pMessage->Writeuint8(
+            MSG_CS_PLAYERNAME);
         pMessage->WriteString(szName);
-		g_pLTClient->SendToServer(pMessage->Read(), MESSAGE_GUARANTEED);
-		pMessage->DecRef();
-	}
-
+        g_pLTClient->SendToServer(
+            pMessage->Read(),
+            MESSAGE_GUARANTEED);
+        pMessage->DecRef();
+    }
 }
 
 
