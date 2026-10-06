@@ -1,6 +1,7 @@
 #include "FireteamSpawner.h"
 #include "serverinterfaces.h"
 #include "msgids.h"
+#include "FireteamDifficultyDefs.h"
 
 #include <iltcommon.h>
 #include <iltmessage.h>
@@ -36,6 +37,7 @@ static uint32 s_nMaxAlive = 0;
 static float s_fNextSpawnTime = 0.0f;
 static float s_fNextRoundTime = 0.0f;
 static float s_fSpawnInterval = 1.25f;
+static FTDifficultyDef s_Difficulty;
 
 static void FT_BroadcastRoundState(uint8 nState)
 {
@@ -108,6 +110,22 @@ void Spawner::ResetRoundController()
     s_fNextSpawnTime = 0.0f;
     s_fNextRoundTime = 0.0f;
     s_fSpawnInterval = 1.25f;
+
+    if(!FT_LoadActiveDifficulty(
+        "config/difficulties.cfg",
+        "config/session.cfg",
+        s_Difficulty))
+    {
+        FT_InitDifficultyDefaults(
+            s_Difficulty);
+    }
+
+    g_pLTServer->CPrint(
+        "Fireteam difficulty: %s hp=%.2fx speed=%.2fx damage=%.2fx",
+        s_Difficulty.sId,
+        s_Difficulty.fHealthMultiplier,
+        s_Difficulty.fSpeedMultiplier,
+        s_Difficulty.fDamageMultiplier);
 
     srand((unsigned int)time(LTNULL));
 }
@@ -209,14 +227,46 @@ void Spawner::StartNextRound()
 {
     ++s_nRound;
 
-    s_nRoundTarget = 6 + ((s_nRound - 1) * 2);
-    if(s_nRoundTarget > 30) s_nRoundTarget = 30;
+    s_nRoundTarget =
+        s_Difficulty.nRoundBase +
+        ((s_nRound - 1) * s_Difficulty.nRoundGrowth);
 
-    s_nMaxAlive = 3 + ((s_nRound - 1) / 2);
-    if(s_nMaxAlive > 8) s_nMaxAlive = 8;
+    if(s_Difficulty.nRoundCap > 0 &&
+       s_nRoundTarget > s_Difficulty.nRoundCap)
+    {
+        s_nRoundTarget =
+            s_Difficulty.nRoundCap;
+    }
 
-    s_fSpawnInterval = 1.25f - ((float)(s_nRound - 1) * 0.05f);
-    if(s_fSpawnInterval < 0.60f) s_fSpawnInterval = 0.60f;
+    const uint32 nAliveSteps =
+        (s_nRound - 1) /
+        (s_Difficulty.nMaxAliveEvery > 0
+            ? s_Difficulty.nMaxAliveEvery
+            : 1);
+
+    s_nMaxAlive =
+        s_Difficulty.nMaxAliveBase +
+        (nAliveSteps *
+         s_Difficulty.nMaxAliveGrowth);
+
+    if(s_Difficulty.nMaxAliveCap > 0 &&
+       s_nMaxAlive > s_Difficulty.nMaxAliveCap)
+    {
+        s_nMaxAlive =
+            s_Difficulty.nMaxAliveCap;
+    }
+
+    s_fSpawnInterval =
+        s_Difficulty.fSpawnIntervalBase -
+        ((float)(s_nRound - 1) *
+         s_Difficulty.fSpawnIntervalDecay);
+
+    if(s_fSpawnInterval <
+       s_Difficulty.fSpawnIntervalMin)
+    {
+        s_fSpawnInterval =
+            s_Difficulty.fSpawnIntervalMin;
+    }
 
     s_nRoundSpawned = 0;
     s_nRoundAlive = 0;
@@ -226,8 +276,12 @@ void Spawner::StartNextRound()
     s_fNextSpawnTime = g_pLTServer->GetTime() + 0.35f;
 
     g_pLTServer->CPrint(
-        "Fireteam: DEV ROUND %u START - %u infected, max %u alive.",
-        s_nRound, s_nRoundTarget, s_nMaxAlive);
+        "Fireteam: %s ROUND %u START - %u infected, max %u alive, spawn %.2fs.",
+        s_Difficulty.sId,
+        s_nRound,
+        s_nRoundTarget,
+        s_nMaxAlive,
+        s_fSpawnInterval);
 
     FT_BroadcastRoundState(1);
 }
@@ -320,11 +374,15 @@ void FT_OnFireteamEnemyKilled()
         {
             s_bRoundActive = false;
             s_bRoundIntermission = true;
-            s_fNextRoundTime = g_pLTServer->GetTime() + 5.0f;
+            s_fNextRoundTime =
+                g_pLTServer->GetTime() +
+                s_Difficulty.fIntermissionSeconds;
 
             g_pLTServer->CPrint(
-                "Fireteam: DEV ROUND %u CLEAR - next round in 5 seconds.",
-                s_nRound);
+                "Fireteam: %s ROUND %u CLEAR - next round in %.1f seconds.",
+                s_Difficulty.sId,
+                s_nRound,
+                s_Difficulty.fIntermissionSeconds);
 
             FT_BroadcastRoundState(2);
         }
