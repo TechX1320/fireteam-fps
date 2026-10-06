@@ -129,12 +129,22 @@ static int FTFindVolume(const FTNavVolume *pVolumes, uint32 nCount, const LTVect
 static bool FTGetConnection(
     const FTNavVolume &a,
     const FTNavVolume &b,
+    float fAgentHalfWidth,
     uint32 nLane,
     LTVector *pOut)
 {
     const float kSlack = 18.0f;
     const float kVerticalSlack = 96.0f;
-    const float kMinOpening = 48.0f;
+
+    // The old prototype assumed NOLF2's 24-unit human half-width everywhere,
+    // which made a 48-unit doorway mathematically have zero usable clearance.
+    // Use the actual infected model width instead.
+    float fHalfWidth = fAgentHalfWidth;
+    if(fHalfWidth < 6.0f) fHalfWidth = 6.0f;
+    if(fHalfWidth > 40.0f) fHalfWidth = 40.0f;
+
+    const float kMinOpening = fHalfWidth * 2.0f;
+    const float kGateStride = (fHalfWidth * 2.0f) + 8.0f;
 
     float aMinX = a.vCenter.x - a.vDims.x;
     float aMaxX = a.vCenter.x + a.vDims.x;
@@ -179,8 +189,12 @@ static bool FTGetConnection(
     // enough clearance for its default 24-unit human half-width.
     if(gapX <= kSlack && overlapZ >= kMinOpening)
     {
-        uint32 nGates = (uint32)(overlapZ / 48.0f);
-        if(nGates == 0) return false;
+        const float fUsable = overlapZ - (fHalfWidth * 2.0f);
+        uint32 nGates = 1;
+        if(fUsable > kGateStride)
+        {
+            nGates += (uint32)(fUsable / kGateStride);
+        }
         uint32 nGate = nLane % nGates;
 
         if(overlapX >= 0.0f)
@@ -190,15 +204,28 @@ static bool FTGetConnection(
         else
             pOut->x = (bMaxX + aMinX) * 0.5f;
 
-        pOut->z = overlapZMin + 24.0f + (48.0f * (float)nGate);
+        if(nGates == 1)
+        {
+            pOut->z = (overlapZMin + overlapZMax) * 0.5f;
+        }
+        else
+        {
+            const float fStep = fUsable / (float)(nGates - 1);
+            pOut->z = overlapZMin + fHalfWidth + (fStep * (float)nGate);
+        }
+
         pOut->y = (a.vCenter.y + b.vCenter.y) * 0.5f;
         return true;
     }
 
     if(gapZ <= kSlack && overlapX >= kMinOpening)
     {
-        uint32 nGates = (uint32)(overlapX / 48.0f);
-        if(nGates == 0) return false;
+        const float fUsable = overlapX - (fHalfWidth * 2.0f);
+        uint32 nGates = 1;
+        if(fUsable > kGateStride)
+        {
+            nGates += (uint32)(fUsable / kGateStride);
+        }
         uint32 nGate = nLane % nGates;
 
         if(overlapZ >= 0.0f)
@@ -208,7 +235,16 @@ static bool FTGetConnection(
         else
             pOut->z = (bMaxZ + aMinZ) * 0.5f;
 
-        pOut->x = overlapXMin + 24.0f + (48.0f * (float)nGate);
+        if(nGates == 1)
+        {
+            pOut->x = (overlapXMin + overlapXMax) * 0.5f;
+        }
+        else
+        {
+            const float fStep = fUsable / (float)(nGates - 1);
+            pOut->x = overlapXMin + fHalfWidth + (fStep * (float)nGate);
+        }
+
         pOut->y = (a.vCenter.y + b.vCenter.y) * 0.5f;
         return true;
     }
@@ -222,18 +258,32 @@ static bool FTGetConnection(
 
         if(dxCenter >= dzCenter)
         {
-            uint32 nGates = (uint32)(overlapZ / 48.0f);
-            if(nGates == 0) return false;
+            const float fUsable = overlapZ - (fHalfWidth * 2.0f);
+            uint32 nGates = 1;
+            if(fUsable > kGateStride)
+                nGates += (uint32)(fUsable / kGateStride);
             uint32 nGate = nLane % nGates;
+
             pOut->x = (overlapXMin + overlapXMax) * 0.5f;
-            pOut->z = overlapZMin + 24.0f + (48.0f * (float)nGate);
+            pOut->z =
+                (nGates == 1)
+                ? (overlapZMin + overlapZMax) * 0.5f
+                : overlapZMin + fHalfWidth +
+                    ((fUsable / (float)(nGates - 1)) * (float)nGate);
         }
         else
         {
-            uint32 nGates = (uint32)(overlapX / 48.0f);
-            if(nGates == 0) return false;
+            const float fUsable = overlapX - (fHalfWidth * 2.0f);
+            uint32 nGates = 1;
+            if(fUsable > kGateStride)
+                nGates += (uint32)(fUsable / kGateStride);
             uint32 nGate = nLane % nGates;
-            pOut->x = overlapXMin + 24.0f + (48.0f * (float)nGate);
+
+            pOut->x =
+                (nGates == 1)
+                ? (overlapXMin + overlapXMax) * 0.5f
+                : overlapXMin + fHalfWidth +
+                    ((fUsable / (float)(nGates - 1)) * (float)nGate);
             pOut->z = (overlapZMin + overlapZMax) * 0.5f;
         }
 
@@ -253,6 +303,7 @@ uint32 FT_GetNavigationVolumeCount()
 bool FT_BuildNavigationPath(
     const LTVector &vStart,
     const LTVector &vDestination,
+    float fAgentHalfWidth,
     uint32 nLane,
     std::vector<LTVector> &aWaypoints)
 {
@@ -320,7 +371,7 @@ bool FT_BuildNavigationPath(
             }
 
             LTVector vConnection;
-            if(!FTGetConnection(aVolumes[nCurrent], aVolumes[i], nLane + nStep, &vConnection))
+            if(!FTGetConnection(aVolumes[nCurrent], aVolumes[i], fAgentHalfWidth, nLane + nStep, &vConnection))
             {
                 continue;
             }
@@ -372,6 +423,7 @@ bool FT_BuildNavigationPath(
         if(FTGetConnection(
             aVolumes[aReverse[i]],
             aVolumes[aReverse[i - 1]],
+            fAgentHalfWidth,
             nLane + (uint32)i,
             &vConnection))
         {
