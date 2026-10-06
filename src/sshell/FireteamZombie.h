@@ -19,6 +19,10 @@ private:
     HOBJECT FindNearestPlayer();
     void UpdateZombie();
     void RebuildPath(const LTVector &vTarget);
+    bool HasDirectPathToTarget(
+        HOBJECT hTarget,
+        const LTVector &vFrom,
+        const LTVector &vTarget);
     void CreateInfectedFace();
 
     uint16 m_nHealth;
@@ -28,6 +32,7 @@ private:
     uint32 m_nPathLane;
     uint32 m_nWaypoint;
     LTVector m_vLastPos;
+    LTVector m_vCollisionDims;
     std::vector<LTVector> m_aPath;
 
     HOBJECT m_hFace;
