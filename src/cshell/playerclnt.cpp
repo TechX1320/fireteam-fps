@@ -54,6 +54,8 @@ m_nViewAttackVariant(0),
 m_nWeaponSlot(1),
 m_fNextPrimaryClientShot(0.0f),
 m_bSemiAutoTriggerHeld(false),
+m_bReloading(false),
+m_fReloadComplete(0.0f),
 m_bPlayerDefLoaded(false),
 m_bIsJumping(false),
 m_fCurrentJumpRadians(0.0f),
@@ -224,6 +226,13 @@ bool CPlayerClnt::IsMoving()
 //-----------------------------------------------------------------------------
 void CPlayerClnt::Update()
 {
+    if(m_bReloading &&
+       g_pLTClient->GetTime() >= m_fReloadComplete)
+    {
+        m_bReloading = false;
+        m_fReloadComplete = 0.0f;
+    }
+
     LTVector vZero(0.0f, 0.0f, 0.0f);
     g_pLTCPhysics->SetAcceleration(m_hObject, &vZero);
 
@@ -499,6 +508,11 @@ void CPlayerClnt::UpdateJump()
 //-----------------------------------------------------------------------------
 bool CPlayerClnt::Attack()
 {
+    if(m_bReloading)
+    {
+        return false;
+    }
+
     const FTWeaponDef *pDef = GetCurrentWeaponDef();
     if(!pDef)
     {
@@ -563,6 +577,11 @@ bool CPlayerClnt::Attack()
 //----------------------------------------------------------------------------
 bool CPlayerClnt::AltAttack()
 {
+    if(m_bReloading)
+    {
+        return false;
+    }
+
     if(m_nWeaponSlot != 3 || m_bAttacking)
     {
         return false;
@@ -600,6 +619,8 @@ bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
     m_bAttacking = false;
     m_bViewWeaponAction = false;
     m_bSemiAutoTriggerHeld = false;
+    m_bReloading = false;
+    m_fReloadComplete = 0.0f;
     m_fNextPrimaryClientShot = 0.0f;
 
     CreateViewWeapon();
@@ -649,10 +670,20 @@ void CPlayerClnt::CycleWeapon(int nDirection)
 bool CPlayerClnt::ReloadWeapon()
 {
     const FTWeaponDef *pDef = GetCurrentWeaponDef();
-    if(!pDef || pDef->nClipSize == 0 || pDef->eType == FT_WEAPON_MELEE)
+    if(!pDef ||
+       pDef->nClipSize == 0 ||
+       pDef->eType == FT_WEAPON_MELEE ||
+       m_bReloading)
     {
         return false;
     }
+
+    m_bReloading = true;
+    m_fReloadComplete =
+        g_pLTClient->GetTime() +
+        (pDef->fReloadSeconds > 0.0f
+            ? pDef->fReloadSeconds
+            : 0.10f);
 
     ILTMessage_Write *pMessage = LTNULL;
     if(g_pLTCCommon->CreateMessage(pMessage) == LT_OK && pMessage)
