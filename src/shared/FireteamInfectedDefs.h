@@ -34,6 +34,11 @@ struct FTInfectedDef
     char sFaceTexture[128];
     char sFaceSocket[64];
 
+    // Optional additional head/headgear child model. Combat Arms character
+    // bodies are modular, so some infected require more than the face mesh.
+    char sHeadModel[128];
+    char sHeadTexture[128];
+
     float fFacePosX;
     float fFacePosY;
     float fFacePosZ;
@@ -246,6 +251,10 @@ inline bool FT_LoadDefaultInfectedDef(
             FT_CopyInfectedString(def.sFaceTexture, sizeof(def.sFaceTexture), pValue);
         else if(_stricmp(pKey, "face_socket") == 0)
             FT_CopyInfectedString(def.sFaceSocket, sizeof(def.sFaceSocket), pValue);
+        else if(_stricmp(pKey, "head_model") == 0)
+            FT_CopyInfectedString(def.sHeadModel, sizeof(def.sHeadModel), pValue);
+        else if(_stricmp(pKey, "head_texture") == 0)
+            FT_CopyInfectedString(def.sHeadTexture, sizeof(def.sHeadTexture), pValue);
         else if(_stricmp(pKey, "face_pos_x") == 0)
             def.fFacePosX = (float)atof(pValue);
         else if(_stricmp(pKey, "face_pos_y") == 0)
