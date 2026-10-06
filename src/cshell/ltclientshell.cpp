@@ -691,10 +691,14 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             {
                 const FTWeaponDef *pDef = m_pPlayer->GetCurrentWeaponDef();
                 if(pDef &&
+                   pDef->bAutoReload &&
                    pDef->nClipSize > 0 &&
                    pDef->eType != FT_WEAPON_MELEE &&
                    pDef->fReloadSeconds > 0.0f)
                 {
+                    // This also starts the local reload animation. The server
+                    // may already have begun the same reload after the final
+                    // shot; duplicate requests are ignored while reloading.
                     m_pPlayer->ReloadWeapon();
                 }
             }
