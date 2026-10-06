@@ -4,6 +4,7 @@
 #include "playersrvr.h"
 #include "serverinterfaces.h"
 #include "msgids.h"
+#include "FireteamDifficultyDefs.h"
 
 #include <iltcommon.h>
 #include <iltmodel.h>
@@ -17,6 +18,8 @@ BEGIN_CLASS(FireteamZombie)
 END_CLASS_DEFAULT_FLAGS(FireteamZombie, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
 
 static uint32 s_nZombieSerial = 0;
+static bool s_bDifficultyLoaded = false;
+static FTDifficultyDef s_ZombieDifficulty;
 
 FireteamZombie::FireteamZombie() :
     m_nHealth(0),
@@ -39,7 +42,41 @@ FireteamZombie::FireteamZombie() :
 
     if(m_bDefLoaded)
     {
-        m_nHealth = m_Def.nHealth;
+        if(!s_bDifficultyLoaded)
+        {
+            if(!FT_LoadActiveDifficulty(
+                "config/difficulties.cfg",
+                "config/session.cfg",
+                s_ZombieDifficulty))
+            {
+                FT_InitDifficultyDefaults(
+                    s_ZombieDifficulty);
+            }
+            s_bDifficultyLoaded = true;
+        }
+
+        float fHealth =
+            (float)m_Def.nHealth *
+            s_ZombieDifficulty.fHealthMultiplier;
+
+        if(fHealth < 1.0f) fHealth = 1.0f;
+        if(fHealth > 65535.0f) fHealth = 65535.0f;
+
+        m_nHealth =
+            (uint16)(fHealth + 0.5f);
+
+        m_Def.fRunSpeed *=
+            s_ZombieDifficulty.fSpeedMultiplier;
+
+        float fDamage =
+            (float)m_Def.nAttackDamage *
+            s_ZombieDifficulty.fDamageMultiplier;
+
+        if(fDamage < 1.0f) fDamage = 1.0f;
+        if(fDamage > 255.0f) fDamage = 255.0f;
+
+        m_Def.nAttackDamage =
+            (uint8)(fDamage + 0.5f);
     }
 }
 
