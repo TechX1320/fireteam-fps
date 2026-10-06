@@ -12,6 +12,8 @@ echo.
 
 set "CONFIG=%~1"
 if "%CONFIG%"=="" set "CONFIG=Release"
+set "BUILD_SCOPE=%~2"
+if "%BUILD_SCOPE%"=="" set "BUILD_SCOPE=All"
 set "BUILD_DIR=%CD%\out\build"
 set "BIN_DIR=%BUILD_DIR%\bin"
 set "BUILT_DIR=%CD%\BUILT"
@@ -87,7 +89,7 @@ if exist "%BUILD_DIR%\CMakeCache.txt" (
 )
 
 echo.
-echo [1/5] Configuring Visual Studio 2022 Win32 build...
+echo [1/6] Configuring Visual Studio 2022 Win32 build...
 "%CMAKE_EXE%" -S . -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A Win32
 if errorlevel 1 (
   echo [ERROR] CMake configuration failed.
@@ -95,7 +97,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/5] Building %CONFIG%...
+echo [2/6] Building %CONFIG%...
 "%CMAKE_EXE%" --build "%BUILD_DIR%" --config %CONFIG% --parallel
 if errorlevel 1 (
   echo [ERROR] Compilation failed.
@@ -110,7 +112,7 @@ for %%F in (cshell.dll object.lto cres.dll sres.dll ClientFx.fxd) do (
 )
 
 echo.
-echo [3/5] Staging runtime...
+echo [3/6] Staging runtime...
 if not exist "%BUILT_DIR%" mkdir "%BUILT_DIR%" >nul
 if not exist "%BUILT_DIR%\rez" mkdir "%BUILT_DIR%\rez" >nul
 
@@ -152,7 +154,7 @@ copy /y "config\player.cfg" "%BUILT_DIR%\config\player.cfg" >nul
 if errorlevel 1 goto :copyfail
 
 echo.
-echo [4/5] Installing freshly built modules...
+echo [4/6] Installing freshly built modules...
 copy /y "%BIN_DIR%\cshell.dll" "%BUILT_DIR%\rez\cshell.dll" >nul
 if errorlevel 1 goto :copyfail
 copy /y "%BIN_DIR%\object.lto" "%BUILT_DIR%\rez\object.lto" >nul
@@ -165,9 +167,22 @@ copy /y "%BIN_DIR%\ClientFx.fxd" "%BUILT_DIR%\rez\ClientFx.fxd" >nul
 if errorlevel 1 goto :copyfail
 
 echo.
-echo [5/5] BUILD COMPLETE
+if /I "%BUILD_SCOPE%"=="GameOnly" (
+  echo [5/6] Launcher build skipped ^(GameOnly^).
+) else (
+  echo [5/6] Building FIRETEAM Launcher...
+  call "%CD%\build-launcher.cmd" nopause
+  if errorlevel 1 (
+    echo [ERROR] Game compiled, but launcher build failed.
+    goto :fail
+  )
+)
+
+echo.
+echo [6/6] BUILD COMPLETE
 echo Output: %BUILT_DIR%
 echo Existing extra files in BUILT were preserved.
+echo Launcher: BUILT\Launcher\FireteamLauncher.exe
 echo Stock test: BUILT\run-normal.cmd
 echo Cabin Fever test: BUILT\run-cabinfever.cmd
 echo.
