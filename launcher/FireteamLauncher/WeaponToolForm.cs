@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 
 namespace FireteamLauncher;
@@ -83,6 +84,7 @@ public sealed class WeaponToolForm : Form
         toolbar.Controls.Add(MakeButton("Reload", (_, _) => LoadConfig()));
         toolbar.Controls.Add(MakeButton("Open weapons.cfg", (_, _) => OpenConfig()));
         toolbar.Controls.Add(MakeButton("Import CA Attributes", (_, _) => ImportAttributes()));
+        toolbar.Controls.Add(MakeButton("Import CA Guns ZIP", (_, _) => ImportGunArchives()));
         right.Controls.Add(toolbar);
 
         var grid = new TableLayoutPanel
@@ -341,6 +343,341 @@ public sealed class WeaponToolForm : Form
         {
             UseShellExecute = true
         });
+    }
+
+    private void ImportGunArchives()
+    {
+        if(_doc is null || _currentSection is null)
+        {
+            return;
+        }
+
+        using var dialog = new OpenFileDialog
+        {
+            Title = "Import Combat Arms Guns.zip / GunsHH.zip",
+            Filter = "ZIP archives (*.zip)|*.zip|All files (*.*)|*.*",
+            Multiselect = true
+        };
+
+        if(dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            var repoRoot = FindRepositoryRoot();
+            var gameRoot = FindGameRoot();
+
+            if(repoRoot is null)
+            {
+                throw new InvalidOperationException(
+                    "Could not locate the FIRETEAM repository root. Run the launcher from BUILT\\Launcher.");
+            }
+
+            var id = NormalizeWeaponName(_text["id"].Text);
+            if(id.Length == 0)
+            {
+                id = NormalizeWeaponName(_text["name"].Text);
+            }
+
+            if(id.Length == 0)
+            {
+                throw new InvalidOperationException(
+                    "Give the weapon an ID or display name before importing assets.");
+            }
+
+            var tokens = BuildAssetTokens(
+                _text["id"].Text,
+                _text["name"].Text);
+
+            var persistentRoot = Path.Combine(
+                repoRoot,
+                "assets-local",
+                "WeaponImports");
+
+            var imported = new ImportedGunAssets();
+
+            foreach(var archivePath in dialog.FileNames)
+            {
+                using var zip = ZipFile.OpenRead(archivePath);
+                ScanAndExtractGunArchive(
+                    zip,
+                    tokens,
+                    id,
+                    persistentRoot,
+                    gameRoot,
+                    imported);
+            }
+
+            if(imported.PvModel is null &&
+               imported.HhModel is null)
+            {
+                MessageBox.Show(
+                    "No matching CA model assets were found in the selected ZIP archive(s). " +
+                    "The importer matches normalized weapon ID/name tokens against CA filenames.",
+                    "Weapon Tool",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            if(imported.PvModel is not null)
+                _text["pv_model"].Text = imported.PvModel;
+            if(imported.PvAnimation is not null)
+                _text["pv_anim"].Text = imported.PvAnimation;
+            if(imported.PvTexture is not null)
+                _text["pv_texture"].Text = imported.PvTexture;
+            if(imported.HhModel is not null)
+                _text["hh_model"].Text = imported.HhModel;
+            if(imported.HhTexture is not null)
+                _text["hh_texture"].Text = imported.HhTexture;
+            if(imported.SoundDir is not null)
+                _text["sound_dir"].Text = imported.SoundDir;
+
+            _status.Text =
+                $"Imported CA ZIP assets for {_text["name"].Text}. Press Save Config, then build normally.";
+
+            MessageBox.Show(
+                "CA weapon assets were extracted to assets-local\\WeaponImports and copied into the current BUILT runtime when available.\n\n" +
+                "Press Save Config to keep the new paths.",
+                "Weapon Tool",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch(Exception ex)
+        {
+            MessageBox.Show(
+                ex.Message,
+                "Weapon Tool",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private static void ScanAndExtractGunArchive(
+        ZipArchive zip,
+        IReadOnlyList<string> tokens,
+        string id,
+        string persistentRoot,
+        string? gameRoot,
+        ImportedGunAssets imported)
+    {
+        var matching = zip.Entries
+            .Where(entry =>
+                !string.IsNullOrEmpty(entry.Name) &&
+                tokens.Any(token =>
+                    NormalizeWeaponName(entry.Name).Contains(
+                        token,
+                        StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        var pvModels = matching
+            .Where(entry =>
+                entry.Name.EndsWith(".LTB", StringComparison.OrdinalIgnoreCase) &&
+                entry.FullName.Contains("GUNS_M_PV", StringComparison.OrdinalIgnoreCase) &&
+                !entry.Name.Contains("ANIBASE", StringComparison.OrdinalIgnoreCase) &&
+                !entry.Name.StartsWith("ANI_", StringComparison.OrdinalIgnoreCase) &&
+                !entry.Name.Contains("I_INFO", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(entry =>
+                entry.Name.StartsWith("CM_HND_", StringComparison.OrdinalIgnoreCase) ? 3 :
+                entry.Name.StartsWith("PVMLA_", StringComparison.OrdinalIgnoreCase) ? 2 : 1)
+            .ThenBy(entry => entry.FullName)
+            .ToList();
+
+        var pvAnims = matching
+            .Where(entry =>
+                entry.Name.EndsWith(".LTB", StringComparison.OrdinalIgnoreCase) &&
+                entry.FullName.Contains("GUNS_M_PV", StringComparison.OrdinalIgnoreCase) &&
+                (entry.Name.Contains("ANIBASE", StringComparison.OrdinalIgnoreCase) ||
+                 entry.Name.StartsWith("ANI_", StringComparison.OrdinalIgnoreCase)) &&
+                !entry.Name.Contains("I_INFO", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(entry => entry.FullName)
+            .ToList();
+
+        var pvTextures = matching
+            .Where(entry =>
+                entry.Name.EndsWith(".DTX", StringComparison.OrdinalIgnoreCase) &&
+                entry.FullName.Contains("GUNS_T_PV", StringComparison.OrdinalIgnoreCase) &&
+                !entry.Name.Contains("I_INFO", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(entry =>
+                entry.Name.StartsWith("PV_", StringComparison.OrdinalIgnoreCase) ? 2 : 1)
+            .ThenBy(entry => entry.FullName)
+            .ToList();
+
+        var hhModels = matching
+            .Where(entry =>
+                entry.Name.EndsWith(".LTB", StringComparison.OrdinalIgnoreCase) &&
+                entry.FullName.Contains("GUNS_M_HH", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(entry => entry.FullName)
+            .ToList();
+
+        var hhTextures = matching
+            .Where(entry =>
+                entry.Name.EndsWith(".DTX", StringComparison.OrdinalIgnoreCase) &&
+                entry.FullName.Contains("GUNS_T_HH", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(entry => entry.FullName)
+            .ToList();
+
+        var sounds = matching
+            .Where(entry =>
+                entry.Name.EndsWith(".WAV", StringComparison.OrdinalIgnoreCase) &&
+                entry.FullName.Contains("GUNS_SND", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if(imported.PvModel is null && pvModels.Count > 0)
+        {
+            var relative = $"Weapons/imported/{id}/{pvModels[0].Name}";
+            ExtractImport(pvModels[0], relative, persistentRoot, gameRoot);
+            imported.PvModel = relative;
+        }
+
+        if(imported.PvAnimation is null && pvAnims.Count > 0)
+        {
+            var relative = $"Weapons/imported/{id}/{pvAnims[0].Name}";
+            ExtractImport(pvAnims[0], relative, persistentRoot, gameRoot);
+            imported.PvAnimation = relative;
+        }
+
+        if(imported.PvTexture is null && pvTextures.Count > 0)
+        {
+            var relative = $"Weapons/imported/{id}/{pvTextures[0].Name}";
+            ExtractImport(pvTextures[0], relative, persistentRoot, gameRoot);
+            ExtractImport(pvTextures[0], $"ModelTextures/{pvTextures[0].Name}", persistentRoot, gameRoot);
+            imported.PvTexture = relative;
+        }
+
+        if(imported.HhModel is null && hhModels.Count > 0)
+        {
+            var relative = $"Weapons/imported/{id}/{hhModels[0].Name}";
+            ExtractImport(hhModels[0], relative, persistentRoot, gameRoot);
+            imported.HhModel = relative;
+        }
+
+        if(imported.HhTexture is null && hhTextures.Count > 0)
+        {
+            var relative = $"Weapons/imported/{id}/{hhTextures[0].Name}";
+            ExtractImport(hhTextures[0], relative, persistentRoot, gameRoot);
+            ExtractImport(hhTextures[0], $"ModelTextures/{hhTextures[0].Name}", persistentRoot, gameRoot);
+            imported.HhTexture = relative;
+        }
+
+        foreach(var sound in sounds)
+        {
+            var relative = $"Weapons/imported/{id}/snd/{sound.Name}";
+            ExtractImport(sound, relative, persistentRoot, gameRoot);
+            imported.SoundDir = $"Weapons/imported/{id}/snd";
+        }
+    }
+
+    private static void ExtractImport(
+        ZipArchiveEntry entry,
+        string relative,
+        string persistentRoot,
+        string? gameRoot)
+    {
+        var persistentPath = Path.Combine(
+            persistentRoot,
+            relative.Replace('/', Path.DirectorySeparatorChar));
+
+        Directory.CreateDirectory(
+            Path.GetDirectoryName(persistentPath)!);
+
+        entry.ExtractToFile(
+            persistentPath,
+            true);
+
+        if(gameRoot is null)
+        {
+            return;
+        }
+
+        var runtimePath = Path.Combine(
+            gameRoot,
+            "rez",
+            relative.Replace('/', Path.DirectorySeparatorChar));
+
+        Directory.CreateDirectory(
+            Path.GetDirectoryName(runtimePath)!);
+
+        File.Copy(
+            persistentPath,
+            runtimePath,
+            true);
+    }
+
+    private static IReadOnlyList<string> BuildAssetTokens(
+        string id,
+        string name)
+    {
+        var tokens = new HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+
+        void Add(string value)
+        {
+            var normalized = NormalizeWeaponName(value);
+            if(normalized.Length >= 3)
+                tokens.Add(normalized);
+        }
+
+        Add(id);
+        Add(name);
+
+        // Useful aliases for common punctuation/marketing-name differences.
+        var normalizedName = NormalizeWeaponName(name);
+        if(normalizedName.StartsWith("colt"))
+            Add(normalizedName.Replace("colt", string.Empty));
+        if(normalizedName.StartsWith("beretta"))
+            Add(normalizedName.Replace("beretta", string.Empty));
+
+        return tokens.ToList();
+    }
+
+    private static string? FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        for(var i = 0; current is not null && i < 8; ++i, current = current.Parent)
+        {
+            if(File.Exists(Path.Combine(current.FullName, "build.cmd")) &&
+               Directory.Exists(Path.Combine(current.FullName, "config")))
+            {
+                return current.FullName;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? FindGameRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        for(var i = 0; current is not null && i < 8; ++i, current = current.Parent)
+        {
+            if(File.Exists(Path.Combine(current.FullName, "Lithtech.exe")))
+            {
+                return current.FullName;
+            }
+
+            var built = Path.Combine(current.FullName, "BUILT");
+            if(File.Exists(Path.Combine(built, "Lithtech.exe")))
+            {
+                return built;
+            }
+        }
+
+        return null;
+    }
+
+    private sealed class ImportedGunAssets
+    {
+        public string? PvModel { get; set; }
+        public string? PvAnimation { get; set; }
+        public string? PvTexture { get; set; }
+        public string? HhModel { get; set; }
+        public string? HhTexture { get; set; }
+        public string? SoundDir { get; set; }
     }
 
     private void ImportAttributes()
