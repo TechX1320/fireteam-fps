@@ -73,7 +73,7 @@ LTRESULT StatsManager::GetPlayerScores(SCORESTRUCT *scores)
     LinkedMember<CPlayerSrvr*> *pMember = m_pPlayers.First();
 
     uint32 iSize = GetNumPlayers();
-    for(int i = 0; iSize; i++)
+    for(uint32 i = 0; i < iSize; ++i)
     {
         if(!pMember)
         {
