@@ -94,6 +94,7 @@ public sealed class MainForm : Form
         var layout = NewGrid();
 
         _playerName.Text = Environment.UserName;
+        _playerName.MaxLength = 15;
         AddRow(layout, 0, "Player Name", _playerName);
 
         _mode.DropDownStyle = ComboBoxStyle.DropDownList;
@@ -333,7 +334,7 @@ public sealed class MainForm : Form
         grid.Controls.Add(line, 1, row);
     }
 
-    private static void ApplyTheme(Control root)
+    private void ApplyTheme(Control root)
     {
         foreach(Control child in root.Controls)
         {
@@ -359,9 +360,12 @@ public sealed class MainForm : Form
                     numeric.BackColor = BackColorPanel;
                     numeric.ForeColor = ForeColorMain;
                     break;
-                case Button button when button != ((MainForm?)root.FindForm())?._launch:
-                    button.BackColor = BackColorPanel;
-                    button.ForeColor = ForeColorMain;
+                case Button button:
+                    if(!ReferenceEquals(button, _launch))
+                    {
+                        button.BackColor = BackColorPanel;
+                        button.ForeColor = ForeColorMain;
+                    }
                     break;
             }
 
