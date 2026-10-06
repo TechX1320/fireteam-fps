@@ -147,4 +147,10 @@ if(Test-Path -LiteralPath $gunsHHPath) {
   } finally { $zip.Dispose() }
 } else { Write-Host "[SKIP] GunsHH.zip is not present in assets-local." }
 
-Write-Host "[OK] Fireteam stock firearm asset staging complete."
+$weaponImports = Join-Path $assetRoot "WeaponImports"
+if(Test-Path -LiteralPath $weaponImports) {
+  Write-Host "[WEAPON] Staging launcher/custom WeaponImports..."
+  Copy-Item -Path (Join-Path $weaponImports "*") -Destination $rezRoot -Recurse -Force
+}
+
+Write-Host "[OK] Fireteam stock/custom firearm asset staging complete."
