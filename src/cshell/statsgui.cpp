@@ -347,6 +347,9 @@ LTRESULT CStatsGui::HandleMessage(ILTMessage_Read* pMessage)
 
 //------------------------------------------------------------------------------
 //	LTRESULT CStatsGui::SortStats()
+//
+//------------------------------------------------------------------------------
+LTRESULT CStatsGui::SortStats()
 {
     if(!m_pScores || m_iNumPlayers < 2)
     {
