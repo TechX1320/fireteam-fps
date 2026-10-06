@@ -39,6 +39,10 @@ struct FTWeaponDef
     bool  bAutomatic;
     bool  bShowCrosshair;
 
+    // Optional first-person optic behavior. A zoom FOV <= 0 means no optic.
+    float fZoomFovDegrees;
+    bool  bZoomHideWeapon;
+
     // HUD presentation only. Ballistic spread remains server-authoritative
     // and can be added as separate gameplay fields later.
     float fCrosshairBaseGap;
@@ -197,6 +201,8 @@ inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
         else if(_stricmp(pKey, "reload") == 0) def.fReloadSeconds = (float)atof(pValue);
         else if(_stricmp(pKey, "automatic") == 0) def.bAutomatic = atoi(pValue) != 0;
         else if(_stricmp(pKey, "show_crosshair") == 0) def.bShowCrosshair = atoi(pValue) != 0;
+        else if(_stricmp(pKey, "zoom_fov") == 0) def.fZoomFovDegrees = (float)atof(pValue);
+        else if(_stricmp(pKey, "zoom_hide_weapon") == 0) def.bZoomHideWeapon = atoi(pValue) != 0;
         else if(_stricmp(pKey, "crosshair_base_gap") == 0) def.fCrosshairBaseGap = (float)atof(pValue);
         else if(_stricmp(pKey, "crosshair_shot_kick") == 0) def.fCrosshairShotKick = (float)atof(pValue);
         else if(_stricmp(pKey, "crosshair_move_kick") == 0) def.fCrosshairMoveKick = (float)atof(pValue);
