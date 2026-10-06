@@ -171,7 +171,8 @@ void FT_RenderWeaponHud(
     bool bFirstPerson,
     bool bShowCrosshair,
     bool bShowAmmo,
-    bool bMoving)
+    bool bMoving,
+    bool bScoped)
 {
     if(!bFirstPerson ||
        nWeaponSlot < 1 ||
@@ -190,6 +191,46 @@ void FT_RenderWeaponHud(
 
     const FTWeaponDef *pDef =
         FT_GetWeaponDef(s_WeaponDefs, nWeaponSlot);
+
+    if(bScoped)
+    {
+        const float fScreenW = (float)nScreenW;
+        const float fScreenH = (float)nScreenH;
+        const float fScopeSize =
+            fScreenW < fScreenH ? fScreenW : fScreenH;
+        const float fScopeLeft =
+            (fScreenW - fScopeSize) * 0.5f;
+        const float fScopeTop =
+            (fScreenH - fScopeSize) * 0.5f;
+        const float cx = fScreenW * 0.5f;
+        const float cy = fScreenH * 0.5f;
+
+        LT_POLYF4 mask[8];
+
+        // Black out everything outside a centered scope viewport.
+        FT_SetupQuad(mask[0], 0.0f, 0.0f, fScopeLeft, fScreenH, 0, 0, 0, 255);
+        FT_SetupQuad(mask[1], fScopeLeft + fScopeSize, 0.0f,
+            fScreenW - (fScopeLeft + fScopeSize), fScreenH, 0, 0, 0, 255);
+        FT_SetupQuad(mask[2], fScopeLeft, 0.0f, fScopeSize, fScopeTop, 0, 0, 0, 255);
+        FT_SetupQuad(mask[3], fScopeLeft, fScopeTop + fScopeSize, fScopeSize,
+            fScreenH - (fScopeTop + fScopeSize), 0, 0, 0, 255);
+
+        // Simple optic reticle. This can later be replaced by an authored CA
+        // scope texture without changing zoom/gameplay behavior.
+        FT_SetupQuad(mask[4], fScopeLeft, cy - 0.5f, fScopeSize, 1.0f,
+            0, 0, 0, 210);
+        FT_SetupQuad(mask[5], cx - 0.5f, fScopeTop, 1.0f, fScopeSize,
+            0, 0, 0, 210);
+        FT_SetupQuad(mask[6], cx - 3.0f, cy - 3.0f, 6.0f, 6.0f,
+            0, 0, 0, 230);
+        FT_SetupQuad(mask[7], fScopeLeft, fScopeTop, fScopeSize, 2.0f,
+            0, 0, 0, 180);
+
+        FT_SetDrawState();
+        g_pLTCDrawPrim->BeginDrawPrim();
+        g_pLTCDrawPrim->DrawPrim(mask, 8);
+        g_pLTCDrawPrim->EndDrawPrim();
+    }
 
     const float fNow = g_pLTClient->GetTime();
     if(s_fLastCrosshairTime <= 0.0f)
