@@ -131,7 +131,7 @@ void CWorldPropsClnt::UnpackWorldProps(ILTMessage_Read *pMsgProps)
 void CWorldPropsClnt::ApplyWorldProps()
 {
 	// Set worldprop console variables.
-	char buffer[255];
+	char buffer[512];
 
 	sprintf(buffer, "FarZ %d", m_nFarZ);
 	g_pLTClient->RunConsoleString(buffer);
