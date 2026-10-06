@@ -28,10 +28,14 @@ struct FTInfectedDef
     char sAnimationModel[128];
     char sBodyTexture0[128];
     char sBodyTexture1[128];
+    char sBodyRenderStyle0[128];
+    char sBodyRenderStyle1[128];
 
     char sFaceMode[32];
     char sFaceModel[128];
     char sFaceTexture[128];
+    char sFaceRenderStyle0[128];
+    char sFaceRenderStyle1[128];
     char sFaceSocket[64];
     char sFaceAlignNode[64];
     bool bFaceAutoAlign;
@@ -134,12 +138,20 @@ inline void FT_ApplyInfectedValue(
         FT_CopyInfectedString(def.sBodyTexture0, sizeof(def.sBodyTexture0), pValue);
     else if(_stricmp(pKey, "body_texture1") == 0)
         FT_CopyInfectedString(def.sBodyTexture1, sizeof(def.sBodyTexture1), pValue);
+    else if(_stricmp(pKey, "body_renderstyle0") == 0)
+        FT_CopyInfectedString(def.sBodyRenderStyle0, sizeof(def.sBodyRenderStyle0), pValue);
+    else if(_stricmp(pKey, "body_renderstyle1") == 0)
+        FT_CopyInfectedString(def.sBodyRenderStyle1, sizeof(def.sBodyRenderStyle1), pValue);
     else if(_stricmp(pKey, "face_mode") == 0)
         FT_CopyInfectedString(def.sFaceMode, sizeof(def.sFaceMode), pValue);
     else if(_stricmp(pKey, "face_model") == 0)
         FT_CopyInfectedString(def.sFaceModel, sizeof(def.sFaceModel), pValue);
     else if(_stricmp(pKey, "face_texture") == 0)
         FT_CopyInfectedString(def.sFaceTexture, sizeof(def.sFaceTexture), pValue);
+    else if(_stricmp(pKey, "face_renderstyle0") == 0)
+        FT_CopyInfectedString(def.sFaceRenderStyle0, sizeof(def.sFaceRenderStyle0), pValue);
+    else if(_stricmp(pKey, "face_renderstyle1") == 0)
+        FT_CopyInfectedString(def.sFaceRenderStyle1, sizeof(def.sFaceRenderStyle1), pValue);
     else if(_stricmp(pKey, "face_socket") == 0)
         FT_CopyInfectedString(def.sFaceSocket, sizeof(def.sFaceSocket), pValue);
     else if(_stricmp(pKey, "face_align_node") == 0)
