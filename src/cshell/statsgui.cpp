@@ -334,7 +334,7 @@ LTRESULT CStatsGui::HandleMessage(ILTMessage_Read* pMessage)
             //g_pLTClient->CPrint("(%d) %d - %s - %d - $%.2f", i, iClientID, sName, iScore, fMoney);
         }
 
-        // Sort the stats from most to least money
+        // Fireteam scoreboard ranks the squad by infected kills.
         SortStats();
 
         // Recalculate the poly string
@@ -347,40 +347,33 @@ LTRESULT CStatsGui::HandleMessage(ILTMessage_Read* pMessage)
 
 //------------------------------------------------------------------------------
 //	LTRESULT CStatsGui::SortStats()
-//
-//------------------------------------------------------------------------------
-LTRESULT CStatsGui::SortStats()
 {
-    SCORESTRUCT largest;
-    int largestElement = 0;
-    SCORESTRUCT temp;
-    largest.fMoney = -1.0f;
-
-    if(m_iNumPlayers < 2)
+    if(!m_pScores || m_iNumPlayers < 2)
     {
         return LT_OK;
     }
 
-    //Sort this stuff (Using Selection Sort algorithm)
-    for(int i = 0; i < m_iNumPlayers; i++)
+    // Selection sort is plenty for a 24-player maximum and keeps this module
+    // compatible with the original Jupiter-era toolchain style.
+    for(int i = 0; i < m_iNumPlayers - 1; ++i)
     {
-        for(int j = 0; j < (m_iNumPlayers - i); j++)
+        int nBest = i;
+
+        for(int j = i + 1; j < m_iNumPlayers; ++j)
         {
-            if(m_pScores[j+i].fMoney > largest.fMoney)
+            if(m_pScores[j].iScore >
+               m_pScores[nBest].iScore)
             {
-                largest.fMoney = m_pScores[j+i].fMoney;
-                largestElement = (j+i);
+                nBest = j;
             }
         }
 
-        //do the move.
-        int nSize = sizeof(SCORESTRUCT);
-        temp = m_pScores[i];
-        m_pScores[i] = m_pScores[largestElement];
-        m_pScores[largestElement] = temp;
-
-        // Invalidate the largest element now.
-        largest.fMoney = -1.0f;
+        if(nBest != i)
+        {
+            SCORESTRUCT temp = m_pScores[i];
+            m_pScores[i] = m_pScores[nBest];
+            m_pScores[nBest] = temp;
+        }
     }
 
     return LT_OK;
@@ -388,92 +381,78 @@ LTRESULT CStatsGui::SortStats()
 
 
 //------------------------------------------------------------------------------
-//	LTRESULT CStatsGui::RecalcStatsString()
+//  LTRESULT CStatsGui::RecalcStatsString()
+//
+//------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
 LTRESULT CStatsGui::RecalcStatsString()
 {
-    if (NULL == m_pStatsString_Title ||
-    	NULL == m_pStatsString_Playername ||
-		NULL == m_pStatsString_Sealswhacked ||
-		NULL == m_pStatsString_Moneyearned)
-	{
-		return LT_ERROR;
-	}
-
-    char sStatText[1024];
-    char sStatText1[1024];
-    char sStatText2[1024];
-    char sStatText3[1024];
-
-    // Set the NULL char so that strncat will work properly. (cheaper than ZeroMemory or memset)
-    sStatText[0] = '\0';
-    sStatText1[0] = '\0';
-    sStatText2[0] = '\0';
-    sStatText3[0] = '\0';
-
-    // This is not exactly an optimal solution, but is sufficiant for our purposes.
-    sprintf(sStatText, "(Name)                -               (Seals Whacked)               -               (Money)\n\n");
-
-	for (int i = 0; i < m_iNumPlayers; i++)
+    if(NULL == m_pStatsString_Title ||
+       NULL == m_pStatsString_Playername ||
+       NULL == m_pStatsString_Sealswhacked ||
+       NULL == m_pStatsString_Moneyearned)
     {
-        char sBuf[256];
-        char sBuf2[32];
-        char sBuf3[64];
-
-        sprintf(sBuf, "%s\n", m_pScores[i].sPlayerName);
-        strncat(sStatText1, sBuf, 128);
-
-        sprintf(sBuf2, "%d\n", m_pScores[i].iScore);
-        strncat(sStatText2, sBuf2, 16);
-
-        sprintf(sBuf3, "$%.2f\n", m_pScores[i].fMoney);
-        strncat(sStatText3, sBuf3, 32);     
+        return LT_ERROR;
     }
 
+    char sNames[1024];
+    char sKills[512];
+    sNames[0] = '\0';
+    sKills[0] = '\0';
 
+    for(int i = 0; i < m_iNumPlayers; ++i)
+    {
+        char sNameLine[80];
+        char sKillLine[32];
 
-    uint32 nWidth, nHeight, nFontWidth, nFontHeight;
+        sprintf(
+            sNameLine,
+            "%s\n",
+            m_pScores[i].sPlayerName);
+        strncat(
+            sNames,
+            sNameLine,
+            sizeof(sNames) - strlen(sNames) - 1);
 
-    // Set up the title
-    m_pStatsString_Title->SetText(sStatText);
-    nFontWidth = static_cast<uint32>(m_pStatsString_Title->GetWidth());
-    nFontHeight = static_cast<uint32>(m_pStatsString_Title->GetHeight());
+        sprintf(
+            sKillLine,
+            "%u\n",
+            (uint32)m_pScores[i].iScore);
+        strncat(
+            sKills,
+            sKillLine,
+            sizeof(sKills) - strlen(sKills) - 1);
+    }
 
-    g_pLTClient->GetSurfaceDims(g_pLTClient->GetScreenSurface(), &nWidth, &nHeight);
+    uint32 nWidth = 0;
+    uint32 nHeight = 0;
+    g_pLTClient->GetSurfaceDims(
+        g_pLTClient->GetScreenSurface(),
+        &nWidth,
+        &nHeight);
+
+    m_pStatsString_Title->SetText(
+        "FIRETEAM SQUAD\n\nPLAYER                                      KILLS");
+    m_pStatsString_Title->SetColor(0xFFFFB000);
     m_pStatsString_Title->SetPosition(
-        static_cast<float>(((nWidth/2) - (nFontWidth/2)) - (254 - nFontWidth/2) ),
-        static_cast<float>((nHeight/2) - (nFontHeight/2)) - (128 - nFontHeight/2) );
+        (float)nWidth * 0.5f - 245.0f,
+        (float)nHeight * 0.5f - 135.0f);
 
-    // Set up the Player's name
-    m_pStatsString_Playername->SetText(sStatText1);
-    nFontWidth = static_cast<uint32>(m_pStatsString_Playername->GetWidth());
-    nFontHeight = static_cast<uint32>(m_pStatsString_Playername->GetHeight());
-
-    g_pLTClient->GetSurfaceDims(g_pLTClient->GetScreenSurface(), &nWidth, &nHeight);
+    m_pStatsString_Playername->SetText(sNames);
+    m_pStatsString_Playername->SetColor(0xFFFFFFFF);
     m_pStatsString_Playername->SetPosition(
-        static_cast<float>(((nWidth/2) - (nFontWidth/2)) - (254 - nFontWidth/2) ),
-        static_cast<float>(((nHeight/2) - (nFontHeight/2)) - (96 - nFontHeight/2)) );
+        (float)nWidth * 0.5f - 245.0f,
+        (float)nHeight * 0.5f - 80.0f);
 
-    // Set up the Seals whacked
-    m_pStatsString_Sealswhacked->SetText(sStatText2);
-    nFontWidth = static_cast<uint32>(m_pStatsString_Sealswhacked->GetWidth());
-    nFontHeight = static_cast<uint32>(m_pStatsString_Sealswhacked->GetHeight());
-
-    g_pLTClient->GetSurfaceDims(g_pLTClient->GetScreenSurface(), &nWidth, &nHeight);
+    m_pStatsString_Sealswhacked->SetText(sKills);
+    m_pStatsString_Sealswhacked->SetColor(0xFFFFFFFF);
     m_pStatsString_Sealswhacked->SetPosition(
-        static_cast<float>((nWidth/2) - (nFontWidth/2)),
-        static_cast<float>( ((nHeight/2) - (nFontHeight/2)) - (96 - nFontHeight/2) )  );
+        (float)nWidth * 0.5f + 180.0f,
+        (float)nHeight * 0.5f - 80.0f);
 
-    // Set up the Money
-    m_pStatsString_Moneyearned->SetText(sStatText3);
-    nFontWidth = static_cast<uint32>(m_pStatsString_Moneyearned->GetWidth());
-    nFontHeight = static_cast<uint32>(m_pStatsString_Moneyearned->GetHeight());
-
-    g_pLTClient->GetSurfaceDims(g_pLTClient->GetScreenSurface(), &nWidth, &nHeight);
-    m_pStatsString_Moneyearned->SetPosition(
-        static_cast<float>(((nWidth/2) - (nFontWidth/2)) + (254 - nFontWidth/2) ),
-        static_cast<float>(((nHeight/2) - (nFontHeight/2)) - (96 - nFontHeight/2)) );
+    // Legacy third column is intentionally unused in Fireteam.
+    m_pStatsString_Moneyearned->SetText("");
 
     return LT_OK;
 }
