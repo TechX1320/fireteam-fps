@@ -581,7 +581,7 @@ bool CPlayerClnt::AltAttack()
 
 //----------------------------------------------------------------------------
 // Fireteam five-slot loadout.
-// 1 primary, 2 pistol, 3 melee, 4 grenade, 5 special.
+// Slot content is entirely definition-driven by config/weapons.cfg.
 //----------------------------------------------------------------------------
 bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
 {
