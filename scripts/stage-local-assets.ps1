@@ -244,6 +244,8 @@ if($charZipName) {
     Extract-ZipEntry $charZipName "CHARS_T_BODY/MT_MG_LEG.DTX" "Characters\infected\body\MT_MG_LEG.DTX" | Out-Null
     Extract-ZipEntry $charZipName "CHARS_M_FACE/CM_FC_NM_VIRUS_HM.LTB" "Characters\infected\face\CM_FC_NM_VIRUS_HM.LTB" | Out-Null
     Extract-ZipEntry $charZipName "CHARS_T_FACE/CM_FC_NM_VIRUS_HM.DTX" "Characters\infected\face\CM_FC_NM_VIRUS_HM.DTX" | Out-Null
+    Extract-OptionalZipEntry $charZipName "CHARS_M_HEAD/CM_HLMT_NM_VIRUS_HM.LTB" "Characters\infected\head\CM_HLMT_NM_VIRUS_HM.LTB" | Out-Null
+    Extract-OptionalZipEntry $charZipName "CHARS_T_HEAD/CM_HLMT_NM_VIRUS_HM.DTX" "Characters\infected\head\CM_HLMT_NM_VIRUS_HM.DTX" | Out-Null
 
     # Stage additional known CA infected bodies now so future external config
     # entries can reference them without changing C++ or staging layout.
