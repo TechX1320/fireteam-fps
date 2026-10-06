@@ -19,6 +19,7 @@ struct FTInfectedDef
     float fAttackCooldown;
     float fUpdateSeconds;
 
+    char sCollisionMode[32];
     float fCollisionX;
     float fCollisionY;
     float fCollisionZ;
@@ -28,6 +29,7 @@ struct FTInfectedDef
     char sBodyTexture0[128];
     char sBodyTexture1[128];
 
+    char sFaceMode[32];
     char sFaceModel[128];
     char sFaceTexture[128];
     char sFaceSocket[64];
@@ -220,6 +222,8 @@ inline bool FT_LoadDefaultInfectedDef(
             def.fAttackCooldown = (float)atof(pValue);
         else if(_stricmp(pKey, "update_seconds") == 0)
             def.fUpdateSeconds = (float)atof(pValue);
+        else if(_stricmp(pKey, "collision_mode") == 0)
+            FT_CopyInfectedString(def.sCollisionMode, sizeof(def.sCollisionMode), pValue);
         else if(_stricmp(pKey, "collision_x") == 0)
             def.fCollisionX = (float)atof(pValue);
         else if(_stricmp(pKey, "collision_y") == 0)
@@ -234,6 +238,8 @@ inline bool FT_LoadDefaultInfectedDef(
             FT_CopyInfectedString(def.sBodyTexture0, sizeof(def.sBodyTexture0), pValue);
         else if(_stricmp(pKey, "body_texture1") == 0)
             FT_CopyInfectedString(def.sBodyTexture1, sizeof(def.sBodyTexture1), pValue);
+        else if(_stricmp(pKey, "face_mode") == 0)
+            FT_CopyInfectedString(def.sFaceMode, sizeof(def.sFaceMode), pValue);
         else if(_stricmp(pKey, "face_model") == 0)
             FT_CopyInfectedString(def.sFaceModel, sizeof(def.sFaceModel), pValue);
         else if(_stricmp(pKey, "face_texture") == 0)
