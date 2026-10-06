@@ -40,6 +40,10 @@ public:
     void    		UpdatePitch(float pitch);
     void    		UpdateZoom(float zoom);
     void            ToggleView();
+
+    void            ToggleWeaponZoom(float fFovDegrees);
+    void            ClearWeaponZoom();
+    bool            IsWeaponZoomed() const { return m_bWeaponZoom; }
     bool            IsFirstPerson() const { return m_bFirstPerson; }
 
 private:
@@ -48,6 +52,8 @@ private:
     float     		m_fPitch;
     float     		m_fZoom;
     bool            m_bFirstPerson;
+    bool            m_bWeaponZoom;
+    float           m_fWeaponZoomFovDegrees;
     uint32          m_nViewportWidth;
     uint32          m_nViewportHeight;
 };
