@@ -39,6 +39,8 @@ enum ECommands
     COMMAND_ENTER                   = 18,
     COMMAND_CHAT                    = 19,
     COMMAND_ALT_ATTACK              = 20,
+    COMMAND_CROUCH                  = 21,
+    COMMAND_SPRINT                  = 22,
     COMMAND_DEBUG_1                 = 61,
        
     COMMAND_QUIT					= 250
@@ -53,6 +55,8 @@ enum ECommands
 #define  MOVE_LEFT       (1<<3)
 #define  MOVE_UP         (1<<4)
 #define  MOVE_JUMP		 (1<<5)
+#define  MOVE_CROUCH     (1<<6)
+#define  MOVE_SPRINT     (1<<7)
 
 //------------------------------------------------------------------------------
 // These directly correspond to the AddDevice values in autoexec.cfg
