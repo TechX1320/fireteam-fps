@@ -39,7 +39,7 @@ public:
           m_bAlive(true),
           m_fRespawnTimer(0.0f),
           m_fPoisonCarry(0.0f),
-          m_nWeaponSlot(3),
+          m_nWeaponSlot(1),
           m_bReloading(false),
           m_nReloadSlot(0),
           m_fReloadComplete(0.0f)
