@@ -197,8 +197,8 @@ void FireteamZombie::CreateInfectedFace()
                 // the inverse Head-node transform so its Head lands on the
                 // body's Head socket instead of offsetting the full skeleton
                 // above/beside the zombie.
-                vOffset -= tAlign.m_Pos;
                 rOffset = tAlign.m_Rot.Conjugate();
+                vOffset += rOffset * (-tAlign.m_Pos);
 
                 g_pLTServer->CPrint(
                     "Fireteam infected: face auto-align node %s local %.1f %.1f %.1f.",
