@@ -39,6 +39,7 @@ private:
 bool FT_BuildNavigationPath(
     const LTVector &vStart,
     const LTVector &vDestination,
+    float fAgentHalfWidth,
     uint32 nLane,
     std::vector<LTVector> &aWaypoints);
 
