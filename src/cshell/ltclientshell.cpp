@@ -28,6 +28,7 @@
 #include "FireteamHealthHud.h"
 #include "FireteamWeaponHud.h"
 #include "FireteamRoundHud.h"
+#include "FireteamLoadingScreen.h"
 // Client-side helper functions
 #include "clienthelper.h"
 
@@ -245,6 +246,7 @@ LTRESULT CLTClientShell::OnEngineInitialized(RMode *pMode, LTGUID *pAppGuid)
     FT_SettingsInit();
     FT_WeaponHudInit();
     FT_RoundHudInit();
+    FT_LoadingScreenInit();
 
 
 
@@ -441,7 +443,13 @@ LTRESULT CLTClientShell::InitGame(EGameType eType, char* ip)
 		strcpy(request.m_WorldName, "worlds/demoroom");
 	}
 
+    FT_LoadingScreenStart(
+        request.m_WorldName);
+
 	result = g_pLTClient->StartGame(&request);
+
+    FT_LoadingScreenStop();
+
 	if (LT_OK != result)
 	{
 		DebugPrintIfFailed(result, "Start Game Request failed.\n");
@@ -1661,6 +1669,7 @@ void CLTClientShell::OnEngineTerm()
 
     // Dispose of the Chat gui
     assert(m_pChatGui);
+    FT_LoadingScreenTerm();
     FT_RoundHudTerm();
     FT_WeaponHudTerm();
     FT_SettingsTerm();
