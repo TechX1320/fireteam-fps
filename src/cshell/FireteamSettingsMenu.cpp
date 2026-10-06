@@ -4,6 +4,7 @@
 #include <iltclient.h>
 #include <iltdrawprim.h>
 #include <iltfontmanager.h>
+#include <iltsoundmgr.h>
 #include <stdio.h>
 #include <windows.h>
 
@@ -38,6 +39,7 @@ static uint32 s_nResolution = 1;
 static uint32 s_nSelected = 0;
 static float s_fSensitivityX = 0.004625f;
 static float s_fSensitivityY = 0.004625f;
+static uint32 s_nSoundVolume = 100;
 
 static float FTClamp(float fValue, float fMin, float fMax)
 {
@@ -99,6 +101,15 @@ static void FTApplySensitivity()
     g_pLTClient->RunConsoleString(szCommand);
 }
 
+static void FTApplySoundVolume()
+{
+    if(g_pLTCSoundMgr)
+    {
+        g_pLTCSoundMgr->SetVolume(
+            (short)s_nSoundVolume);
+    }
+}
+
 static void FTSaveSettings()
 {
     FILE *pFile = fopen("fireteam-settings.cfg", "wt");
@@ -109,9 +120,10 @@ static void FTSaveSettings()
 
     fprintf(
         pFile,
-        "%.6f %.6f %u %u %u\n",
+        "%.6f %.6f %u %u %u %u\n",
         s_fSensitivityX,
         s_fSensitivityY,
+        s_nSoundVolume,
         s_aResolutions[s_nResolution].nWidth,
         s_aResolutions[s_nResolution].nHeight,
         s_bWindowed ? 1 : 0);
@@ -136,22 +148,41 @@ static void FTLoadSettings()
 
     float fSensitivityX = s_fSensitivityX;
     float fSensitivityY = s_fSensitivityY;
+    uint32 nSoundVolume = s_nSoundVolume;
     uint32 nWidth = 0;
     uint32 nHeight = 0;
     uint32 nWindowed = 1;
 
     int nRead = sscanf(
         szLine,
-        "%f %f %u %u %u",
+        "%f %f %u %u %u %u",
         &fSensitivityX,
         &fSensitivityY,
+        &nSoundVolume,
         &nWidth,
         &nHeight,
         &nWindowed);
 
-    if(nRead != 5)
+    if(nRead != 6)
     {
-        // Backward compatibility with the old single-sensitivity file.
+        // Previous format: X sensitivity, Y sensitivity, width, height, windowed.
+        if(sscanf(
+            szLine,
+            "%f %f %u %u %u",
+            &fSensitivityX,
+            &fSensitivityY,
+            &nWidth,
+            &nHeight,
+            &nWindowed) == 5)
+        {
+            nSoundVolume = 100;
+            nRead = 6;
+        }
+    }
+
+    if(nRead != 6)
+    {
+        // Original format: one sensitivity, width, height, windowed.
         float fLegacySensitivity = s_fSensitivityX;
         if(sscanf(
             szLine,
@@ -163,16 +194,23 @@ static void FTLoadSettings()
         {
             fSensitivityX = fLegacySensitivity;
             fSensitivityY = fLegacySensitivity;
-            nRead = 5;
+            nSoundVolume = 100;
+            nRead = 6;
         }
     }
 
-    if(nRead == 5)
+    if(nRead == 6)
     {
         s_fSensitivityX =
             FTClamp(fSensitivityX, 0.000500f, 0.020000f);
         s_fSensitivityY =
             FTClamp(fSensitivityY, 0.000500f, 0.020000f);
+
+        if(nSoundVolume > 100)
+        {
+            nSoundVolume = 100;
+        }
+        s_nSoundVolume = nSoundVolume;
 
         for(uint32 i = 0; i < s_nResolutionCount; ++i)
         {
@@ -245,6 +283,7 @@ void FT_SettingsInit()
     FTReadCurrentVideo();
     FTLoadSettings();
     FTApplySensitivity();
+    FTApplySoundVolume();
 
     if(!s_pFont)
     {
@@ -343,13 +382,13 @@ bool FT_SettingsHandleKey(int nKey)
 
     if(nKey == VK_UP)
     {
-        s_nSelected = (s_nSelected == 0) ? 6 : (s_nSelected - 1);
+        s_nSelected = (s_nSelected == 0) ? 7 : (s_nSelected - 1);
         return true;
     }
 
     if(nKey == VK_DOWN)
     {
-        s_nSelected = (s_nSelected + 1) % 7;
+        s_nSelected = (s_nSelected + 1) % 8;
         return true;
     }
 
@@ -379,6 +418,19 @@ bool FT_SettingsHandleKey(int nKey)
         }
         else if(s_nSelected == 2)
         {
+            int nVolume =
+                (int)s_nSoundVolume +
+                (5 * nDirection);
+
+            if(nVolume < 0) nVolume = 0;
+            if(nVolume > 100) nVolume = 100;
+
+            s_nSoundVolume = (uint32)nVolume;
+            FTApplySoundVolume();
+            FTSaveSettings();
+        }
+        else if(s_nSelected == 3)
+        {
             int nNew = (int)s_nResolution + nDirection;
 
             if(nNew < 0)
@@ -388,7 +440,7 @@ bool FT_SettingsHandleKey(int nKey)
 
             s_nResolution = (uint32)nNew;
         }
-        else if(s_nSelected == 3)
+        else if(s_nSelected == 4)
         {
             s_bWindowed = !s_bWindowed;
         }
@@ -398,16 +450,16 @@ bool FT_SettingsHandleKey(int nKey)
 
     if(nKey == VK_RETURN)
     {
-        if(s_nSelected == 4)
+        if(s_nSelected == 5)
         {
             FTApplyVideo();
         }
-        else if(s_nSelected == 5)
+        else if(s_nSelected == 6)
         {
             s_bOpen = false;
             g_pLTClient->ClearInput();
         }
-        else if(s_nSelected == 6)
+        else if(s_nSelected == 7)
         {
             g_pLTClient->Shutdown();
         }
@@ -433,7 +485,7 @@ void FT_SettingsRender()
         &nScreenH);
 
     const float fWidth = 560.0f;
-    const float fHeight = 355.0f;
+    const float fHeight = 385.0f;
     const float fX = ((float)nScreenW - fWidth) * 0.5f;
     const float fY = ((float)nScreenH - fHeight) * 0.5f;
 
@@ -463,6 +515,7 @@ void FT_SettingsRender()
         szBody,
         "%s Horizontal Sensitivity  %.2fx\n"
         "%s Vertical Sensitivity    %.2fx\n"
+        "%s Game Volume             %u%%\n"
         "%s Resolution              %u x %u\n"
         "%s Display                 %s\n"
         "%s Apply Video\n"
@@ -474,13 +527,15 @@ void FT_SettingsRender()
         s_nSelected == 1 ? ">" : " ",
         fMultiplierY,
         s_nSelected == 2 ? ">" : " ",
+        s_nSoundVolume,
+        s_nSelected == 3 ? ">" : " ",
         s_aResolutions[s_nResolution].nWidth,
         s_aResolutions[s_nResolution].nHeight,
-        s_nSelected == 3 ? ">" : " ",
-        s_bWindowed ? "Windowed" : "Fullscreen",
         s_nSelected == 4 ? ">" : " ",
+        s_bWindowed ? "Windowed" : "Fullscreen",
         s_nSelected == 5 ? ">" : " ",
-        s_nSelected == 6 ? ">" : " ");
+        s_nSelected == 6 ? ">" : " ",
+        s_nSelected == 7 ? ">" : " ");
 
     s_pTitle->SetText("FIRETEAM  -  SETTINGS");
     s_pTitle->SetPosition(fX + 32.0f, fY + 28.0f);
