@@ -281,7 +281,17 @@ uint32 CPlayerSrvr::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
 //-----------------------------------------------------------------------------
 void CPlayerSrvr::SetPlayerName(const char* name)
 {
-    strncpy(m_sName, name, 16);
+    if(!name)
+    {
+        m_sName[0] = '\0';
+        return;
+    }
+
+    strncpy(
+        m_sName,
+        name,
+        sizeof(m_sName) - 1);
+    m_sName[sizeof(m_sName) - 1] = '\0';
 }
 
 
