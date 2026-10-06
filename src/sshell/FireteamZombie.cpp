@@ -640,6 +640,35 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                                 m_Def.sFaceModel);
                         }
                     }
+
+                    if(m_Def.sHeadModel[0])
+                    {
+                        HMODELDB hHeadModel = LTNULL;
+
+                        if(g_pLTSModel->CacheModelDB(
+                            m_Def.sHeadModel,
+                            hHeadModel) == LT_OK)
+                        {
+                            FT_CopyInfectedString(
+                                pOCS->m_Filenames[3],
+                                MAX_CS_FILENAME_LEN,
+                                m_Def.sHeadModel);
+                            FT_CopyInfectedString(
+                                pOCS->m_SkinNames[3],
+                                MAX_CS_FILENAME_LEN,
+                                m_Def.sHeadTexture);
+
+                            g_pLTServer->CPrint(
+                                "Fireteam infected: cached head child %s.",
+                                m_Def.sHeadModel);
+                        }
+                        else
+                        {
+                            g_pLTServer->CPrint(
+                                "Fireteam infected: could not cache head child %s.",
+                                m_Def.sHeadModel);
+                        }
+                    }
                 }
             }
         }
@@ -709,6 +738,24 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                             modelOCS.m_SkinNames[2],
                             MAX_CS_FILENAME_LEN,
                             m_Def.sFaceTexture);
+                    }
+                }
+
+                if(m_Def.sHeadModel[0])
+                {
+                    HMODELDB hHeadModel = LTNULL;
+                    if(g_pLTSModel->CacheModelDB(
+                        m_Def.sHeadModel,
+                        hHeadModel) == LT_OK)
+                    {
+                        FT_CopyInfectedString(
+                            modelOCS.m_Filenames[3],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sHeadModel);
+                        FT_CopyInfectedString(
+                            modelOCS.m_SkinNames[3],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sHeadTexture);
                     }
                 }
 
