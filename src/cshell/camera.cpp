@@ -14,6 +14,7 @@
 
 #include <iltclient.h>
 #include <ltobjectcreate.h>
+#include <math.h>
 #include "clientinterfaces.h"
 
 #define MAX_PITCH   (85.0f * (MATH_PI / 180.0f))
@@ -30,6 +31,8 @@ CCamera::CCamera() :
 m_fPitch(0.0f),
 m_fZoom(MIN_ZOOM),
 m_bFirstPerson(true),
+m_bWeaponZoom(false),
+m_fWeaponZoomFovDegrees(24.0f),
 m_nViewportWidth(0),
 m_nViewportHeight(0)
 {
@@ -99,10 +102,17 @@ void CCamera::RefreshViewport()
         nWidth,
         nHeight);
 
-    const float fFovX = MATH_PI / 2.0f;
+    const float fFovX =
+        m_bWeaponZoom
+        ? MATH_DEGREES_TO_RADIANS(m_fWeaponZoomFovDegrees)
+        : (MATH_PI / 2.0f);
+
+    // Keep vertical FOV aspect-correct instead of linearly scaling radians.
+    const float fAspect =
+        (float)nWidth / (float)nHeight;
     const float fFovY =
-        (fFovX * (float)nHeight) /
-        (float)nWidth;
+        2.0f * (float)atan(
+            tan(fFovX * 0.5f) / fAspect);
 
     g_pLTClient->SetCameraFOV(
         m_hObject,
@@ -200,10 +210,56 @@ void CCamera::UpdateZoom(float zoom)
 
 
 //----------------------------------------------------------------------------
+// Scoped first-person weapon zoom.
+//----------------------------------------------------------------------------
+void CCamera::ToggleWeaponZoom(float fFovDegrees)
+{
+    if(!m_bFirstPerson || fFovDegrees <= 0.0f)
+    {
+        return;
+    }
+
+    m_fWeaponZoomFovDegrees = fFovDegrees;
+    if(m_fWeaponZoomFovDegrees < 8.0f) m_fWeaponZoomFovDegrees = 8.0f;
+    if(m_fWeaponZoomFovDegrees > 70.0f) m_fWeaponZoomFovDegrees = 70.0f;
+
+    m_bWeaponZoom = !m_bWeaponZoom;
+
+    // Force the next RefreshViewport call to update camera FOV immediately.
+    m_nViewportWidth = 0;
+    m_nViewportHeight = 0;
+
+    g_pLTClient->CPrint(
+        "Fireteam scope: %s %.1f deg",
+        m_bWeaponZoom ? "ON" : "OFF",
+        m_fWeaponZoomFovDegrees);
+}
+
+void CCamera::ClearWeaponZoom()
+{
+    if(!m_bWeaponZoom)
+    {
+        return;
+    }
+
+    m_bWeaponZoom = false;
+    m_nViewportWidth = 0;
+    m_nViewportHeight = 0;
+}
+
+//----------------------------------------------------------------------------
 // CCamera::ToggleView()
 //----------------------------------------------------------------------------
 void CCamera::ToggleView()
 {
     m_bFirstPerson = !m_bFirstPerson;
+    if(!m_bFirstPerson)
+    {
+        ClearWeaponZoom();
+    }
+
+    m_nViewportWidth = 0;
+    m_nViewportHeight = 0;
+
     g_pLTClient->CPrint("Camera: %s", m_bFirstPerson ? "First Person" : "Third Person");
 }
