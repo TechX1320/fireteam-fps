@@ -753,7 +753,17 @@ void CLTClientShell::Update()
 
             // Update our camera
             m_pCamera->UpdatePosition(m_pPlayer->GetPlayerObject());
-            m_pPlayer->UpdateWeaponView(m_pCamera->IsFirstPerson());
+
+            const FTWeaponDef *pViewWeapon =
+                m_pPlayer->GetCurrentWeaponDef();
+
+            const bool bShowViewWeapon =
+                m_pCamera->IsFirstPerson() &&
+                !(m_pCamera->IsWeaponZoomed() &&
+                  pViewWeapon &&
+                  pViewWeapon->bZoomHideWeapon);
+
+            m_pPlayer->UpdateWeaponView(bShowViewWeapon);
         }
     }
 
@@ -837,10 +847,12 @@ LTRESULT CLTClientShell::Render()
                 m_pCamera->IsFirstPerson(),
                 pHudWeapon
                     ? (pHudWeapon->bShowCrosshair &&
+                       !m_pCamera->IsWeaponZoomed() &&
                        !m_pChatGui->IsChatInputActive())
                     : false,
                 pHudWeapon ? (pHudWeapon->nClipSize > 0) : false,
-                m_pPlayer->IsMoving());
+                m_pPlayer->IsMoving(),
+                m_pCamera->IsWeaponZoomed());
         }
     }
 
@@ -948,6 +960,21 @@ void CLTClientShell::OnCommandOn(int command)
             {
                 m_pChatGui->SetActive(true);
             }
+            else if(command == COMMAND_ALT_ATTACK)
+            {
+                const FTWeaponDef *pWeaponDef =
+                    m_pPlayer
+                    ? m_pPlayer->GetCurrentWeaponDef()
+                    : LTNULL;
+
+                if(pWeaponDef &&
+                   pWeaponDef->fZoomFovDegrees > 0.0f &&
+                   m_pCamera)
+                {
+                    m_pCamera->ToggleWeaponZoom(
+                        pWeaponDef->fZoomFovDegrees);
+                }
+            }
             else
             if (command == COMMAND_SHOWSTATS)
             {
@@ -1050,6 +1077,7 @@ LTRESULT CLTClientShell::PollInput()
         m_pPlayer->UpdateRotation(offsets[0], 0.0f, 0.0f);
         if(m_pCamera->IsFirstPerson() && offsets[2] != 0.0f)
         {
+            m_pCamera->ClearWeaponZoom();
             m_pPlayer->CycleWeapon(offsets[2] > 0.0f ? 1 : -1);
         }
         else
@@ -1125,10 +1153,17 @@ LTRESULT CLTClientShell::PollInput()
     }
 
 
-	    // Combat Arms knife secondary attack.
-    if (g_pLTClient->IsCommandOn(COMMAND_ALT_ATTACK))
+    // Right mouse is knife secondary for melee, scope toggle for scoped guns.
+    if(g_pLTClient->IsCommandOn(COMMAND_ALT_ATTACK))
     {
-        m_pPlayer->AltAttack();
+        const FTWeaponDef *pAltWeapon =
+            m_pPlayer->GetCurrentWeaponDef();
+
+        if(!pAltWeapon ||
+           pAltWeapon->fZoomFovDegrees <= 0.0f)
+        {
+            m_pPlayer->AltAttack();
+        }
     }
 
     // jump
@@ -1408,6 +1443,7 @@ void CLTClientShell::OnKeyDown(int key, int rep)
         {
            if(key >= '1' && key <= '5')
            {
+               m_pCamera->ClearWeaponZoom();
                m_pPlayer->SelectWeaponSlot((uint8)(key - '0'));
            }
            else if('R' == key)
