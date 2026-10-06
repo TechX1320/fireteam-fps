@@ -131,23 +131,9 @@ if(Test-Path -LiteralPath $gunsPath) {
   $zip = [System.IO.Compression.ZipFile]::OpenRead($gunsPath)
   try {
     Stage-PVWeapon $zip "AK-47" @("AK-47","AK47") @("PV_AR_AK47_SH.LTB") @("PV_AK-47.DTX") @("AK47_ANIBASE.LTB") "Weapons\primary_m_pv\PV_AR_AK47_SH.LTB" "Weapons\primary_t\AK47_PV.DTX" "Weapons\primary_m_pv\AK47_ANIBASE.LTB" "Weapons\primary_snd\AK47"
-    Stage-PVWeapon $zip "Beretta M92FS" @("Beretta_M92FS","M92FS") @("PVMLA_BERETTA_M92FS.LTB") @("PV_BERETTA_M92FS.DTX") @("COLT_MEU_ANIBASE-1.LTB") "Weapons\secondary_m_pv\PVMLA_BERETTA_M92FS.LTB" "Weapons\secondary_t\PV_BERETTA_M92FS.DTX" "Weapons\secondary_m_pv\COLT_MEU_ANIBASE-1.LTB" "Weapons\secondary_snd\BERETTA_M92FS"
-    Stage-PVWeapon $zip "M67" @("M67") @("PVMLA_M67.LTB") @("PV_M67.DTX") @("M67_ANIBASE-1.LTB") "Weapons\grenade_m_pv\PVMLA_M67.LTB" "Weapons\grenade_t\PV_M67.DTX" "Weapons\grenade_m_pv\M67_ANIBASE-1.LTB" "Weapons\grenade_snd\M67"
-    Stage-PVWeapon $zip "LAW" @("LAW") @("PVMLA_LAW.LTB") @("PV_LAW.DTX") @("LAW_ANIBASE.LTB") "Weapons\special_m_pv\PVMLA_LAW.LTB" "Weapons\special_t\PV_LAW.DTX" "Weapons\special_m_pv\LAW_ANIBASE.LTB" "Weapons\special_snd\LAW"
-    Write-Host "[WEAPON] CA projectile assets"
-    $missileModel = $zip.Entries | Where-Object { $_.FullName -ieq "GUNS_PT/MODELS/MISSILE.LTB" } | Select-Object -First 1
-    Copy-ZipEntry $missileModel "Weapons\projectile_m\MISSILE.LTB" | Out-Null
-
-    $missileSkin = $zip.Entries | Where-Object { $_.FullName -ieq "GUNS_PT/SKINS/MISSILE.DTX" } | Select-Object -First 1
-    if(Copy-ZipEntry $missileSkin "Weapons\projectile_t\MISSILE.DTX") {
-      Add-TextureAliases "Weapons\projectile_t\MISSILE.DTX"
-    }
-
-    $projectileSound = $zip.Entries | Where-Object { $_.FullName -ieq "GUNS_PT/SND/GRENADE.WAV" } | Select-Object -First 1
-    Copy-ZipEntry $projectileSound "Weapons\projectile_snd\GRENADE.WAV" | Out-Null
-
-    $explosionSound = $zip.Entries | Where-Object { $_.FullName -ieq "GUNS_SND_IMPACTS/EXPLOSIONS/GREN.WAV" } | Select-Object -First 1
-    Copy-ZipEntry $explosionSound "Weapons\explosive_snd\GREN.WAV" | Out-Null
+    Stage-PVWeapon $zip "Beretta M92FS" @("Beretta_M92FS","M92FS") @("PVMLA_BERETTA_M92FS.LTB") @("PV_BERETTA_M92FS.DTX") @("COLT_MEU_ANIBASE-1.LTB") "Weapons\secondary_m_pv\PVMLA_BERETTA_M92FS.LTB" "Weapons\secondary_t\BERETTA_M92FS_PV.DTX" "Weapons\secondary_m_pv\COLT_MEU_ANIBASE-1.LTB" "Weapons\secondary_snd\BERETTA_M92FS"
+    Stage-PVWeapon $zip "Colt 1911A1 MEU" @("COLT_1911A1_MEU") @("PVMLA_COLT_1911A1_MEU.LTB") @("PV_COLT_1911A1_MEU.DTX") @("COLT_MEU_ANIBASE.LTB","COLT_MEU_ANIBASE-1.LTB") "Weapons\sidearm2_m_pv\PVMLA_COLT_1911A1_MEU.LTB" "Weapons\sidearm2_t\PV_COLT_1911A1_MEU.DTX" "Weapons\sidearm2_m_pv\COLT_MEU_ANIBASE.LTB" "Weapons\sidearm2_snd\COLT_1911A1_MEU"
+    Stage-PVWeapon $zip "L96A1" @("L96A1") @("PVMLA_L96A1.LTB") @("PV_L96A1.DTX") @("L96A1_ANIBASE.LTB") "Weapons\sniper_m_pv\PVMLA_L96A1.LTB" "Weapons\sniper_t\PV_L96A1.DTX" "Weapons\sniper_m_pv\L96A1_ANIBASE.LTB" "Weapons\sniper_snd\L96A1"
   } finally { $zip.Dispose() }
 } else { Write-Host "[SKIP] Guns.zip is not present in assets-local." }
 
@@ -156,9 +142,9 @@ if(Test-Path -LiteralPath $gunsHHPath) {
   try {
     Stage-HHWeapon $zip "AK-47" @("AK-47","AK47") @("HH_AK-47.LTB","HH_AR_AK47_SH.LTB") @("HH_AK-47.DTX","HH_AR_AK47.DTX") "Weapons\primary_m_hh\HH_AK-47.LTB" "Weapons\primary_t\HH_AK-47.DTX"
     Stage-HHWeapon $zip "Beretta M92FS" @("Beretta_M92FS","M92FS") @("HH_PST_M92FS_SH.LTB","HH_BERETTA_M92FS.LTB") @("HH_Beretta_M92FS.DTX","HH_BERETTA_M92FS.DTX") "Weapons\secondary_m_hh\HH_BERETTA_M92FS.LTB" "Weapons\secondary_t\HH_BERETTA_M92FS.DTX"
-    Stage-HHWeapon $zip "M67" @("M67") @("HH_Throwing_M67Frag_SH.LTB","HH_M67.LTB") @("HH_M67.DTX") "Weapons\grenade_m_hh\HH_M67.LTB" "Weapons\grenade_t\HH_M67.DTX"
-    Stage-HHWeapon $zip "LAW" @("LAW") @("HH_LCH_LAW_SH.LTB","HH_LAW.LTB") @("HH_LAW.DTX") "Weapons\special_m_hh\HH_LAW.LTB" "Weapons\special_t\HH_LAW.DTX"
+    Stage-HHWeapon $zip "Colt 1911A1 MEU" @("COLT_1911A1_MEU") @("HH_COLT_1911A1_MEU.LTB") @("HH_COLT_1911A1_MEU.DTX") "Weapons\sidearm2_m_hh\HH_COLT_1911A1_MEU.LTB" "Weapons\sidearm2_t\HH_COLT_1911A1_MEU.DTX"
+    Stage-HHWeapon $zip "L96A1" @("L96A1") @("HH_L96A1.LTB") @("HH_L96A1.DTX") "Weapons\sniper_m_hh\HH_L96A1.LTB" "Weapons\sniper_t\HH_L96A1.DTX"
   } finally { $zip.Dispose() }
 } else { Write-Host "[SKIP] GunsHH.zip is not present in assets-local." }
 
-Write-Host "[OK] Fireteam five-slot weapon asset staging complete."
+Write-Host "[OK] Fireteam stock firearm asset staging complete."
