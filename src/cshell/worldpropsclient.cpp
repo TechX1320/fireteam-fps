@@ -47,8 +47,15 @@ m_nFogFarZ(5000),
 m_bSkyFogEnable(false),
 m_nSkyFogNearZ(0),
 m_nSkyFogFarZ(5000),
+m_bAllSkyPortals(false),
+m_bPanSky(false),
+m_fPanSkyOffsetX(0.0f),
+m_fPanSkyOffsetZ(0.0f),
+m_fPanSkyScaleX(1.0f),
+m_fPanSkyScaleZ(1.0f),
 m_fSkyScale(1.0f)
 {
+    m_szPanSkyTexture[0] = '\0';
 }
 
 
@@ -80,8 +87,18 @@ void CWorldPropsClnt::UnpackWorldProps(ILTMessage_Read *pMsgProps)
 	m_nSkyFogFarZ = pMsgProps->Readuint32();
 	m_fSkyScale = pMsgProps->Readfloat();
 
+    m_bAllSkyPortals = pMsgProps->Readbool();
+    m_bPanSky = pMsgProps->Readbool();
+    pMsgProps->ReadString(
+        m_szPanSkyTexture,
+        sizeof(m_szPanSkyTexture));
+    m_fPanSkyOffsetX = pMsgProps->Readfloat();
+    m_fPanSkyOffsetZ = pMsgProps->Readfloat();
+    m_fPanSkyScaleX = pMsgProps->Readfloat();
+    m_fPanSkyScaleZ = pMsgProps->Readfloat();
+
     g_pLTClient->CPrint(
-        "Fireteam worldprops(client): FarZ=%d Background=%.1f %.1f %.1f Fog=%u color=%.1f %.1f %.1f near=%u far=%u SkyFog=%u near=%u far=%u SkyScale=%.2f",
+        "Fireteam worldprops(client): FarZ=%d Background=%.1f %.1f %.1f Fog=%u color=%.1f %.1f %.1f near=%u far=%u SkyFog=%u near=%u far=%u SkyScale=%.2f AllSky=%u PanSky=%u tex=%s",
         m_nFarZ,
         m_vBackgroundColor.x,
         m_vBackgroundColor.y,
@@ -95,7 +112,12 @@ void CWorldPropsClnt::UnpackWorldProps(ILTMessage_Read *pMsgProps)
         m_bSkyFogEnable ? 1u : 0u,
         m_nSkyFogNearZ,
         m_nSkyFogFarZ,
-        m_fSkyScale);
+        m_fSkyScale,
+        m_bAllSkyPortals ? 1u : 0u,
+        m_bPanSky ? 1u : 0u,
+        m_szPanSkyTexture[0]
+            ? m_szPanSkyTexture
+            : "<none>");
 
 	this->ApplyWorldProps();
 }
@@ -144,6 +166,36 @@ void CWorldPropsClnt::ApplyWorldProps()
 
 	sprintf(buffer, "SkyScale %f", m_fSkyScale);
 	g_pLTClient->RunConsoleString(buffer);
+
+    sprintf(
+        buffer,
+        "AllSkyPortals %d",
+        m_bAllSkyPortals ? 1 : 0);
+    g_pLTClient->RunConsoleString(buffer);
+
+    sprintf(
+        buffer,
+        "PanSky %d",
+        m_bPanSky ? 1 : 0);
+    g_pLTClient->RunConsoleString(buffer);
+
+    if(m_szPanSkyTexture[0])
+    {
+        sprintf(
+            buffer,
+            "PanSkyTexture %s",
+            m_szPanSkyTexture);
+        g_pLTClient->RunConsoleString(buffer);
+    }
+
+    sprintf(buffer, "PanSkyOffsetX %f", m_fPanSkyOffsetX);
+    g_pLTClient->RunConsoleString(buffer);
+    sprintf(buffer, "PanSkyOffsetZ %f", m_fPanSkyOffsetZ);
+    g_pLTClient->RunConsoleString(buffer);
+    sprintf(buffer, "PanSkyScaleX %f", m_fPanSkyScaleX);
+    g_pLTClient->RunConsoleString(buffer);
+    sprintf(buffer, "PanSkyScaleZ %f", m_fPanSkyScaleZ);
+    g_pLTClient->RunConsoleString(buffer);
 }
 
 
