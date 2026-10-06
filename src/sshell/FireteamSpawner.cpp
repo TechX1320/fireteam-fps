@@ -1,6 +1,9 @@
 #include "FireteamSpawner.h"
 #include "serverinterfaces.h"
+#include "msgids.h"
 
+#include <iltcommon.h>
+#include <iltmessage.h>
 #include <ltobjectcreate.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +36,31 @@ static uint32 s_nMaxAlive = 0;
 static float s_fNextSpawnTime = 0.0f;
 static float s_fNextRoundTime = 0.0f;
 static float s_fSpawnInterval = 1.25f;
+
+static void FT_BroadcastRoundState(uint8 nState)
+{
+    ILTMessage_Write *pMsg = LTNULL;
+    if(g_pLTSCommon->CreateMessage(pMsg) != LT_OK ||
+       !pMsg)
+    {
+        return;
+    }
+
+    pMsg->IncRef();
+    pMsg->Writeuint8(MSG_SC_ROUND);
+    pMsg->Writeuint8(nState);
+    pMsg->Writeuint16((uint16)s_nRound);
+    pMsg->Writeuint16((uint16)s_nRoundTarget);
+    pMsg->Writeuint16((uint16)s_nRoundKilled);
+    pMsg->Writeuint16((uint16)s_nRoundAlive);
+
+    g_pLTServer->SendToClient(
+        pMsg->Read(),
+        LTNULL,
+        MESSAGE_GUARANTEED);
+
+    pMsg->DecRef();
+}
 
 Spawner::Spawner()
 {
@@ -200,6 +228,8 @@ void Spawner::StartNextRound()
     g_pLTServer->CPrint(
         "Fireteam: DEV ROUND %u START - %u infected, max %u alive.",
         s_nRound, s_nRoundTarget, s_nMaxAlive);
+
+    FT_BroadcastRoundState(1);
 }
 
 void Spawner::UpdateRoundController()
@@ -269,6 +299,8 @@ void Spawner::UpdateRoundController()
         {
             pSpawn->SpawnCrawlerSeal();
         }
+
+        FT_BroadcastRoundState(0);
     }
 
     float fJitter = ((float)(rand() % 51) / 100.0f);
@@ -293,6 +325,12 @@ void FT_OnFireteamEnemyKilled()
             g_pLTServer->CPrint(
                 "Fireteam: DEV ROUND %u CLEAR - next round in 5 seconds.",
                 s_nRound);
+
+            FT_BroadcastRoundState(2);
+        }
+        else
+        {
+            FT_BroadcastRoundState(0);
         }
     }
 }
