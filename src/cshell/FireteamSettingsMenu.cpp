@@ -37,9 +37,10 @@ static bool s_bOpen = false;
 static bool s_bWindowed = true;
 static uint32 s_nResolution = 1;
 static uint32 s_nSelected = 0;
-static float s_fSensitivityX = 0.004625f;
-static float s_fSensitivityY = 0.004625f;
+static float s_fSensitivityX = 0.001500f;
+static float s_fSensitivityY = 0.001500f;
 static uint32 s_nSoundVolume = 100;
+static float s_fGamma = 1.0f;
 
 static float FTClamp(float fValue, float fMin, float fMax)
 {
@@ -110,6 +111,18 @@ static void FTApplySoundVolume()
     }
 }
 
+static void FTApplyGamma()
+{
+    char szCommand[64];
+
+    sprintf(szCommand, "GammaR %.3f", s_fGamma);
+    g_pLTClient->RunConsoleString(szCommand);
+    sprintf(szCommand, "GammaG %.3f", s_fGamma);
+    g_pLTClient->RunConsoleString(szCommand);
+    sprintf(szCommand, "GammaB %.3f", s_fGamma);
+    g_pLTClient->RunConsoleString(szCommand);
+}
+
 static void FTSaveSettings()
 {
     FILE *pFile = fopen("fireteam-settings.cfg", "wt");
@@ -120,10 +133,11 @@ static void FTSaveSettings()
 
     fprintf(
         pFile,
-        "%.6f %.6f %u %u %u %u\n",
+        "%.6f %.6f %u %.3f %u %u %u\n",
         s_fSensitivityX,
         s_fSensitivityY,
         s_nSoundVolume,
+        s_fGamma,
         s_aResolutions[s_nResolution].nWidth,
         s_aResolutions[s_nResolution].nHeight,
         s_bWindowed ? 1 : 0);
@@ -149,21 +163,41 @@ static void FTLoadSettings()
     float fSensitivityX = s_fSensitivityX;
     float fSensitivityY = s_fSensitivityY;
     uint32 nSoundVolume = s_nSoundVolume;
+    float fGamma = s_fGamma;
     uint32 nWidth = 0;
     uint32 nHeight = 0;
     uint32 nWindowed = 1;
 
     int nRead = sscanf(
         szLine,
-        "%f %f %u %u %u %u",
+        "%f %f %u %f %u %u %u",
         &fSensitivityX,
         &fSensitivityY,
         &nSoundVolume,
+        &fGamma,
         &nWidth,
         &nHeight,
         &nWindowed);
 
-    if(nRead != 6)
+    if(nRead != 7)
+    {
+        // 2026-10 format before gamma was added.
+        if(sscanf(
+            szLine,
+            "%f %f %u %u %u %u",
+            &fSensitivityX,
+            &fSensitivityY,
+            &nSoundVolume,
+            &nWidth,
+            &nHeight,
+            &nWindowed) == 6)
+        {
+            fGamma = 1.0f;
+            nRead = 7;
+        }
+    }
+
+    if(nRead != 7)
     {
         // Previous format: X sensitivity, Y sensitivity, width, height, windowed.
         if(sscanf(
@@ -176,11 +210,12 @@ static void FTLoadSettings()
             &nWindowed) == 5)
         {
             nSoundVolume = 100;
-            nRead = 6;
+            fGamma = 1.0f;
+            nRead = 7;
         }
     }
 
-    if(nRead != 6)
+    if(nRead != 7)
     {
         // Original format: one sensitivity, width, height, windowed.
         float fLegacySensitivity = s_fSensitivityX;
@@ -195,22 +230,28 @@ static void FTLoadSettings()
             fSensitivityX = fLegacySensitivity;
             fSensitivityY = fLegacySensitivity;
             nSoundVolume = 100;
-            nRead = 6;
+            fGamma = 1.0f;
+            nRead = 7;
         }
     }
 
-    if(nRead == 6)
+    if(nRead == 7)
     {
+        // Much finer low-end mouse range. The old 0.0005 floor/step was too
+        // coarse for modern high-DPI mice.
         s_fSensitivityX =
-            FTClamp(fSensitivityX, 0.000500f, 0.020000f);
+            FTClamp(fSensitivityX, 0.000050f, 0.020000f);
         s_fSensitivityY =
-            FTClamp(fSensitivityY, 0.000500f, 0.020000f);
+            FTClamp(fSensitivityY, 0.000050f, 0.020000f);
 
         if(nSoundVolume > 100)
         {
             nSoundVolume = 100;
         }
         s_nSoundVolume = nSoundVolume;
+
+        // Matches the range used by NOLF2's original display screen.
+        s_fGamma = FTClamp(fGamma, 0.50f, 6.00f);
 
         for(uint32 i = 0; i < s_nResolutionCount; ++i)
         {
@@ -284,6 +325,7 @@ void FT_SettingsInit()
     FTLoadSettings();
     FTApplySensitivity();
     FTApplySoundVolume();
+    FTApplyGamma();
 
     if(!s_pFont)
     {
@@ -382,13 +424,13 @@ bool FT_SettingsHandleKey(int nKey)
 
     if(nKey == VK_UP)
     {
-        s_nSelected = (s_nSelected == 0) ? 7 : (s_nSelected - 1);
+        s_nSelected = (s_nSelected == 0) ? 8 : (s_nSelected - 1);
         return true;
     }
 
     if(nKey == VK_DOWN)
     {
-        s_nSelected = (s_nSelected + 1) % 8;
+        s_nSelected = (s_nSelected + 1) % 9;
         return true;
     }
 
@@ -399,8 +441,8 @@ bool FT_SettingsHandleKey(int nKey)
         if(s_nSelected == 0)
         {
             s_fSensitivityX = FTClamp(
-                s_fSensitivityX + (0.000500f * (float)nDirection),
-                0.000500f,
+                s_fSensitivityX + (0.000100f * (float)nDirection),
+                0.000050f,
                 0.020000f);
 
             FTApplySensitivity();
@@ -409,8 +451,8 @@ bool FT_SettingsHandleKey(int nKey)
         else if(s_nSelected == 1)
         {
             s_fSensitivityY = FTClamp(
-                s_fSensitivityY + (0.000500f * (float)nDirection),
-                0.000500f,
+                s_fSensitivityY + (0.000100f * (float)nDirection),
+                0.000050f,
                 0.020000f);
 
             FTApplySensitivity();
@@ -431,6 +473,16 @@ bool FT_SettingsHandleKey(int nKey)
         }
         else if(s_nSelected == 3)
         {
+            s_fGamma = FTClamp(
+                s_fGamma + (0.10f * (float)nDirection),
+                0.50f,
+                6.00f);
+
+            FTApplyGamma();
+            FTSaveSettings();
+        }
+        else if(s_nSelected == 4)
+        {
             int nNew = (int)s_nResolution + nDirection;
 
             if(nNew < 0)
@@ -440,7 +492,7 @@ bool FT_SettingsHandleKey(int nKey)
 
             s_nResolution = (uint32)nNew;
         }
-        else if(s_nSelected == 4)
+        else if(s_nSelected == 5)
         {
             s_bWindowed = !s_bWindowed;
         }
@@ -450,16 +502,16 @@ bool FT_SettingsHandleKey(int nKey)
 
     if(nKey == VK_RETURN)
     {
-        if(s_nSelected == 5)
+        if(s_nSelected == 6)
         {
             FTApplyVideo();
         }
-        else if(s_nSelected == 6)
+        else if(s_nSelected == 7)
         {
             s_bOpen = false;
             g_pLTClient->ClearInput();
         }
-        else if(s_nSelected == 7)
+        else if(s_nSelected == 8)
         {
             g_pLTClient->Shutdown();
         }
@@ -485,7 +537,7 @@ void FT_SettingsRender()
         &nScreenH);
 
     const float fWidth = 560.0f;
-    const float fHeight = 385.0f;
+    const float fHeight = 415.0f;
     const float fX = ((float)nScreenW - fWidth) * 0.5f;
     const float fY = ((float)nScreenH - fHeight) * 0.5f;
 
@@ -516,6 +568,7 @@ void FT_SettingsRender()
         "%s Horizontal Sensitivity  %.2fx\n"
         "%s Vertical Sensitivity    %.2fx\n"
         "%s Game Volume             %u%%\n"
+        "%s Brightness / Gamma      %.2fx\n"
         "%s Resolution              %u x %u\n"
         "%s Display                 %s\n"
         "%s Apply Video\n"
@@ -529,13 +582,15 @@ void FT_SettingsRender()
         s_nSelected == 2 ? ">" : " ",
         s_nSoundVolume,
         s_nSelected == 3 ? ">" : " ",
+        s_fGamma,
+        s_nSelected == 4 ? ">" : " ",
         s_aResolutions[s_nResolution].nWidth,
         s_aResolutions[s_nResolution].nHeight,
-        s_nSelected == 4 ? ">" : " ",
-        s_bWindowed ? "Windowed" : "Fullscreen",
         s_nSelected == 5 ? ">" : " ",
+        s_bWindowed ? "Windowed" : "Fullscreen",
         s_nSelected == 6 ? ">" : " ",
-        s_nSelected == 7 ? ">" : " ");
+        s_nSelected == 7 ? ">" : " ",
+        s_nSelected == 8 ? ">" : " ");
 
     s_pTitle->SetText("FIRETEAM  -  SETTINGS");
     s_pTitle->SetPosition(fX + 32.0f, fY + 28.0f);
