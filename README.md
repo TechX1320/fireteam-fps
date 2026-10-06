@@ -102,23 +102,53 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - Cabin Fever `Spawner` objects are recognized, but bring-up is deliberately capped: only outside perimeter `Spawner_01_01N` is active so testing cannot reproduce the old mass-spawn crash.
 - That single outside spawner creates three human-scale `FireteamZombie` placeholders as an AI/melee validation step. They use temporary HARM-guard visuals while Combat Arms infected assets are brought online. All other imported spawners remain inert.
 - Cabin Fever's map-authored navigation metadata is preserved: `AIRegion`, `AIVolume` fields, and `AINodePatrol` objects load instead of being discarded.
-- Placeholder infected path through the authored AIVolume network using an NOLF2-inspired volume search and shared-opening gates. Their collision is now fixed to NOLF2 CAIHuman's 24 x 53 x 24 half-dimensions, gates use NOLF2's 48-unit spacing, and movement is floor-aware rather than inheriting the HARMGuard animation collision box. They periodically repath, change gates when stuck, and apply local separation.
+- Infected path through the authored AIVolume network using an NOLF2-inspired volume search and shared-opening gates. Collision now prefers the staged CA model's authored animation dimensions, with 24 x 53 x 24 retained only as fallback. Direct pursuit uses an agent-width clearance probe instead of a zero-width sight ray so visible doorways do not automatically bypass the navigation gate.
 - Cabin Fever now has a temporary development round loop using all discovered `Spawner_01_*` perimeter points: staggered randomized spawns, a max-alive cap, round-clear intermission, and simple increasing DEV counts. These values are explicitly temporary until authentic GMS round data is recovered.
 - A 2% bonus crawler easter egg can spawn an original SealHunter seal from a perimeter point. Bonus seals do not count toward round completion.
 - Bowie melee keeps the Combat Arms 135-unit range during bring-up and can damage `FireteamZombie` objects. The old SealHunter single-OBB assumption is patched structurally so persistent local source trees are upgraded correctly.
-- Basic in-game settings are available from Escape: mouse sensitivity, resolution, windowed/fullscreen, Apply Video, Resume and Quit.
-- Fireteam now has a five-slot loadout: `1 = AK-47`, `2 = Beretta M92FS`, `3 = Bowie`, `4 = M67`, `5 = LAW`; number keys and the mouse wheel switch slots.
-- Weapon definitions live in `config/weapons.cfg`. The server owns ammo, damage, cadence, reload completion and explosive damage; clients only request actions and render the selected weapon/HUD.
-- Base AK-47, Beretta, Bowie, M67 and LAW ammo/damage/range values are grounded in the supplied decrypted Combat Arms weapon data. Fire/reload timing and projectile speed remain explicit development approximations where the decrypted data does not establish them.
+- Escape settings now include fine-grained horizontal/vertical mouse sensitivity, game volume, native LithTech/NOLF2 gamma, resolution, windowed/fullscreen, Apply Video, Resume and Quit.
+- The stock five-slot test loadout is now conventional firearms: `1 = AK-47`, `2 = Beretta M92FS`, `3 = Bowie`, `4 = Colt 1911A1 MEU`, `5 = L96A1`. Explosive weapons remain possible mod content but are intentionally not part of the stock game until their FX/projectile presentation is mature.
+- Weapon definitions live in `config/weapons.cfg`. The server owns ammo, damage, cadence and reload completion; clients request actions and render the selected weapon/HUD.
+- The L96A1 has a definition-driven right-mouse scope zoom with an initial FIRETEAM optic overlay. The same config format can support later scoped weapons without hardcoding one rifle.
 - `R` requests a server-authoritative reload. The HUD shows the selected weapon and server-synchronized ammo; crosshair visibility follows each weapon definition (the CA Bowie disables it).
-- Grenades and rockets are server-created projectiles. Splash damage is restricted to Fireteam enemies, preserving the no-friendly-fire rule. LAW currently uses a temporary projectile body until the CA `Missile` projectile visual is reproduced.
+- Round state is now server-broadcast and the client has `ROUND N BEGIN` / `ROUND N CLEAR` announcements plus a persistent round kill/alive line. The Tab scoreboard is Fireteam-oriented and ranks squad members by infected kills.
 - Player damage is real again. The earlier respawn loop was caused by stale PoisonGas hazard code surviving in the local generated source; the build now replaces that function body explicitly. Environmental PoisonGas damage remains disabled until Combat Arms safe/outside volume semantics are reproduced.
+
+## Launcher
+
+A local .NET 8 WinForms launcher now lives under `launcher/FireteamLauncher/`.
+
+Current V1 supports:
+
+- Single Player
+- Host Multiplayer (24-player host path)
+- Join Multiplayer by IP
+- player name
+- Cabin Fever
+- stock loadout display
+- resolution/windowed mode
+- fine mouse sensitivity
+- game volume
+- gamma/brightness
+- an initial Mods & Tools page
+
+Build it separately with `build-launcher.cmd`. The launcher is deliberately
+local/client-side for now; no account or backend is required.
+
+The client now accepts launcher console variables for `fireteammode`,
+`playername`, and `joinip`.
+
+## Loading / model research
+
+- FIRETEAM now uses a lightweight NOLF2-style loading render thread around the synchronous world load so Cabin Fever shows visible loading feedback instead of a black screen.
+- The supplied `ST_M_CHILD.LTB` exposes its animation-name strings directly; LTB-to-LTA conversion is not required just to discover names. Findings are recorded in `docs/CA_MODEL_ANIMATION_NOTES.md`.
+- Normal infected now reapply their CA animation/face/head child models after creation using the same `ILTCommon::SetObjectFilenames` pattern used by NOLF2 CAI. A matching `CM_HLMT_NM_VIRUS_HM` head child is staged for the current headless-model compatibility test.
 
 ## Combat Arms compatibility work
 
 - Local `CLIENTFX.zip` and `ClientFx.fxd` can replace SealHunter's small FxED database without committing commercial files. Cabin Fever references `Foggy_Vio`, which is present in the supplied Combat Arms ClientFX database.
 - Cabin Fever texture references are read directly from the DAT during local staging. Missing flattened paths are aliased to matching extracted textures when the match is unambiguous.
-- A minimal Specialist male body/face/hand asset set is staged from `CharModels-Textur.zip` for upcoming player-model work.
+- Character staging now includes the normal infected CA body, shared animation child, virus face, matching virus head child, and additional known infected bodies for later data-driven variants.
 - LightGroup compatibility now logs the map-authored StartOn/StartColor state and the client's resolved global/base light values during Cabin Fever bring-up. This is diagnostic only; no arbitrary brightness override is applied.
 
 
