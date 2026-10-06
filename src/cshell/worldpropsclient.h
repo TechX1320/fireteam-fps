@@ -58,6 +58,14 @@ private:
 	uint32			m_nSkyFogNearZ;
 	uint32			m_nSkyFogFarZ;
 
+    bool            m_bAllSkyPortals;
+    bool            m_bPanSky;
+    char            m_szPanSkyTexture[256];
+    float           m_fPanSkyOffsetX;
+    float           m_fPanSkyOffsetZ;
+    float           m_fPanSkyScaleX;
+    float           m_fPanSkyScaleZ;
+
 	bool			m_bSkyPanEnable;
 	char			m_szSkyPanTexture[256];
 	int32			m_nSkyPanAutoPanX;
