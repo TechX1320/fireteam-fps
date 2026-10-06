@@ -35,7 +35,7 @@ public:
 	LTRESULT 		CreateCamera();
 	HOBJECT 		GetCamera()		{ return m_hObject; }
 
-    void    		UpdatePosition(HOBJECT hObject);
+    void    		UpdatePosition(HOBJECT hObject, float fEyeHeight);
     void            RefreshViewport();
     void    		UpdatePitch(float pitch);
     void    		UpdateZoom(float zoom);
