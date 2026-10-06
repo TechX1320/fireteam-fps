@@ -831,6 +831,12 @@ void CPlayerSrvr::FirePrimary(
     if(m_nWeaponAmmoInClip[m_nWeaponSlot] == 0)
     {
         SendPrimaryAmmo();
+
+        if(pDef->bAutoReload)
+        {
+            ReloadWeapon();
+        }
+
         return;
     }
 
@@ -850,6 +856,12 @@ void CPlayerSrvr::FirePrimary(
 
     --m_nWeaponAmmoInClip[m_nWeaponSlot];
     SendPrimaryAmmo();
+
+    if(m_nWeaponAmmoInClip[m_nWeaponSlot] == 0 &&
+       pDef->bAutoReload)
+    {
+        ReloadWeapon();
+    }
 
     if(pDef->eType == FT_WEAPON_GRENADE ||
        pDef->eType == FT_WEAPON_ROCKET)
