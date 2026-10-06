@@ -292,6 +292,33 @@ public sealed class MainForm : Form
         };
         panel.Controls.Add(weaponButton);
 
+        var characterButton = new Button
+        {
+            Text = "Open Character Config",
+            Width = 190,
+            Height = 38,
+            FlatStyle = FlatStyle.Flat
+        };
+        characterButton.Click += (_, _) =>
+        {
+            var path = FindEditableConfig("characters.cfg");
+            if(path is null)
+            {
+                MessageBox.Show(
+                    "Could not locate config\\characters.cfg.",
+                    "FIRETEAM",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo(path)
+            {
+                UseShellExecute = true
+            });
+        };
+        panel.Controls.Add(characterButton);
+
         page.Controls.Add(panel);
         return page;
     }
@@ -616,6 +643,59 @@ public sealed class MainForm : Form
     {
         start.ArgumentList.Add(name);
         start.ArgumentList.Add(value);
+    }
+
+    private static string? FindEditableConfig(string fileName)
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        for(var i = 0;
+            current is not null && i < 7;
+            ++i, current = current.Parent)
+        {
+            var source =
+                Path.Combine(
+                    current.FullName,
+                    "config",
+                    fileName);
+
+            if(File.Exists(source) &&
+               File.Exists(Path.Combine(current.FullName, "build.cmd")))
+            {
+                return source;
+            }
+
+            var runtime =
+                Path.Combine(
+                    current.FullName,
+                    "BUILT",
+                    "config",
+                    fileName);
+
+            if(File.Exists(runtime))
+            {
+                return runtime;
+            }
+
+            if(string.Equals(
+                current.Name,
+                "BUILT",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                var direct =
+                    Path.Combine(
+                        current.FullName,
+                        "config",
+                        fileName);
+
+                if(File.Exists(direct))
+                {
+                    return direct;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static string? FindGameDirectory()
