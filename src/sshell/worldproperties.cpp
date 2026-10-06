@@ -37,6 +37,7 @@ extern CLTServerShell *g_pSShell;
 //-----------------------------------------------------------------------------
 BEGIN_CLASS(WorldProperties)
 	ADD_LONGINTPROP_FLAG(FarZ, 10000, PF_DISTANCE)
+    ADD_BOOLPROP(AllSkyPortals, LTFALSE)
 	ADD_COLORPROP_FLAG(BackgroundColor, 0.0f, 0.0f, 0.0f, 0)
 	PROP_DEFINEGROUP(FogProps, PF_GROUP(1))
 		ADD_BOOLPROP_FLAG(FogEnable, false, PF_GROUP(1))
@@ -53,7 +54,18 @@ BEGIN_CLASS(WorldProperties)
 		ADD_LONGINTPROP_FLAG(SkyPanAutoPanZ, 0, PF_DISTANCE | PF_GROUP(2))
 		ADD_REALPROP_FLAG(SkyPanScaleX, 1.0, PF_GROUP(2))
 		ADD_REALPROP_FLAG(SkyPanScaleZ, 1.0, PF_GROUP(2))
-		ADD_REALPROP_FLAG(SkyScale, 1.0, 0)
+
+    // Original Jupiter/NOLF2 names. Imported Combat Arms worlds were authored
+    // against these properties rather than SealHunter's SkyPan aliases.
+    PROP_DEFINEGROUP(PanSkyProps, PF_GROUP(3))
+        ADD_STRINGPROP_FLAG(PanSkyTexture, "", PF_FILENAME | PF_GROUP(3))
+        ADD_BOOLPROP_FLAG(PanSky, false, PF_GROUP(3))
+        ADD_REALPROP_FLAG(PanSkyOffsetX, 0.0, PF_GROUP(3))
+        ADD_REALPROP_FLAG(PanSkyOffsetZ, 0.0, PF_GROUP(3))
+        ADD_REALPROP_FLAG(PanSkyScaleX, 1.0, PF_GROUP(3))
+        ADD_REALPROP_FLAG(PanSkyScaleZ, 1.0, PF_GROUP(3))
+
+	ADD_REALPROP_FLAG(SkyScale, 1.0, 0)
 END_CLASS_DEFAULT_FLAGS(WorldProperties, BaseClass, NULL, NULL, CF_ALWAYSLOAD)
 
 
@@ -73,6 +85,12 @@ m_nFogFarZ(2000),
 m_bSkyFogEnable(false),
 m_nSkyFogNearZ(0),
 m_nSkyFogFarZ(2000),
+m_bAllSkyPortals(false),
+m_bPanSky(false),
+m_fPanSkyOffsetX(0.0f),
+m_fPanSkyOffsetZ(0.0f),
+m_fPanSkyScaleX(1.0f),
+m_fPanSkyScaleZ(1.0f),
 m_bSkyPanEnable(false),
 //m_szSkyPanTexture(NULL),
 m_nSkyPanAutoPanX(0),
@@ -81,6 +99,8 @@ m_fSkyPanScaleX(1.0f),
 m_fSkyPanScaleZ(1.0f),
 m_fSkyScale(1.0f)
 {
+    m_szPanSkyTexture[0] = '\0';
+    m_szSkyPanTexture[0] = '\0';
 }
 
 
@@ -181,6 +201,17 @@ void WorldProperties::ReadProps(ObjectCreateStruct* pStruct)
 	g_pLTServer->GetPropLongInt("SkyFogNearZ", (int32*)&m_nSkyFogNearZ);
 	g_pLTServer->GetPropLongInt("SkyFogFarZ", (int32*)&m_nSkyFogFarZ);
 
+    g_pLTServer->GetPropBool("AllSkyPortals", &m_bAllSkyPortals);
+    g_pLTServer->GetPropBool("PanSky", &m_bPanSky);
+    g_pLTServer->GetPropString(
+        "PanSkyTexture",
+        m_szPanSkyTexture,
+        sizeof(m_szPanSkyTexture));
+    g_pLTServer->GetPropReal("PanSkyOffsetX", &m_fPanSkyOffsetX);
+    g_pLTServer->GetPropReal("PanSkyOffsetZ", &m_fPanSkyOffsetZ);
+    g_pLTServer->GetPropReal("PanSkyScaleX", &m_fPanSkyScaleX);
+    g_pLTServer->GetPropReal("PanSkyScaleZ", &m_fPanSkyScaleZ);
+
 	g_pLTServer->GetPropBool("SkyPanEnable", &m_bSkyPanEnable);
 	/*
 	//	if (m_szSkyPanTexture)
@@ -194,7 +225,7 @@ void WorldProperties::ReadProps(ObjectCreateStruct* pStruct)
 	g_pLTServer->GetPropReal("SkyScale", &m_fSkyScale);
 
     g_pLTServer->CPrint(
-        "Fireteam worldprops(server): FarZ=%u Background=%.1f %.1f %.1f Fog=%u color=%.1f %.1f %.1f near=%u far=%u SkyFog=%u near=%u far=%u SkyScale=%.2f",
+        "Fireteam worldprops(server): FarZ=%u Background=%.1f %.1f %.1f Fog=%u color=%.1f %.1f %.1f near=%u far=%u SkyFog=%u near=%u far=%u SkyScale=%.2f AllSky=%u PanSky=%u tex=%s",
         (uint32)m_nFarZ,
         m_vBackgroundColor.x,
         m_vBackgroundColor.y,
@@ -208,7 +239,12 @@ void WorldProperties::ReadProps(ObjectCreateStruct* pStruct)
         m_bSkyFogEnable ? 1u : 0u,
         (uint32)m_nSkyFogNearZ,
         (uint32)m_nSkyFogFarZ,
-        m_fSkyScale);
+        m_fSkyScale,
+        m_bAllSkyPortals ? 1u : 0u,
+        m_bPanSky ? 1u : 0u,
+        m_szPanSkyTexture[0]
+            ? m_szPanSkyTexture
+            : "<none>");
 
 }
 
@@ -254,6 +290,15 @@ void WorldProperties::SendToClient(HCLIENT hClient)
 		pMsg->Writefloat(m_fSkyPanScaleZ);
 		*/
 		pMsg->Writefloat(m_fSkyScale);
+
+        pMsg->Writebool(m_bAllSkyPortals);
+        pMsg->Writebool(m_bPanSky);
+        pMsg->WriteString(m_szPanSkyTexture);
+        pMsg->Writefloat(m_fPanSkyOffsetX);
+        pMsg->Writefloat(m_fPanSkyOffsetZ);
+        pMsg->Writefloat(m_fPanSkyScaleX);
+        pMsg->Writefloat(m_fPanSkyScaleZ);
+
 		//pMsg->WriteString(m_szSkyPanTexture);
 		g_pLTServer->SendToClient(pMsg->Read(), hClient, MESSAGE_GUARANTEED);
 
