@@ -176,6 +176,40 @@ void FireteamZombie::CreateInfectedFace()
 
     LTRotation rOffset;
     rOffset.Init();
+
+    if(m_Def.bFaceAutoAlign &&
+       m_Def.sFaceAlignNode[0])
+    {
+        HMODELNODE hAlignNode;
+        if(g_pLTSModel->GetNode(
+            m_hFace,
+            m_Def.sFaceAlignNode,
+            hAlignNode) == LT_OK)
+        {
+            LTransform tAlign;
+            if(g_pLTSModel->GetNodeTransform(
+                m_hFace,
+                hAlignNode,
+                tAlign,
+                LTFALSE) == LT_OK)
+            {
+                // The face LTB carries a full skeleton. Attach its root with
+                // the inverse Head-node transform so its Head lands on the
+                // body's Head socket instead of offsetting the full skeleton
+                // above/beside the zombie.
+                vOffset -= tAlign.m_Pos;
+                rOffset = tAlign.m_Rot.Conjugate();
+
+                g_pLTServer->CPrint(
+                    "Fireteam infected: face auto-align node %s local %.1f %.1f %.1f.",
+                    m_Def.sFaceAlignNode,
+                    tAlign.m_Pos.x,
+                    tAlign.m_Pos.y,
+                    tAlign.m_Pos.z);
+            }
+        }
+    }
+
     rOffset.Rotate(
         rOffset.Right(),
         MATH_DEGREES_TO_RADIANS(m_Def.fFaceRotX));
