@@ -278,6 +278,20 @@ public sealed class MainForm : Form
         };
         panel.Controls.Add(modsButton);
 
+        var weaponButton = new Button
+        {
+            Text = "Weapon Tool",
+            Width = 190,
+            Height = 38,
+            FlatStyle = FlatStyle.Flat
+        };
+        weaponButton.Click += (_, _) =>
+        {
+            using var tool = new WeaponToolForm();
+            tool.ShowDialog(this);
+        };
+        panel.Controls.Add(weaponButton);
+
         page.Controls.Add(panel);
         return page;
     }
