@@ -228,6 +228,14 @@ LTRESULT CLTClientShell::OnEngineInitialized(RMode *pMode, LTGUID *pAppGuid)
     assert(m_pChatGui);
     m_pChatGui->Init();
 
+    // Initialize Fireteam presentation/settings before an autostarted world.
+    // This lets gamma/volume apply to the loading screen too and prevents
+    // server round messages from racing HUD initialization.
+    FT_SettingsInit();
+    FT_WeaponHudInit();
+    FT_RoundHudInit();
+    FT_LoadingScreenInit();
+
     HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");
     if(hAutoStart && g_pLTClient->GetVarValueFloat(hAutoStart) != 0.0f)
     {
@@ -289,42 +297,6 @@ LTRESULT CLTClientShell::OnEngineInitialized(RMode *pMode, LTGUID *pAppGuid)
             result = StartNormalGame();
         }
     }
-
-
-
-
-
-
-
-
-
-    FT_SettingsInit();
-    FT_WeaponHudInit();
-    FT_RoundHudInit();
-    FT_LoadingScreenInit();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     return result;
 }
