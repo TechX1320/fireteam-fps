@@ -154,6 +154,22 @@ void FireteamZombie::CreateInfectedFace()
         MAX_CS_FILENAME_LEN,
         m_Def.sFaceTexture);
 
+    if(m_Def.sFaceRenderStyle0[0])
+    {
+        FT_CopyInfectedString(
+            ocs.m_RenderStyleNames[0],
+            MAX_CS_FILENAME_LEN,
+            m_Def.sFaceRenderStyle0);
+    }
+
+    if(m_Def.sFaceRenderStyle1[0])
+    {
+        FT_CopyInfectedString(
+            ocs.m_RenderStyleNames[1],
+            MAX_CS_FILENAME_LEN,
+            m_Def.sFaceRenderStyle1);
+    }
+
     BaseClass *pFace =
         (BaseClass*)g_pLTServer->CreateObject(
             hBaseClass,
@@ -680,6 +696,22 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                         MAX_CS_FILENAME_LEN,
                         m_Def.sBodyTexture1);
 
+                    if(m_Def.sBodyRenderStyle0[0])
+                    {
+                        FT_CopyInfectedString(
+                            pOCS->m_RenderStyleNames[0],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sBodyRenderStyle0);
+                    }
+
+                    if(m_Def.sBodyRenderStyle1[0])
+                    {
+                        FT_CopyInfectedString(
+                            pOCS->m_RenderStyleNames[1],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sBodyRenderStyle1);
+                    }
+
                     if(_stricmp(
                         m_Def.sFaceMode,
                         "child_model") == 0 &&
@@ -776,6 +808,22 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                     modelOCS.m_SkinNames[1],
                     MAX_CS_FILENAME_LEN,
                     m_Def.sBodyTexture1);
+
+                if(m_Def.sBodyRenderStyle0[0])
+                {
+                    FT_CopyInfectedString(
+                        modelOCS.m_RenderStyleNames[0],
+                        MAX_CS_FILENAME_LEN,
+                        m_Def.sBodyRenderStyle0);
+                }
+
+                if(m_Def.sBodyRenderStyle1[0])
+                {
+                    FT_CopyInfectedString(
+                        modelOCS.m_RenderStyleNames[1],
+                        MAX_CS_FILENAME_LEN,
+                        m_Def.sBodyRenderStyle1);
+                }
 
                 if(m_Def.sAnimationModel[0])
                 {
