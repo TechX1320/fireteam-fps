@@ -84,7 +84,7 @@ LTRESULT CLTServerShell::OnServerInitialized()
 
     g_pLTSPhysics->SetStairHeight(16.0f);
 
-    srand(time(NULL));
+    srand((unsigned int)time(NULL));
 
 	return LT_OK;
 }
