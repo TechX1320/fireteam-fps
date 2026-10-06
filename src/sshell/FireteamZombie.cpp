@@ -249,40 +249,75 @@ bool FireteamZombie::HasDirectPathToTarget(
     const LTVector &vFrom,
     const LTVector &vTarget)
 {
-    LTVector vEyeFrom = vFrom;
-    LTVector vEyeTarget = vTarget;
+    LTVector vForward = vTarget - vFrom;
+    vForward.y = 0.0f;
+
+    if(vForward.Mag() < 1.0f)
+    {
+        return true;
+    }
+
+    vForward.Normalize();
+
+    // A center ray can see through a doorway even when the infected's collision
+    // box cannot fit along that exact steering line. Probe a corridor as wide
+    // as the actual model so door jambs keep us on the authored nav gate.
+    LTVector vRight(
+        -vForward.z,
+        0.0f,
+        vForward.x);
+
+    float fHalfWidth = m_vCollisionDims.x;
+    if(m_vCollisionDims.z > fHalfWidth)
+    {
+        fHalfWidth = m_vCollisionDims.z;
+    }
+
+    if(fHalfWidth < 6.0f) fHalfWidth = 6.0f;
 
     const float fProbeHeight =
         m_vCollisionDims.y > 20.0f
         ? m_vCollisionDims.y * 0.45f
         : 12.0f;
 
-    vEyeFrom.y += fProbeHeight;
-    vEyeTarget.y += fProbeHeight;
-
-    IntersectQuery query;
-    IntersectInfo info;
-
-    query.m_From = vEyeFrom;
-    query.m_To = vEyeTarget;
-    query.m_Flags =
-        INTERSECT_OBJECTS |
-        IGNORE_NONSOLID |
-        INTERSECT_HPOLY;
+    const float aOffsets[3] =
+    {
+        0.0f,
+        -(fHalfWidth + 2.0f),
+        (fHalfWidth + 2.0f)
+    };
 
     FTZombieSightFilterData filterData;
     filterData.hZombie = m_hObject;
     filterData.hTarget = hTarget;
 
-    query.m_FilterFn = FTZombieSightFilter;
-    query.m_pUserData = &filterData;
+    for(uint32 i = 0; i < 3; ++i)
+    {
+        LTVector vOffset = vRight * aOffsets[i];
 
-    // No blocking geometry/object between the infected and player means the
-    // player is directly reachable as the steering target. The AIVolume graph
-    // is then only needed when geometry actually blocks pursuit.
-    return !g_pLTServer->IntersectSegment(
-        &query,
-        &info);
+        IntersectQuery query;
+        IntersectInfo info;
+
+        query.m_From = vFrom + vOffset;
+        query.m_To = vTarget + vOffset;
+        query.m_From.y += fProbeHeight;
+        query.m_To.y += fProbeHeight;
+        query.m_Flags =
+            INTERSECT_OBJECTS |
+            IGNORE_NONSOLID |
+            INTERSECT_HPOLY;
+        query.m_FilterFn = FTZombieSightFilter;
+        query.m_pUserData = &filterData;
+
+        if(g_pLTServer->IntersectSegment(
+            &query,
+            &info))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void FireteamZombie::RebuildPath(const LTVector &vTarget)
@@ -546,10 +581,23 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
 
                     if(m_Def.sAnimationModel[0])
                     {
-                        FT_CopyInfectedString(
-                            pOCS->m_Filenames[1],
-                            MAX_CS_FILENAME_LEN,
-                            m_Def.sAnimationModel);
+                        HMODELDB hAnimationModel = LTNULL;
+
+                        if(g_pLTSModel->CacheModelDB(
+                            m_Def.sAnimationModel,
+                            hAnimationModel) == LT_OK)
+                        {
+                            FT_CopyInfectedString(
+                                pOCS->m_Filenames[1],
+                                MAX_CS_FILENAME_LEN,
+                                m_Def.sAnimationModel);
+                        }
+                        else
+                        {
+                            g_pLTServer->CPrint(
+                                "Fireteam infected: could not cache animation child %s.",
+                                m_Def.sAnimationModel);
+                        }
                     }
 
                     FT_CopyInfectedString(
@@ -566,14 +614,31 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                         "child_model") == 0 &&
                        m_Def.sFaceModel[0])
                     {
-                        FT_CopyInfectedString(
-                            pOCS->m_Filenames[2],
-                            MAX_CS_FILENAME_LEN,
-                            m_Def.sFaceModel);
-                        FT_CopyInfectedString(
-                            pOCS->m_SkinNames[2],
-                            MAX_CS_FILENAME_LEN,
-                            m_Def.sFaceTexture);
+                        HMODELDB hFaceModel = LTNULL;
+
+                        if(g_pLTSModel->CacheModelDB(
+                            m_Def.sFaceModel,
+                            hFaceModel) == LT_OK)
+                        {
+                            FT_CopyInfectedString(
+                                pOCS->m_Filenames[2],
+                                MAX_CS_FILENAME_LEN,
+                                m_Def.sFaceModel);
+                            FT_CopyInfectedString(
+                                pOCS->m_SkinNames[2],
+                                MAX_CS_FILENAME_LEN,
+                                m_Def.sFaceTexture);
+
+                            g_pLTServer->CPrint(
+                                "Fireteam infected: cached face child %s.",
+                                m_Def.sFaceModel);
+                        }
+                        else
+                        {
+                            g_pLTServer->CPrint(
+                                "Fireteam infected: could not cache face child %s.",
+                                m_Def.sFaceModel);
+                        }
                     }
                 }
             }
@@ -709,6 +774,39 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
         if(m_nHealth == 0)
         {
             FT_OnFireteamEnemyKilled();
+
+            if(hSender)
+            {
+                HCLASS hPlayerClass =
+                    g_pLTServer->GetClass("CPlayerSrvr");
+                HCLASS hSenderClass =
+                    g_pLTServer->GetObjectClass(hSender);
+
+                if(hPlayerClass &&
+                   hSenderClass &&
+                   g_pLTServer->IsKindOf(
+                       hSenderClass,
+                       hPlayerClass))
+                {
+                    ILTMessage_Write *pKill = LTNULL;
+                    if(g_pLTSCommon->CreateMessage(pKill) == LT_OK &&
+                       pKill)
+                    {
+                        pKill->IncRef();
+                        pKill->Writeuint32(
+                            OBJ_MID_KILLSCORE);
+                        // Legacy score protocol still reads a money field.
+                        pKill->Writefloat(0.0f);
+                        g_pLTServer->SendToObject(
+                            pKill->Read(),
+                            m_hObject,
+                            hSender,
+                            0);
+                        pKill->DecRef();
+                    }
+                }
+            }
+
             g_pLTServer->CPrint(
                 "Fireteam: infected %s killed.",
                 m_bDefLoaded ? m_Def.sId : "unknown");
