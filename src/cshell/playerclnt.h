@@ -46,6 +46,8 @@ public:
     bool                ReloadWeapon();
     void                ReleaseAttackTrigger() { m_bSemiAutoTriggerHeld = false; }
     bool                IsMoving();
+    bool                IsCrouching() const { return m_bCrouching; }
+    float               GetEyeHeight() const { return m_bCrouching ? 42.0f : 65.0f; }
     uint8               GetWeaponSlot() const { return m_nWeaponSlot; }
     const FTWeaponDef*  GetCurrentWeaponDef() const { return FT_GetWeaponDef(m_WeaponDefs, m_nWeaponSlot); }
 
@@ -109,6 +111,9 @@ private:
 
     uint32          	m_iScore;
     float           	m_fMoney;
+
+	//Movement stance.
+    bool                m_bCrouching;
 
 	//Jump vars
 	bool				m_bIsJumping;
