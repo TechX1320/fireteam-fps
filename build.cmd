@@ -152,6 +152,8 @@ copy /y "config\infected.cfg" "%BUILT_DIR%\config\infected.cfg" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\player.cfg" "%BUILT_DIR%\config\player.cfg" >nul
 if errorlevel 1 goto :copyfail
+copy /y "config\characters.cfg" "%BUILT_DIR%\config\characters.cfg" >nul
+if errorlevel 1 goto :copyfail
 copy /y "config\difficulties.cfg" "%BUILT_DIR%\config\difficulties.cfg" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\session.cfg" "%BUILT_DIR%\config\session.cfg" >nul
