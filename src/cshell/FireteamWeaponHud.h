@@ -12,6 +12,7 @@ void FT_RenderWeaponHud(
     bool bFirstPerson,
     bool bShowCrosshair,
     bool bShowAmmo,
-    bool bMoving);
+    bool bMoving,
+    bool bScoped);
 
 #endif
