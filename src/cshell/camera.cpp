@@ -133,7 +133,7 @@ void CCamera::RefreshViewport()
 // CCamera::UpdatePosition(HOBJECT hObject)
 //
 //----------------------------------------------------------------------------
-void CCamera::UpdatePosition(HOBJECT hObject)
+void CCamera::UpdatePosition(HOBJECT hObject, float fEyeHeight)
 {
     RefreshViewport();
 
@@ -152,7 +152,7 @@ void CCamera::UpdatePosition(HOBJECT hObject)
     if (m_bFirstPerson)
     {
         g_pLTCCommon->SetObjectFlags(hObject, OFT_Flags, 0, FLAG_VISIBLE);
-        vPos += vEyeUp * 65.0f;
+        vPos += vEyeUp * fEyeHeight;
         vPos += rRot.Forward() * 3.0f;
         g_pLTClient->SetObjectPosAndRotation(m_hObject, &vPos, &rRot);
         return;
