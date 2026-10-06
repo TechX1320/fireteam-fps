@@ -33,9 +33,10 @@ struct FTInfectedDef
     char sFaceModel[128];
     char sFaceTexture[128];
     char sFaceSocket[64];
+    char sFaceAlignNode[64];
+    bool bFaceAutoAlign;
 
-    // Optional additional head/headgear child model. Combat Arms character
-    // bodies are modular, so some infected require more than the face mesh.
+    // Optional extra modular head/headgear for custom characters.
     char sHeadModel[128];
     char sHeadTexture[128];
 
@@ -94,6 +95,143 @@ inline char* FT_TrimInfectedLine(char *pText)
 inline void FT_InitInfectedDef(FTInfectedDef &def)
 {
     memset(&def, 0, sizeof(def));
+}
+
+inline void FT_ApplyInfectedValue(
+    FTInfectedDef &def,
+    const char *pKey,
+    const char *pValue)
+{
+    if(_stricmp(pKey, "id") == 0)
+        FT_CopyInfectedString(def.sId, sizeof(def.sId), pValue);
+    else if(_stricmp(pKey, "name") == 0)
+        FT_CopyInfectedString(def.sName, sizeof(def.sName), pValue);
+    else if(_stricmp(pKey, "health") == 0)
+        def.nHealth = (uint16)atoi(pValue);
+    else if(_stricmp(pKey, "run_speed") == 0)
+        def.fRunSpeed = (float)atof(pValue);
+    else if(_stricmp(pKey, "attack_damage") == 0)
+        def.nAttackDamage = (uint8)atoi(pValue);
+    else if(_stricmp(pKey, "attack_range") == 0)
+        def.fAttackRange = (float)atof(pValue);
+    else if(_stricmp(pKey, "attack_cooldown") == 0)
+        def.fAttackCooldown = (float)atof(pValue);
+    else if(_stricmp(pKey, "update_seconds") == 0)
+        def.fUpdateSeconds = (float)atof(pValue);
+    else if(_stricmp(pKey, "collision_mode") == 0)
+        FT_CopyInfectedString(def.sCollisionMode, sizeof(def.sCollisionMode), pValue);
+    else if(_stricmp(pKey, "collision_x") == 0)
+        def.fCollisionX = (float)atof(pValue);
+    else if(_stricmp(pKey, "collision_y") == 0)
+        def.fCollisionY = (float)atof(pValue);
+    else if(_stricmp(pKey, "collision_z") == 0)
+        def.fCollisionZ = (float)atof(pValue);
+    else if(_stricmp(pKey, "body_model") == 0)
+        FT_CopyInfectedString(def.sBodyModel, sizeof(def.sBodyModel), pValue);
+    else if(_stricmp(pKey, "animation_model") == 0)
+        FT_CopyInfectedString(def.sAnimationModel, sizeof(def.sAnimationModel), pValue);
+    else if(_stricmp(pKey, "body_texture0") == 0)
+        FT_CopyInfectedString(def.sBodyTexture0, sizeof(def.sBodyTexture0), pValue);
+    else if(_stricmp(pKey, "body_texture1") == 0)
+        FT_CopyInfectedString(def.sBodyTexture1, sizeof(def.sBodyTexture1), pValue);
+    else if(_stricmp(pKey, "face_mode") == 0)
+        FT_CopyInfectedString(def.sFaceMode, sizeof(def.sFaceMode), pValue);
+    else if(_stricmp(pKey, "face_model") == 0)
+        FT_CopyInfectedString(def.sFaceModel, sizeof(def.sFaceModel), pValue);
+    else if(_stricmp(pKey, "face_texture") == 0)
+        FT_CopyInfectedString(def.sFaceTexture, sizeof(def.sFaceTexture), pValue);
+    else if(_stricmp(pKey, "face_socket") == 0)
+        FT_CopyInfectedString(def.sFaceSocket, sizeof(def.sFaceSocket), pValue);
+    else if(_stricmp(pKey, "face_align_node") == 0)
+        FT_CopyInfectedString(def.sFaceAlignNode, sizeof(def.sFaceAlignNode), pValue);
+    else if(_stricmp(pKey, "face_auto_align") == 0)
+        def.bFaceAutoAlign = atoi(pValue) != 0;
+    else if(_stricmp(pKey, "head_model") == 0)
+        FT_CopyInfectedString(def.sHeadModel, sizeof(def.sHeadModel), pValue);
+    else if(_stricmp(pKey, "head_texture") == 0)
+        FT_CopyInfectedString(def.sHeadTexture, sizeof(def.sHeadTexture), pValue);
+    else if(_stricmp(pKey, "face_pos_x") == 0)
+        def.fFacePosX = (float)atof(pValue);
+    else if(_stricmp(pKey, "face_pos_y") == 0)
+        def.fFacePosY = (float)atof(pValue);
+    else if(_stricmp(pKey, "face_pos_z") == 0)
+        def.fFacePosZ = (float)atof(pValue);
+    else if(_stricmp(pKey, "face_rot_x") == 0)
+        def.fFaceRotX = (float)atof(pValue);
+    else if(_stricmp(pKey, "face_rot_y") == 0)
+        def.fFaceRotY = (float)atof(pValue);
+    else if(_stricmp(pKey, "face_rot_z") == 0)
+        def.fFaceRotZ = (float)atof(pValue);
+    else if(_stricmp(pKey, "idle_anim") == 0)
+        FT_CopyInfectedString(def.sIdleAnim, sizeof(def.sIdleAnim), pValue);
+}
+
+inline bool FT_LoadInfectedSection(
+    const char *pFilename,
+    const char *pSectionName,
+    FTInfectedDef &def)
+{
+    FILE *pFile = fopen(pFilename, "rt");
+    if(!pFile)
+    {
+        return false;
+    }
+
+    char sLine[512];
+    char sSection[64];
+    sSection[0] = '\0';
+    bool bFound = false;
+
+    while(fgets(sLine, sizeof(sLine), pFile))
+    {
+        char *pLine = FT_TrimInfectedLine(sLine);
+        if(!pLine[0] || pLine[0] == '#' || pLine[0] == ';')
+        {
+            continue;
+        }
+
+        if(pLine[0] == '[')
+        {
+            char *pEnd = strchr(pLine, ']');
+            if(pEnd)
+            {
+                *pEnd = '\0';
+                FT_CopyInfectedString(
+                    sSection,
+                    sizeof(sSection),
+                    pLine + 1);
+
+                bFound =
+                    (_stricmp(
+                        sSection,
+                        pSectionName) == 0);
+            }
+            continue;
+        }
+
+        if(!bFound)
+        {
+            continue;
+        }
+
+        char *pEquals = strchr(pLine, '=');
+        if(!pEquals)
+        {
+            continue;
+        }
+
+        *pEquals = '\0';
+        char *pKey = FT_TrimInfectedLine(pLine);
+        char *pValue = FT_TrimInfectedLine(pEquals + 1);
+
+        FT_ApplyInfectedValue(
+            def,
+            pKey,
+            pValue);
+    }
+
+    fclose(pFile);
+    return true;
 }
 
 inline bool FT_LoadDefaultInfectedDef(
@@ -161,117 +299,24 @@ inline bool FT_LoadDefaultInfectedDef(
         }
     }
 
+    fclose(pFile);
+
     if(!sDefaultSection[0])
     {
-        fclose(pFile);
         return false;
     }
 
-    rewind(pFile);
-    sSection[0] = '\0';
+    FT_LoadInfectedSection(
+        pFilename,
+        sDefaultSection,
+        def);
 
-    bool bFoundSection = false;
-
-    while(fgets(sLine, sizeof(sLine), pFile))
-    {
-        char *pLine = FT_TrimInfectedLine(sLine);
-        if(!pLine[0] || pLine[0] == '#' || pLine[0] == ';')
-        {
-            continue;
-        }
-
-        if(pLine[0] == '[')
-        {
-            char *pEnd = strchr(pLine, ']');
-            if(pEnd)
-            {
-                *pEnd = '\0';
-                FT_CopyInfectedString(
-                    sSection,
-                    sizeof(sSection),
-                    pLine + 1);
-                bFoundSection =
-                    (_stricmp(sSection, sDefaultSection) == 0);
-            }
-            continue;
-        }
-
-        if(!bFoundSection)
-        {
-            continue;
-        }
-
-        char *pEquals = strchr(pLine, '=');
-        if(!pEquals)
-        {
-            continue;
-        }
-
-        *pEquals = '\0';
-        char *pKey = FT_TrimInfectedLine(pLine);
-        char *pValue = FT_TrimInfectedLine(pEquals + 1);
-
-        if(_stricmp(pKey, "id") == 0)
-            FT_CopyInfectedString(def.sId, sizeof(def.sId), pValue);
-        else if(_stricmp(pKey, "name") == 0)
-            FT_CopyInfectedString(def.sName, sizeof(def.sName), pValue);
-        else if(_stricmp(pKey, "health") == 0)
-            def.nHealth = (uint16)atoi(pValue);
-        else if(_stricmp(pKey, "run_speed") == 0)
-            def.fRunSpeed = (float)atof(pValue);
-        else if(_stricmp(pKey, "attack_damage") == 0)
-            def.nAttackDamage = (uint8)atoi(pValue);
-        else if(_stricmp(pKey, "attack_range") == 0)
-            def.fAttackRange = (float)atof(pValue);
-        else if(_stricmp(pKey, "attack_cooldown") == 0)
-            def.fAttackCooldown = (float)atof(pValue);
-        else if(_stricmp(pKey, "update_seconds") == 0)
-            def.fUpdateSeconds = (float)atof(pValue);
-        else if(_stricmp(pKey, "collision_mode") == 0)
-            FT_CopyInfectedString(def.sCollisionMode, sizeof(def.sCollisionMode), pValue);
-        else if(_stricmp(pKey, "collision_x") == 0)
-            def.fCollisionX = (float)atof(pValue);
-        else if(_stricmp(pKey, "collision_y") == 0)
-            def.fCollisionY = (float)atof(pValue);
-        else if(_stricmp(pKey, "collision_z") == 0)
-            def.fCollisionZ = (float)atof(pValue);
-        else if(_stricmp(pKey, "body_model") == 0)
-            FT_CopyInfectedString(def.sBodyModel, sizeof(def.sBodyModel), pValue);
-        else if(_stricmp(pKey, "animation_model") == 0)
-            FT_CopyInfectedString(def.sAnimationModel, sizeof(def.sAnimationModel), pValue);
-        else if(_stricmp(pKey, "body_texture0") == 0)
-            FT_CopyInfectedString(def.sBodyTexture0, sizeof(def.sBodyTexture0), pValue);
-        else if(_stricmp(pKey, "body_texture1") == 0)
-            FT_CopyInfectedString(def.sBodyTexture1, sizeof(def.sBodyTexture1), pValue);
-        else if(_stricmp(pKey, "face_mode") == 0)
-            FT_CopyInfectedString(def.sFaceMode, sizeof(def.sFaceMode), pValue);
-        else if(_stricmp(pKey, "face_model") == 0)
-            FT_CopyInfectedString(def.sFaceModel, sizeof(def.sFaceModel), pValue);
-        else if(_stricmp(pKey, "face_texture") == 0)
-            FT_CopyInfectedString(def.sFaceTexture, sizeof(def.sFaceTexture), pValue);
-        else if(_stricmp(pKey, "face_socket") == 0)
-            FT_CopyInfectedString(def.sFaceSocket, sizeof(def.sFaceSocket), pValue);
-        else if(_stricmp(pKey, "head_model") == 0)
-            FT_CopyInfectedString(def.sHeadModel, sizeof(def.sHeadModel), pValue);
-        else if(_stricmp(pKey, "head_texture") == 0)
-            FT_CopyInfectedString(def.sHeadTexture, sizeof(def.sHeadTexture), pValue);
-        else if(_stricmp(pKey, "face_pos_x") == 0)
-            def.fFacePosX = (float)atof(pValue);
-        else if(_stricmp(pKey, "face_pos_y") == 0)
-            def.fFacePosY = (float)atof(pValue);
-        else if(_stricmp(pKey, "face_pos_z") == 0)
-            def.fFacePosZ = (float)atof(pValue);
-        else if(_stricmp(pKey, "face_rot_x") == 0)
-            def.fFaceRotX = (float)atof(pValue);
-        else if(_stricmp(pKey, "face_rot_y") == 0)
-            def.fFaceRotY = (float)atof(pValue);
-        else if(_stricmp(pKey, "face_rot_z") == 0)
-            def.fFaceRotZ = (float)atof(pValue);
-        else if(_stricmp(pKey, "idle_anim") == 0)
-            FT_CopyInfectedString(def.sIdleAnim, sizeof(def.sIdleAnim), pValue);
-    }
-
-    fclose(pFile);
+    // Character/model presentation is deliberately a separate file so users
+    // can fix/replace bodies, faces and offsets without touching AI balance.
+    FT_LoadInfectedSection(
+        "config/characters.cfg",
+        sDefaultSection,
+        def);
 
     return def.sId[0] &&
            def.sBodyModel[0] &&
