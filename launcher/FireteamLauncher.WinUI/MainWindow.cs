@@ -1751,8 +1751,7 @@ public sealed partial class MainWindow : Window
                     : PlayerNameBox.Text.Trim(),
                 ModeCombo.SelectedItem?.ToString()
                     ?? "Single Player",
-                DifficultyCombo.SelectedItem?.ToString()
-                    ?? "Normal",
+                DifficultyProfileValue(),
                 string.IsNullOrWhiteSpace(JoinIpBox.Text)
                     ? "127.0.0.1"
                     : JoinIpBox.Text.Trim(),

@@ -718,8 +718,6 @@ public sealed partial class MainWindow
         DifficultySlider.Minimum = 0;
         DifficultySlider.Maximum = 10;
         DifficultySlider.StepFrequency = 1;
-        DifficultySlider.SnapsTo =
-            SliderSnapsTo.StepValues;
         DifficultySlider.Value = 4;
         DifficultySlider.HorizontalAlignment =
             HorizontalAlignment.Stretch;
