@@ -275,6 +275,37 @@ public sealed class WeaponStudioForm : Form
         _enabled.AutoSize = true;
         _enabled.ForeColor = TextMain;
         _enabled.Margin = new Padding(3, 8, 3, 8);
+        _enabled.CheckedChanged += (_, _) =>
+        {
+            if(_suppressChecks ||
+               _doc is null ||
+               string.IsNullOrWhiteSpace(_selectedSection) ||
+               !_selectedSection.StartsWith(
+                   "catalog.",
+                   StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _doc.SetValue(
+                _selectedSection,
+                "enabled",
+                _enabled.Checked ? "1" : "0");
+
+            foreach(ListViewItem item in _weaponList.Items)
+            {
+                if(item.Tag is string section &&
+                   section.Equals(
+                       _selectedSection,
+                       StringComparison.OrdinalIgnoreCase))
+                {
+                    _suppressChecks = true;
+                    item.Checked = _enabled.Checked;
+                    _suppressChecks = false;
+                    break;
+                }
+            }
+        };
         identityGrid.Controls.Add(Label("Catalog state"), 0, 3);
         identityGrid.Controls.Add(_enabled, 1, 3);
 
