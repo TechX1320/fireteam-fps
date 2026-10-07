@@ -149,6 +149,7 @@ private:
 	bool					m_bHavePlayerStartInfo;
     bool                    m_bQaControlDown;
     bool                    m_bQaMenuOpen;
+    bool                    m_bQaMenuKeyHeld;
     bool                    m_bQaZombiesEnabled;
     bool                    m_bQaZombieSettingSent;
     uint8                   m_nQaMoveStepIndex;

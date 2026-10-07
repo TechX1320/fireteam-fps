@@ -130,6 +130,7 @@ m_bFirstUpdate(true),
 m_bHavePlayerStartInfo(false),
 m_bQaControlDown(false),
 m_bQaMenuOpen(false),
+m_bQaMenuKeyHeld(false),
 m_bQaZombiesEnabled(false),
 m_bQaZombieSettingSent(false),
 m_nQaMoveStepIndex(2),
@@ -624,6 +625,7 @@ void CLTClientShell::OnExitWorld()
     m_bHavePlayerStartInfo = false;
     m_bQaControlDown = false;
     m_bQaMenuOpen = false;
+    m_bQaMenuKeyHeld = false;
     m_bQaZombieSettingSent = false;
 
     FT_WeaponHudSetQaMenu(
@@ -1186,16 +1188,61 @@ LTRESULT CLTClientShell::PollInput()
         return LT_OK;
     }
 
-    if(m_pPlayer->IsDevWeaponQa() &&
-       !m_bQaZombieSettingSent)
+    if(m_pPlayer->IsDevWeaponQa())
     {
-        SendQaZombieSetting();
+        if(!m_bQaZombieSettingSent)
+        {
+            SendQaZombieSetting();
 
-        FT_WeaponHudSetQaMenu(
-            m_bQaMenuOpen,
-            g_aQaMoveSteps[
-                m_nQaMoveStepIndex],
-            m_bQaZombiesEnabled);
+            // Weapon QA is an editor workflow, so show the tools immediately
+            // on first entry. Insert/F10 can collapse it afterward.
+            m_bQaMenuOpen = true;
+
+            FT_WeaponHudSetQaMenu(
+                true,
+                g_aQaMoveSteps[
+                    m_nQaMoveStepIndex],
+                m_bQaZombiesEnabled);
+
+            g_pLTClient->CPrint(
+                "Fireteam QA tools: OPEN (Insert or F10 toggles panel).");
+        }
+
+        const bool bQaMenuKeyDown =
+            ((GetAsyncKeyState(
+                  VK_INSERT) &
+              0x8000) != 0) ||
+            ((GetAsyncKeyState(
+                  VK_F10) &
+              0x8000) != 0);
+
+        if(bQaMenuKeyDown &&
+           !m_bQaMenuKeyHeld)
+        {
+            m_bQaMenuOpen =
+                !m_bQaMenuOpen;
+
+            g_pLTClient->ClearInput();
+
+            FT_WeaponHudSetQaMenu(
+                m_bQaMenuOpen,
+                g_aQaMoveSteps[
+                    m_nQaMoveStepIndex],
+                m_bQaZombiesEnabled);
+
+            g_pLTClient->CPrint(
+                "Fireteam QA tools: %s",
+                m_bQaMenuOpen
+                    ? "OPEN"
+                    : "CLOSED");
+        }
+
+        m_bQaMenuKeyHeld =
+            bQaMenuKeyDown;
+    }
+    else
+    {
+        m_bQaMenuKeyHeld = false;
     }
 
 	fFrameTime = g_pLTClient->GetFrameTime();
@@ -1341,6 +1388,19 @@ LTRESULT CLTClientShell::PollInput()
         // after every movement command is sampled so legacy arrow bindings
         // cannot move the player while editing a view model.
         dwMoveFlags = 0;
+
+        // Some legacy bindings can leave residual velocity behind even after
+        // their command flag is suppressed. Pin velocity to zero while the
+        // editor panel is open so arrow-key view-model edits never slide the
+        // player across the map.
+        LTVector vQaStop(
+            0.0f,
+            0.0f,
+            0.0f);
+
+        g_pLTCPhysics->SetVelocity(
+            hPlayer,
+            &vQaStop);
     }
 
     m_pPlayer->UpdateMoveFlags(dwMoveFlags);
@@ -1693,23 +1753,8 @@ void CLTClientShell::OnKeyDown(int key, int rep)
         else
         {
            if(m_pPlayer->IsDevWeaponQa() &&
-              VK_INSERT == key &&
+              'Q' == key &&
               rep == 0)
-           {
-               m_bQaMenuOpen =
-                   !m_bQaMenuOpen;
-
-               g_pLTClient->ClearInput();
-
-               FT_WeaponHudSetQaMenu(
-                   m_bQaMenuOpen,
-                   g_aQaMoveSteps[
-                       m_nQaMoveStepIndex],
-                   m_bQaZombiesEnabled);
-           }
-           else if(m_pPlayer->IsDevWeaponQa() &&
-                   'Q' == key &&
-                   rep == 0)
            {
                m_pPlayer->ToggleDevWeaponQuarantine();
            }

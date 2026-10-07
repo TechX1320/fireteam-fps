@@ -424,7 +424,7 @@ void FT_RenderWeaponHud(
         {
             sprintf(
                 szWeaponLabel,
-                "QA %u/%u  %s%s  [X %.2f Y %.2f Z %.2f]",
+                "QA %u/%u  %s%s  [X %.2f Y %.2f Z %.2f]  [INSERT/F10: TOOLS]",
                 s_nQaCurrent,
                 s_nQaTotal,
                 s_bQaQuarantined
@@ -546,7 +546,7 @@ void FT_RenderWeaponHud(
                 "Q                  enable / disable weapon\n"
                 "Z                  toggle zombies\n"
                 "MOUSE WHEEL        previous / next weapon\n"
-                "INSERT             close QA tools",
+                "INSERT / F10       close QA tools",
                 s_bQaQuarantined
                     ? "[DISABLED] "
                     : "",
