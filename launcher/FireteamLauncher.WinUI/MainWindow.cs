@@ -79,6 +79,13 @@ public sealed partial class MainWindow : Window
     private readonly TextBlock CaImportStatusText = new();
     private readonly TextBox CaImportLogBox = new();
     private readonly Button CaImportRunButton = new();
+    private readonly Button CaAttachmentImportButton = new();
+    private readonly TextBlock CaWeaponsSourceText = new();
+    private readonly TextBlock CaGunsSourceText = new();
+    private readonly TextBlock CaAttachmentsSourceText = new();
+    private string? _caWeaponsPath;
+    private string? _caGunsPath;
+    private string? _caAttachmentsPath;
 
     private readonly ScrollViewer ArsenalView = new();
     private readonly TextBox WeaponSearchBox = new();
@@ -468,11 +475,32 @@ public sealed partial class MainWindow : Window
                                 StringComparison.OrdinalIgnoreCase));
             }
 
-            if(weapon is null &&
-               slot < active.Count)
+            if(weapon is not null &&
+               !CategoryAllowedForSlot(
+                   weapon.LoadoutCategory,
+                   slot))
             {
+                weapon = null;
+            }
+
+            if(weapon is null)
+            {
+                // Old Gear Tabs can predate the slot rules. Prefer a usable
+                // active weapon for this role instead of preserving an
+                // impossible combination such as a Sickle in SIDEARM.
                 weapon =
-                    active[slot];
+                    active.FirstOrDefault(
+                        candidate =>
+                            CategoryAllowedForSlot(
+                                candidate.LoadoutCategory,
+                                slot) &&
+                            HasUsablePlayerView(
+                                candidate)) ??
+                    active.FirstOrDefault(
+                        candidate =>
+                            CategoryAllowedForSlot(
+                                candidate.LoadoutCategory,
+                                slot));
             }
 
             _draftLoadout[slot] =
@@ -635,6 +663,23 @@ public sealed partial class MainWindow : Window
                 category,
                 StringComparer.OrdinalIgnoreCase);
 
+    private static bool HasUsablePlayerView(
+        WeaponDefinition weapon)
+    {
+        if(weapon.Type.Equals(
+               "melee",
+               StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return weapon.Values.TryGetValue(
+                   "pv_model",
+                   out var model) &&
+               !string.IsNullOrWhiteSpace(
+                   model);
+    }
+
     private void SetLoadoutCategory(
         string category)
     {
@@ -777,54 +822,73 @@ public sealed partial class MainWindow : Window
                         candidate,
                         weapon));
 
-        if(equippedSlot >= 0)
-        {
-            var equippedLabel =
-                LoadoutSlotLabel(
-                    equippedSlot);
+        var canEquipHere =
+            CategoryAllowedForSlot(
+                weapon.LoadoutCategory,
+                _selectedLoadoutSlot);
 
+        var selectedSlotLabel =
+            LoadoutSlotLabel(
+                _selectedLoadoutSlot);
+
+        if(canEquipHere)
+        {
             LoadoutEquipSlotCombo.ItemsSource =
                 new[]
                 {
-                    equippedLabel
+                    selectedSlotLabel
                 };
 
             LoadoutEquipSlotCombo.SelectedIndex =
                 0;
 
-            LoadoutEquipButton.Content =
-                "EQUIPPED";
+            if(equippedSlot ==
+               _selectedLoadoutSlot)
+            {
+                LoadoutEquipButton.Content =
+                    "EQUIPPED";
+                LoadoutEquipButton.IsEnabled =
+                    false;
+            }
+            else
+            {
+                LoadoutEquipButton.Content =
+                    equippedSlot >= 0
+                    ? "MOVE WEAPON"
+                    : "EQUIP WEAPON";
 
-            LoadoutEquipButton.IsEnabled =
-                false;
+                LoadoutEquipButton.IsEnabled =
+                    true;
+            }
 
             return;
         }
 
-        var slots =
-            CategoryAllowedForSlot(
-                weapon.LoadoutCategory,
-                _selectedLoadoutSlot)
-                ? new[]
+        if(equippedSlot >= 0)
+        {
+            LoadoutEquipSlotCombo.ItemsSource =
+                new[]
                 {
                     LoadoutSlotLabel(
-                        _selectedLoadoutSlot)
-                }
-                : Array.Empty<string>();
-
-        LoadoutEquipSlotCombo.ItemsSource =
-            slots;
-
-        LoadoutEquipSlotCombo.SelectedIndex =
-            slots.Length > 0
-                ? 0
-                : -1;
-
-        LoadoutEquipButton.Content =
-            "EQUIP WEAPON";
+                        equippedSlot)
+                };
+            LoadoutEquipSlotCombo.SelectedIndex =
+                0;
+            LoadoutEquipButton.Content =
+                "EQUIPPED";
+        }
+        else
+        {
+            LoadoutEquipSlotCombo.ItemsSource =
+                Array.Empty<string>();
+            LoadoutEquipSlotCombo.SelectedIndex =
+                -1;
+            LoadoutEquipButton.Content =
+                "NOT VALID FOR SLOT";
+        }
 
         LoadoutEquipButton.IsEnabled =
-            slots.Length > 0;
+            false;
     }
 
     private static bool SameWeapon(
@@ -942,6 +1006,21 @@ public sealed partial class MainWindow : Window
         if(slot < 0)
         {
             return;
+        }
+
+        for(var index = 0;
+            index < _draftLoadout.Length;
+            ++index)
+        {
+            if(index != slot &&
+               _draftLoadout[index] is not null &&
+               SameWeapon(
+                   _draftLoadout[index]!,
+                   _selectedLoadoutWeapon))
+            {
+                _draftLoadout[index] =
+                    null;
+            }
         }
 
         _draftLoadout[slot] =
@@ -1206,10 +1285,7 @@ public sealed partial class MainWindow : Window
                 10);
 
         DifficultyValueText.Text =
-            $"{level}  •  {DifficultyName(level)}" +
-            (level == 4
-                ? "  •  ORIGINAL NORMAL"
-                : string.Empty);
+            $"{level}  •  {DifficultyName(level)}";
     }
 
     private void RefreshModeVisibility()
@@ -1531,49 +1607,151 @@ public sealed partial class MainWindow : Window
         values[key] = value?.Trim() ?? string.Empty;
     }
 
+    private async void SelectCaWeaponsSourceButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        var path =
+            await PickLauncherFileAsync(
+                ".txt");
+
+        if(path is null)
+        {
+            return;
+        }
+
+        _caWeaponsPath =
+            path;
+
+        CaWeaponsSourceText.Text =
+            Path.GetFileName(
+                path);
+
+        UpdateCaImportReadyState();
+    }
+
+    private async void SelectCaGunsSourceButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        var path =
+            await PickLauncherFileAsync(
+                ".zip");
+
+        if(path is null)
+        {
+            return;
+        }
+
+        _caGunsPath =
+            path;
+
+        CaGunsSourceText.Text =
+            Path.GetFileName(
+                path);
+
+        UpdateCaImportReadyState();
+    }
+
+    private async void SelectCaAttachmentsSourceButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        var path =
+            await PickLauncherFileAsync(
+                ".zip");
+
+        if(path is null)
+        {
+            return;
+        }
+
+        _caAttachmentsPath =
+            path;
+
+        CaAttachmentsSourceText.Text =
+            Path.GetFileName(
+                path);
+
+        UpdateCaImportReadyState();
+    }
+
+    private void UpdateCaImportReadyState()
+    {
+        CaImportRunButton.IsEnabled =
+            !string.IsNullOrWhiteSpace(
+                _caWeaponsPath) &&
+            !string.IsNullOrWhiteSpace(
+                _caGunsPath);
+
+        CaAttachmentImportButton.IsEnabled =
+            !string.IsNullOrWhiteSpace(
+                _caAttachmentsPath);
+
+        if(CaImportRunButton.IsEnabled)
+        {
+            CaImportStatusText.Text =
+                "Weapon sources ready. START WEAPON IMPORT will audit the selected WEAPONS.txt against Guns.zip.";
+        }
+        else if(CaAttachmentImportButton.IsEnabled)
+        {
+            CaImportStatusText.Text =
+                "Attachment archive ready. IMPORT ATTACHMENTS will extract it and rebuild config/attachments.cfg.";
+        }
+        else
+        {
+            CaImportStatusText.Text =
+                "Select the Combat Arms source files you want to work with.";
+        }
+    }
+
     private async void ImportCombatArmsButton_Click(
         object sender,
         RoutedEventArgs e)
     {
+        if(string.IsNullOrWhiteSpace(
+               _caWeaponsPath) ||
+           string.IsNullOrWhiteSpace(
+               _caGunsPath))
+        {
+            CaImportStatusText.Text =
+                "Select WEAPONS.txt and Guns.zip first.";
+            return;
+        }
+
         try
         {
             CaImportRunButton.IsEnabled = false;
+            CaAttachmentImportButton.IsEnabled = false;
             CaImportProgressBar.Value = 0;
             CaImportLogBox.Text = string.Empty;
-            CaImportStatusText.Text = "Choose decrypted Combat Arms WEAPONS.txt...";
 
-            var weaponsPath = await PickLauncherFileAsync(".txt");
-            if(weaponsPath is null)
-            {
-                CaImportStatusText.Text = "Import cancelled.";
-                return;
-            }
+            AppendImportLog(
+                $"WEAPONS: {_caWeaponsPath}");
+            AppendImportLog(
+                $"GUNS: {_caGunsPath}");
+            AppendImportLog(
+                "Archive-first weapon audit started.");
 
-            AppendImportLog($"WEAPONS: {weaponsPath}");
-            CaImportStatusText.Text = "Choose the matching Guns.zip archive...";
+            var progress =
+                new Progress<WeaponImportProgress>(
+                    update =>
+                    {
+                        CaImportProgressBar.Value =
+                            update.Percent;
+                        CaImportStatusText.Text =
+                            $"{update.Stage}  •  {update.Processed}/{update.Total}";
+                        AppendImportLog(
+                            $"[{update.Stage}] {update.Detail}");
+                    });
 
-            var gunsPath = await PickLauncherFileAsync(".zip");
-            if(gunsPath is null)
-            {
-                CaImportStatusText.Text = "Import cancelled.";
-                return;
-            }
-
-            AppendImportLog($"GUNS: {gunsPath}");
-            AppendImportLog("Archive-first audit started. Attribute-only weapons will be skipped.");
-
-            var progress = new Progress<WeaponImportProgress>(update =>
-            {
-                CaImportProgressBar.Value = update.Percent;
-                CaImportStatusText.Text = $"{update.Stage}  •  {update.Processed}/{update.Total}";
-                AppendImportLog($"[{update.Stage}] {update.Detail}");
-            });
-
-            var result = await Task.Run(() =>
-                App.Instance.Services.WeaponImports.Import(
-                    weaponsPath,
-                    gunsPath,
-                    progress));
+            var result =
+                await Task.Run(
+                    () =>
+                        App.Instance.Services.WeaponImports.Import(
+                            _caWeaponsPath,
+                            _caGunsPath,
+                            progress));
 
             App.Instance.Services.Weapons.Invalidate();
             ReloadWeapons(true);
@@ -1583,12 +1761,81 @@ public sealed partial class MainWindow : Window
         }
         catch(Exception ex)
         {
-            CaImportStatusText.Text = "Combat Arms import failed: " + ex.Message;
-            AppendImportLog("[ERROR] " + ex);
+            CaImportStatusText.Text =
+                "Combat Arms weapon import failed: " +
+                ex.Message;
+
+            AppendImportLog(
+                "[ERROR] " +
+                ex);
         }
         finally
         {
-            CaImportRunButton.IsEnabled = true;
+            UpdateCaImportReadyState();
+        }
+    }
+
+    private async void ImportCombatArmsAttachmentsButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if(string.IsNullOrWhiteSpace(
+               _caAttachmentsPath))
+        {
+            CaImportStatusText.Text =
+                "Select Attachments.zip first.";
+            return;
+        }
+
+        try
+        {
+            CaImportRunButton.IsEnabled = false;
+            CaAttachmentImportButton.IsEnabled = false;
+            CaImportProgressBar.Value = 0;
+            CaImportLogBox.Text = string.Empty;
+
+            AppendImportLog(
+                $"ATTACHMENTS: {_caAttachmentsPath}");
+
+            var progress =
+                new Progress<AttachmentImportProgress>(
+                    update =>
+                    {
+                        CaImportProgressBar.Value =
+                            update.Percent;
+                        CaImportStatusText.Text =
+                            $"{update.Stage}  •  {update.Processed}/{update.Total}";
+                        AppendImportLog(
+                            $"[{update.Stage}] {update.Detail}");
+                    });
+
+            var result =
+                await Task.Run(
+                    () =>
+                        App.Instance.Services.AttachmentImports.Import(
+                            _caAttachmentsPath,
+                            progress));
+
+            CaImportProgressBar.Value = 100;
+            CaImportStatusText.Text =
+                result.Summary;
+
+            AppendImportLog(
+                result.Summary);
+        }
+        catch(Exception ex)
+        {
+            CaImportStatusText.Text =
+                "Combat Arms attachment import failed: " +
+                ex.Message;
+
+            AppendImportLog(
+                "[ERROR] " +
+                ex);
+        }
+        finally
+        {
+            UpdateCaImportReadyState();
         }
     }
 
