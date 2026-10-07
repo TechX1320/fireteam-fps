@@ -1271,7 +1271,6 @@ public sealed class WeaponStudioForm : Form
                     entry.Name.EndsWith(".WAV", StringComparison.OrdinalIgnoreCase) &&
                     entry.FullName.Contains("GUNS_SND", StringComparison.OrdinalIgnoreCase) &&
                     tokens.Any(token => Normalize(entry.FullName).Contains(token)))
-                .Take(32)
                 .ToList();
 
             var imported = new ImportedAssetSet();
@@ -1289,9 +1288,19 @@ public sealed class WeaponStudioForm : Form
 
             if(soundEntries.Count > 0)
             {
-                foreach(var entry in soundEntries)
-                    Extract(entry, id, "snd");
-                imported.SoundDir = $"Weapons/imported/{id}/snd";
+                var fire = FindSound(soundEntries, "fire");
+                var reload = FindSound(soundEntries, "reload");
+                var select = FindSound(soundEntries, "select");
+
+                if(fire is not null)
+                    Extract(fire, id, "snd", "FIRE.WAV");
+                if(reload is not null)
+                    Extract(reload, id, "snd", "RELOAD.WAV");
+                if(select is not null)
+                    Extract(select, id, "snd", "SELECT.WAV");
+
+                if(fire is not null || reload is not null || select is not null)
+                    imported.SoundDir = $"Weapons/imported/{id}/snd";
             }
 
             if(imported.PvModel.Length > 0)
@@ -1310,9 +1319,26 @@ public sealed class WeaponStudioForm : Form
             return imported;
         }
 
-        private string Extract(ZipArchiveEntry entry, string id, string bucket)
+        private static ZipArchiveEntry? FindSound(
+            IEnumerable<ZipArchiveEntry> entries,
+            string stem) =>
+            entries
+                .Where(entry =>
+                    entry.Name.Contains(
+                        stem,
+                        StringComparison.OrdinalIgnoreCase))
+                .OrderBy(entry => entry.Name.Length)
+                .ThenBy(entry => entry.FullName)
+                .FirstOrDefault();
+
+        private string Extract(
+            ZipArchiveEntry entry,
+            string id,
+            string bucket,
+            string? outputName = null)
         {
-            var relative = $"Weapons/imported/{id}/{bucket}/{entry.Name}";
+            var relative =
+                $"Weapons/imported/{id}/{bucket}/{outputName ?? entry.Name}";
             var path = Path.Combine(
                 _repoRoot,
                 "assets-local",
