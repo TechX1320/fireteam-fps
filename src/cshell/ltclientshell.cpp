@@ -1588,6 +1588,11 @@ LTRESULT CLTClientShell::PollInput()
                 pMessage->Writeuint8(MSG_CS_SHOOT);
                 pMessage->WriteLTVector(vFirePos);
                 pMessage->WriteLTVector(vFireDir);
+                // Server uses this only to choose authoritative CA perturb:
+                // scoped shots use MinPerturb, no-scope scoped weapons use
+                // MaxPerturb.
+                pMessage->Writebool(
+                    m_pCamera->IsWeaponZoomed());
                 const uint32 nDelivery =
                     (pWeaponDef->eType == FT_WEAPON_GRENADE ||
                      pWeaponDef->eType == FT_WEAPON_ROCKET)
