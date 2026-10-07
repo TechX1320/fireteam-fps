@@ -408,6 +408,14 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
             }
         }
         break;
+    case MSG_CS_AMMO_SYNC:
+        {
+            if(pPlayerClass)
+            {
+                pPlayerClass->SyncPrimaryAmmo();
+            }
+        }
+        break;
     case MSG_CS_SCORE:
         {
             bool bShowStats = pMessage->Readbool();
