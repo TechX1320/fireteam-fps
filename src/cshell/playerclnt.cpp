@@ -59,6 +59,10 @@ m_fNextPrimaryClientShot(0.0f),
 m_bSemiAutoTriggerHeld(false),
 m_bReloading(false),
 m_fReloadComplete(0.0f),
+m_pDevWeaponDefs(NULL),
+m_nDevWeaponCount(0),
+m_nDevWeaponIndex(0),
+m_bDevWeaponQa(false),
 m_bPlayerDefLoaded(false),
 m_bCrouching(false),
 m_bIsJumping(false),
@@ -71,6 +75,65 @@ m_fLeashingDelay(0.0f)
     if(!FT_LoadWeaponDefs("config/weapons.cfg", m_WeaponDefs))
     {
         g_pLTClient->CPrint("Fireteam: failed to load config/weapons.cfg.");
+    }
+
+    HCONSOLEVAR hDevWeaponQa =
+        g_pLTClient->GetConsoleVar(
+            "devweaponqa");
+
+    m_bDevWeaponQa =
+        hDevWeaponQa &&
+        g_pLTClient->GetVarValueFloat(
+            hDevWeaponQa) != 0.0f;
+
+    if(m_bDevWeaponQa)
+    {
+        const uint32 nCatalogCount =
+            FT_CountCatalogWeaponDefs(
+                "config/weapons.cfg");
+
+        m_pDevWeaponDefs =
+            new FTWeaponDef[nCatalogCount + 5];
+
+        if(m_pDevWeaponDefs)
+        {
+            uint32 nActiveCount = 0;
+
+            for(uint8 nSlot = 1;
+                nSlot <= 5;
+                ++nSlot)
+            {
+                const FTWeaponDef *pActive =
+                    FT_GetWeaponDef(
+                        m_WeaponDefs,
+                        nSlot);
+
+                if(pActive)
+                {
+                    m_pDevWeaponDefs[nActiveCount] =
+                        *pActive;
+                    m_pDevWeaponDefs[nActiveCount].nSlot =
+                        1;
+                    ++nActiveCount;
+                }
+            }
+
+            const uint32 nLoadedCatalog =
+                FT_LoadCatalogWeaponDefs(
+                    "config/weapons.cfg",
+                    m_pDevWeaponDefs + nActiveCount,
+                    nCatalogCount);
+
+            m_nDevWeaponCount =
+                nActiveCount +
+                nLoadedCatalog;
+
+            g_pLTClient->CPrint(
+                "Fireteam weapon QA: loaded %u test entries (%u active + %u catalog). Mouse wheel cycles every entry regardless of launcher Enabled state.",
+                m_nDevWeaponCount,
+                nActiveCount,
+                nLoadedCatalog);
+        }
     }
 
     m_bPlayerDefLoaded =
@@ -93,6 +156,13 @@ m_fLeashingDelay(0.0f)
 //-----------------------------------------------------------------------------
 CPlayerClnt::~CPlayerClnt()
 {
+    if(m_pDevWeaponDefs)
+    {
+        delete [] m_pDevWeaponDefs;
+        m_pDevWeaponDefs = NULL;
+        m_nDevWeaponCount = 0;
+    }
+
     if(m_hViewWeaponObject)
     {
         g_pLTClient->RemoveObject(m_hViewWeaponObject);
@@ -658,6 +728,11 @@ bool CPlayerClnt::AltAttack()
 //----------------------------------------------------------------------------
 bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
 {
+    if(m_bDevWeaponQa)
+    {
+        return false;
+    }
+
     const FTWeaponDef *pDef = FT_GetWeaponDef(m_WeaponDefs, nSlot);
     if(!pDef)
     {
@@ -706,6 +781,13 @@ void CPlayerClnt::CycleWeapon(int nDirection)
         return;
     }
 
+    if(m_bDevWeaponQa)
+    {
+        CycleDevWeapon(
+            nDirection);
+        return;
+    }
+
     int nSlot = (int)m_nWeaponSlot;
     for(int nTry = 0; nTry < 5; ++nTry)
     {
@@ -721,6 +803,63 @@ void CPlayerClnt::CycleWeapon(int nDirection)
     }
 }
 
+void CPlayerClnt::CycleDevWeapon(int nDirection)
+{
+    if(!m_pDevWeaponDefs ||
+       m_nDevWeaponCount == 0 ||
+       nDirection == 0)
+    {
+        return;
+    }
+
+    int nNext =
+        (int)m_nDevWeaponIndex +
+        (nDirection > 0
+            ? 1
+            : -1);
+
+    if(nNext >= (int)m_nDevWeaponCount)
+    {
+        nNext = 0;
+    }
+    else if(nNext < 0)
+    {
+        nNext =
+            (int)m_nDevWeaponCount - 1;
+    }
+
+    m_nDevWeaponIndex =
+        (uint32)nNext;
+    m_nWeaponSlot = 1;
+    m_bAttacking = false;
+    m_bViewWeaponAction = false;
+    m_bSemiAutoTriggerHeld = false;
+    m_bReloading = false;
+    m_fReloadComplete = 0.0f;
+    m_fNextPrimaryClientShot = 0.0f;
+
+    CreateViewWeapon();
+
+    const FTWeaponDef *pDef =
+        GetCurrentWeaponDef();
+
+    if(pDef)
+    {
+        g_pLTClient->CPrint(
+            "Fireteam weapon QA [%u/%u]: %s | model=%s | texture=%s | view=<%.2f, %.2f, %.2f>",
+            m_nDevWeaponIndex + 1,
+            m_nDevWeaponCount,
+            pDef->sName,
+            pDef->sPVModel,
+            pDef->sPVTexture,
+            pDef->fViewX,
+            pDef->fViewY,
+            pDef->fViewZ);
+    }
+}
+
+
+//----------------------------------------------------------------------------
 bool CPlayerClnt::ReloadWeapon()
 {
     const FTWeaponDef *pDef = GetCurrentWeaponDef();
@@ -740,7 +879,9 @@ bool CPlayerClnt::ReloadWeapon()
             : 0.10f);
 
     ILTMessage_Write *pMessage = LTNULL;
-    if(g_pLTCCommon->CreateMessage(pMessage) == LT_OK && pMessage)
+    if(!m_bDevWeaponQa &&
+       g_pLTCCommon->CreateMessage(pMessage) == LT_OK &&
+       pMessage)
     {
         pMessage->IncRef();
         pMessage->Writeuint8(MSG_CS_RELOAD);
@@ -1009,6 +1150,23 @@ void CPlayerClnt::CreateViewWeapon()
     if(!pDef)
     {
         return;
+    }
+
+    FT_WeaponHudSetWeaponDefinition(
+        1,
+        pDef);
+
+    if(m_bDevWeaponQa)
+    {
+        FT_WeaponHudSetQaProgress(
+            m_nDevWeaponIndex + 1,
+            m_nDevWeaponCount);
+    }
+    else
+    {
+        FT_WeaponHudSetQaProgress(
+            0,
+            0);
     }
 
     char sLocalModelPath[256];
