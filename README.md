@@ -102,7 +102,7 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - Cabin Fever `Spawner` objects are recognized, but bring-up is deliberately capped: only outside perimeter `Spawner_01_01N` is active so testing cannot reproduce the old mass-spawn crash.
 - That single outside spawner creates three human-scale `FireteamZombie` placeholders as an AI/melee validation step. They use temporary HARM-guard visuals while Combat Arms infected assets are brought online. All other imported spawners remain inert.
 - Cabin Fever's map-authored navigation metadata is preserved: `AIRegion`, `AIVolume` fields, and `AINodePatrol` objects load instead of being discarded.
-- Infected path through the authored AIVolume network using an NOLF2-inspired volume search and shared-opening gates. Collision now prefers the staged CA model's authored animation dimensions, with 24 x 53 x 24 retained only as fallback. Direct pursuit uses an agent-width clearance probe instead of a zero-width sight ray so visible doorways do not automatically bypass the navigation gate.
+- Infected path through the authored AIVolume network using an NOLF2-inspired volume search and shared-opening gates. Collision prefers the staged CA model's authored animation dimensions. Direct pursuit uses agent-width clearance, stuck enemies temporarily force authored volume paths, local obstruction steering can slide around walls, incomplete volume paths get a short dog-leg recovery waypoint, and floor probing now accepts walkable solid WorldModels such as stairs instead of requiring the root BSP world.
 - Cabin Fever now has a temporary development round loop using all discovered `Spawner_01_*` perimeter points: staggered randomized spawns, a max-alive cap, round-clear intermission, and simple increasing DEV counts. These values are explicitly temporary until authentic GMS round data is recovered.
 - A 2% bonus crawler easter egg can spawn an original SealHunter seal from a perimeter point. Bonus seals do not count toward round completion.
 - Bowie melee keeps the Combat Arms 135-unit range during bring-up and can damage `FireteamZombie` objects. The old SealHunter single-OBB assumption is patched structurally so persistent local source trees are upgraded correctly.
@@ -111,7 +111,10 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - Weapon definitions live in `config/weapons.cfg`. The server owns ammo, damage, cadence and reload completion; clients request actions and render the selected weapon/HUD.
 - The L96A1 has a definition-driven right-mouse scope zoom with an initial FIRETEAM optic overlay. The same config format can support later scoped weapons without hardcoding one rifle.
 - `R` requests a server-authoritative reload. The HUD shows the selected weapon and server-synchronized ammo; crosshair visibility follows each weapon definition (the CA Bowie disables it).
-- Round state is now server-broadcast and the client has `ROUND N BEGIN` / `ROUND N CLEAR` announcements plus a persistent round kill/alive line. The Tab scoreboard is Fireteam-oriented and ranks squad members by infected kills.
+- Round state is server-broadcast and the client has `ROUND N BEGIN` / `ROUND N CLEAR` announcements plus a persistent round kill/alive line. The Tab scoreboard is Fireteam-oriented and ranks squad members by infected kills.
+- Normal infected presentation is external in `config/characters.cfg`. The default CA virus mapping now uses `VLST` idle, `VLWFR` walk, `VLRFR` run and `VDIE` death; corpses remain visible briefly for the death animation without blocking players.
+- Hitscan fire now validates the client's real first-person camera origin against the authoritative player body. NOLF2-style reverse-trace penetration is definition-driven; the L96 is the first stock shoot-through test while CA material-specific surface rules are still being mapped.
+- Reload completion explicitly reconciles server ammo back to the client HUD, preventing a completed zero-mag reload from visually staying at zero.
 - Player damage is real again. The earlier respawn loop was caused by stale PoisonGas hazard code surviving in the local generated source; the build now replaces that function body explicitly. Environmental PoisonGas damage remains disabled until Combat Arms safe/outside volume semantics are reproduced.
 
 ## Launcher
@@ -140,9 +143,30 @@ The client now accepts launcher console variables for `fireteammode`,
 
 ## Loading / model research
 
-- FIRETEAM now uses a lightweight NOLF2-style loading render thread around the synchronous world load so Cabin Fever shows visible loading feedback instead of a black screen.
+- FIRETEAM uses a lightweight NOLF2-style loading render thread around the synchronous world load. It now waits for the render thread to actually enter its loop and guarantees a short visible interval, fixing fast loads that could skip the loading presentation entirely.
 - The supplied `ST_M_CHILD.LTB` exposes its animation-name strings directly; LTB-to-LTA conversion is not required just to discover names. Findings are recorded in `docs/CA_MODEL_ANIMATION_NOTES.md`.
 - Normal infected now reapply their CA animation/face/head child models after creation using the same `ILTCommon::SetObjectFilenames` pattern used by NOLF2 CAI. A matching `CM_HLMT_NM_VIRUS_HM` head child is staged for the current headless-model compatibility test.
+
+### Weapon Studio
+
+The launcher now has an Open1320-inspired Weapon Studio with a searchable left
+catalog, grouped gameplay/view/assets panels, active-slot assignment and
+definition-driven penetration/view tuning.
+
+`AUTO IMPORT CA CATALOG` can read decrypted Combat Arms weapon attributes,
+match local `Guns.zip` / `GunsHH.zip` assets, append `[catalog.*]`
+definitions to `config/weapons.cfg`, and extract matched commercial assets
+only into ignored `assets-local/WeaponImports`. Supported firearm/melee
+entries can be enabled/disabled; normal builds stage only enabled catalog
+imports. The runtime continues to consume the active `[weapon1]` through
+`[weapon5]` sections, so any catalog weapon can be copied into a loadout slot.
+
+### Character Studio
+
+The launcher also exposes a Character Studio for body/animation models,
+textures/render styles, face attachment/alignment, animation-state names and
+infected gameplay/collision values across `characters.cfg` and
+`infected.cfg`.
 
 ## Combat Arms compatibility work
 
