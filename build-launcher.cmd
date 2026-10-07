@@ -104,6 +104,24 @@ if not exist "%SHORT_OUTPUT%\FireteamLauncher.exe" (
   goto :fail
 )
 
+if not exist "%SHORT_OUTPUT%\FireteamLauncher.pri" (
+  echo [ERROR] WinUI publish is missing FireteamLauncher.pri.
+  echo         Refusing to stage a launcher that will fail with ERROR_FILE_NOT_FOUND.
+  goto :fail
+)
+
+if not exist "%SHORT_OUTPUT%\Microsoft.ui.xaml.dll" (
+  echo [ERROR] WinUI publish is missing Microsoft.ui.xaml.dll.
+  goto :fail
+)
+
+if not exist "%SHORT_OUTPUT%\Microsoft.WindowsAppRuntime.dll" (
+  echo [ERROR] WinUI publish is missing Microsoft.WindowsAppRuntime.dll.
+  goto :fail
+)
+
+echo [OK] WinUI PRI/runtime validation passed.
+
 echo.
 echo [LAUNCHER 3/4] Staging clean launcher runtime...
 if not exist "%BUILT_DIR%" mkdir "%BUILT_DIR%" >nul
@@ -152,6 +170,16 @@ if not exist "%ROOT_EXE%" (
 
 if not exist "%APP_DIR%\FireteamLauncher.exe" (
   echo [ERROR] Launcher runtime was not staged correctly.
+  goto :fail
+)
+
+if not exist "%APP_DIR%\FireteamLauncher.pri" (
+  echo [ERROR] Launcher PRI did not survive runtime staging.
+  goto :fail
+)
+
+if not exist "%APP_DIR%\Microsoft.ui.xaml.dll" (
+  echo [ERROR] WinUI runtime did not survive runtime staging.
   goto :fail
 )
 

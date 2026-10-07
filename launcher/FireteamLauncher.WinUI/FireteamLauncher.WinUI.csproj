@@ -13,6 +13,10 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <ProjectPriFileName>FireteamLauncher.pri</ProjectPriFileName>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Version>0.3.0</Version>
@@ -26,4 +30,28 @@
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
+
+  <!--
+    Windows App SDK currently has a dotnet-publish regression for unpackaged
+    WinUI apps where the generated app PRI can be omitted from publish output.
+    Force the generated PRI into ResolvedFileToPublish and fail the publish if
+    it is still missing. See microsoft/WindowsAppSDK#6720.
+  -->
+  <Target Name="FireteamAddProjectPriToPublish"
+          BeforeTargets="ComputeResolvedFilesToPublishList"
+          DependsOnTargets="$(GenerateProjectPriFile)">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(ProjectPriFullPath)"
+                             Condition="Exists('$(ProjectPriFullPath)')">
+        <RelativePath>$(ProjectPriFileName)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="FireteamVerifyPublishedPri"
+          AfterTargets="Publish">
+    <Error Condition="!Exists('$(PublishDir)$(ProjectPriFileName)')"
+           Text="FIRETEAM launcher publish is missing $(ProjectPriFileName). Refusing to stage a WinUI runtime that will fail at startup." />
+  </Target>
 </Project>

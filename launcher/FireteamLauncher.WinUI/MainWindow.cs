@@ -25,11 +25,6 @@ public sealed partial class MainWindow : Window
     private WeaponDefinition? _selectedWeapon;
 
     private readonly Grid AppTitleBar = new();
-    private readonly NavigationView RootNavigation = new();
-    private readonly NavigationViewItem HomeItem = new();
-    private readonly NavigationViewItem LoadoutItem = new();
-    private readonly NavigationViewItem ArsenalItem = new();
-    private readonly NavigationViewItem ModsItem = new();
 
     private readonly ScrollViewer HomeView = new();
     private readonly TextBox PlayerNameBox = new();
@@ -89,6 +84,9 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
+        StartupDiagnostics.Write(
+            "MainWindow title bar configured.");
+
         ModeCombo.ItemsSource = new string[]
         {
             "Single Player",
@@ -115,13 +113,28 @@ public sealed partial class MainWindow : Window
 
         ResolutionCombo.ItemsSource = Resolutions;
 
-        LoadProfile();
-        LoadSettings();
-        ReloadWeapons();
-        RefreshToolPaths();
+        StartupDiagnostics.Write(
+            "MainWindow control data sources configured.");
 
-        RootNavigation.SelectedItem = HomeItem;
+        LoadProfile();
+        StartupDiagnostics.Write(
+            "MainWindow profile loaded.");
+
+        LoadSettings();
+        StartupDiagnostics.Write(
+            "MainWindow settings loaded.");
+
+        ReloadWeapons();
+        StartupDiagnostics.Write(
+            "MainWindow weapon catalog loaded.");
+
+        RefreshToolPaths();
+        StartupDiagnostics.Write(
+            "MainWindow tool paths refreshed.");
+
         ShowView("home");
+        StartupDiagnostics.Write(
+            "MainWindow constructor completed.");
     }
 
     private void BuildUi()
@@ -147,29 +160,46 @@ public sealed partial class MainWindow : Window
         Grid.SetRow(AppTitleBar, 0);
         root.Children.Add(AppTitleBar);
 
-        HomeItem.Content = "Home";
-        HomeItem.Tag = "home";
-        LoadoutItem.Content = "Loadout";
-        LoadoutItem.Tag = "loadout";
-        ArsenalItem.Content = "Arsenal";
-        ArsenalItem.Tag = "arsenal";
-        ModsItem.Content = "Mods & Content Tools";
-        ModsItem.Tag = "mods";
+        var body = new Grid();
+        body.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width = new GridLength(220)
+            });
+        body.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width = new GridLength(
+                    1,
+                    GridUnitType.Star)
+            });
 
-        RootNavigation.IsBackButtonVisible =
-            NavigationViewBackButtonVisible.Collapsed;
-        RootNavigation.IsPaneToggleButtonVisible = false;
-        RootNavigation.IsPaneOpen = true;
-        RootNavigation.IsSettingsVisible = true;
-        RootNavigation.OpenPaneLength = 220;
-        RootNavigation.PaneDisplayMode =
-            NavigationViewPaneDisplayMode.Left;
-        RootNavigation.MenuItems.Add(HomeItem);
-        RootNavigation.MenuItems.Add(LoadoutItem);
-        RootNavigation.MenuItems.Add(ArsenalItem);
-        RootNavigation.MenuItems.Add(ModsItem);
-        RootNavigation.SelectionChanged +=
-            RootNavigation_SelectionChanged;
+        var navigation = new StackPanel
+        {
+            Spacing = 6,
+            Margin = new Thickness(12, 18, 12, 18)
+        };
+
+        navigation.Children.Add(
+            NavigationButton(
+                "HOME",
+                "home"));
+        navigation.Children.Add(
+            NavigationButton(
+                "LOADOUT",
+                "loadout"));
+        navigation.Children.Add(
+            NavigationButton(
+                "ARSENAL",
+                "arsenal"));
+        navigation.Children.Add(
+            NavigationButton(
+                "MODS & CONTENT TOOLS",
+                "mods"));
+        navigation.Children.Add(
+            NavigationButton(
+                "SETTINGS",
+                "settings"));
 
         var content = new Grid();
         BuildHomeView();
@@ -184,9 +214,13 @@ public sealed partial class MainWindow : Window
         content.Children.Add(ModsView);
         content.Children.Add(SettingsView);
 
-        RootNavigation.Content = content;
-        Grid.SetRow(RootNavigation, 1);
-        root.Children.Add(RootNavigation);
+        Grid.SetColumn(navigation, 0);
+        Grid.SetColumn(content, 1);
+        body.Children.Add(navigation);
+        body.Children.Add(content);
+
+        Grid.SetRow(body, 1);
+        root.Children.Add(body);
 
         Content = root;
 
@@ -262,6 +296,48 @@ public sealed partial class MainWindow : Window
 
         button.Click += handler;
         return button;
+    }
+
+    private Button NavigationButton(
+        string text,
+        string tag)
+    {
+        var button = new Button
+        {
+            Content = text,
+            HorizontalAlignment =
+                HorizontalAlignment.Stretch,
+            Padding =
+                new Thickness(14, 10, 14, 10)
+        };
+
+        button.Click +=
+            (sender, args) =>
+                NavigateTo(tag);
+
+        return button;
+    }
+
+    private void NavigateTo(string tag)
+    {
+        ShowView(tag);
+
+        if(tag == "loadout")
+        {
+            ReloadWeapons();
+        }
+        else if(tag == "arsenal")
+        {
+            ReloadArsenal();
+        }
+        else if(tag == "mods")
+        {
+            RefreshToolPaths();
+        }
+        else if(tag == "settings")
+        {
+            LoadSettings();
+        }
     }
 
     private void BuildHomeView()
@@ -631,36 +707,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void RootNavigation_SelectionChanged(
-        NavigationView sender,
-        NavigationViewSelectionChangedEventArgs args)
-    {
-        if(args.IsSettingsSelected)
-        {
-            ShowView("settings");
-            LoadSettings();
-            return;
-        }
-
-        if(args.SelectedItemContainer?.Tag is string tag)
-        {
-            ShowView(tag);
-
-            if(tag == "loadout")
-            {
-                ReloadWeapons();
-            }
-            else if(tag == "arsenal")
-            {
-                ReloadArsenal();
-            }
-            else if(tag == "mods")
-            {
-                RefreshToolPaths();
-            }
-        }
-    }
-
     private void ShowView(string tag)
     {
         HomeView.Visibility = tag == "home" ? Visibility.Visible : Visibility.Collapsed;
@@ -821,16 +867,12 @@ public sealed partial class MainWindow : Window
 
     private void EditLoadoutButton_Click(object sender, RoutedEventArgs e)
     {
-        RootNavigation.SelectedItem = LoadoutItem;
-        ShowView("loadout");
-        ReloadWeapons();
+        NavigateTo("loadout");
     }
 
     private void OpenArsenalButton_Click(object sender, RoutedEventArgs e)
     {
-        RootNavigation.SelectedItem = ArsenalItem;
-        ShowView("arsenal");
-        ReloadArsenal();
+        NavigateTo("arsenal");
     }
 
     private void ApplyLoadoutButton_Click(object sender, RoutedEventArgs e)
