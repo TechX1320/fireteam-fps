@@ -31,6 +31,8 @@
 #include <string.h>
 #include "FireteamPoisonGas.h"
 #include "FireteamExplosiveProjectile.h"
+#include "FireteamDifficultyDefs.h"
+#include "FireteamZombie.h"
 
 
 //-----------------------------------------------------------------------------
@@ -52,6 +54,81 @@ static bool FTFireFilter(HOBJECT hObject, void *pUserData)
 
     return hObject != pData->hPlayer &&
            hObject != pData->hWeapon;
+}
+
+
+static float FT_StackedPowerupUntil(
+    float fCurrentUntil,
+    float fBaseSeconds,
+    uint8 &nStack,
+    float &fAddedSeconds)
+{
+    fAddedSeconds = 0.0f;
+
+    if(fBaseSeconds <= 0.0f)
+    {
+        return fCurrentUntil;
+    }
+
+    const float fNow =
+        g_pLTServer->GetTime();
+
+    if(fCurrentUntil <=
+       fNow)
+    {
+        fCurrentUntil =
+            fNow;
+        nStack =
+            0;
+    }
+
+    if(nStack < 255)
+    {
+        ++nStack;
+    }
+
+    const uint32 nDifficulty =
+        FT_GetActiveDifficultyLevel(
+            "config/session.cfg");
+
+    float fFactor =
+        1.0f;
+
+    // Normal (4) and below get full-duration stacking. Medium/Hard keep
+    // stacking, but follow the requested 30s -> 25s -> 15s style taper.
+    if(nDifficulty >= 5 &&
+       nStack > 1)
+    {
+        if(nDifficulty <= 6)
+        {
+            if(nStack == 2) fFactor = 0.833333f;
+            else if(nStack == 3) fFactor = 0.50f;
+            else if(nStack == 4) fFactor = 0.333333f;
+            else fFactor = 0.20f;
+        }
+        else if(nDifficulty <= 8)
+        {
+            if(nStack == 2) fFactor = 0.75f;
+            else if(nStack == 3) fFactor = 0.40f;
+            else if(nStack == 4) fFactor = 0.25f;
+            else fFactor = 0.15f;
+        }
+        else
+        {
+            if(nStack == 2) fFactor = 0.50f;
+            else if(nStack == 3) fFactor = 0.25f;
+            else if(nStack == 4) fFactor = 0.15f;
+            else fFactor = 0.10f;
+        }
+    }
+
+    fAddedSeconds =
+        fBaseSeconds *
+        fFactor;
+
+    return
+        fCurrentUntil +
+        fAddedSeconds;
 }
 
 
@@ -902,6 +979,16 @@ void CPlayerSrvr::ApplyDamage(uint8 nDamage)
         return;
     }
 
+    if(g_pLTServer->GetTime() <
+       m_fGodUntil)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam: %s GOD MODE absorbed %u damage.",
+            m_sName,
+            (uint32)nDamage);
+        return;
+    }
+
     m_nHealth = (nDamage >= m_nHealth) ? 0 : (uint8)(m_nHealth - nDamage);
     g_pLTServer->CPrint(
         "Fireteam: %s took %u damage (%u/%u HP).",
@@ -941,8 +1028,13 @@ void CPlayerSrvr::Respawn()
     m_nReloadSlot = 0;
     m_fBottomlessUntil = 0.0f;
     m_fOneHitUntil = 0.0f;
+    m_fGodUntil = 0.0f;
+    m_nBottomlessStacks = 0;
+    m_nOneHitStacks = 0;
+    m_nGodStacks = 0;
     m_bBottomlessWasActive = false;
     m_bOneHitWasActive = false;
+    m_bGodWasActive = false;
     m_fLastKillFeedbackTime = 0.0f;
     m_nKillFeedbackChain = 0;
 
@@ -1053,11 +1145,25 @@ void CPlayerSrvr::SendPowerupState()
         ? (m_fOneHitUntil - fNow)
         : 0.0f;
 
+    float fGod =
+        m_bGodWasActive
+        ? (m_fGodUntil - fNow)
+        : 0.0f;
+
+    float fWallhack =
+        FT_GetZombieWallhackRemaining();
+
     if(fBottomless < 0.0f)
         fBottomless = 0.0f;
 
     if(fOneHit < 0.0f)
         fOneHit = 0.0f;
+
+    if(fGod < 0.0f)
+        fGod = 0.0f;
+
+    if(fWallhack < 0.0f)
+        fWallhack = 0.0f;
 
     ILTMessage_Write *pMsg = LTNULL;
 
@@ -1075,6 +1181,10 @@ void CPlayerSrvr::SendPowerupState()
         fBottomless);
     pMsg->Writefloat(
         fOneHit);
+    pMsg->Writefloat(
+        fGod);
+    pMsg->Writefloat(
+        fWallhack);
 
     g_pLTServer->SendToClient(
         pMsg->Read(),
@@ -1164,16 +1274,15 @@ void CPlayerSrvr::GrantBottomless(
         return;
     }
 
-    const float fUntil =
-        g_pLTServer->GetTime() +
-        fSeconds;
+    float fAdded =
+        0.0f;
 
-    if(fUntil >
-       m_fBottomlessUntil)
-    {
-        m_fBottomlessUntil =
-            fUntil;
-    }
+    m_fBottomlessUntil =
+        FT_StackedPowerupUntil(
+            m_fBottomlessUntil,
+            fSeconds,
+            m_nBottomlessStacks,
+            fAdded);
 
     const FTWeaponDef *pDef =
         FT_GetWeaponDef(
@@ -1195,6 +1304,12 @@ void CPlayerSrvr::GrantBottomless(
     m_bBottomlessWasActive =
         true;
 
+    g_pLTServer->CPrint(
+        "Fireteam powerup: %s BOTTOMLESS stack %u +%.1fs.",
+        m_sName,
+        (uint32)m_nBottomlessStacks,
+        fAdded);
+
     SendPowerupState();
 }
 
@@ -1206,19 +1321,54 @@ void CPlayerSrvr::GrantOneHit(
         return;
     }
 
-    const float fUntil =
-        g_pLTServer->GetTime() +
-        fSeconds;
+    float fAdded =
+        0.0f;
 
-    if(fUntil >
-       m_fOneHitUntil)
-    {
-        m_fOneHitUntil =
-            fUntil;
-    }
+    m_fOneHitUntil =
+        FT_StackedPowerupUntil(
+            m_fOneHitUntil,
+            fSeconds,
+            m_nOneHitStacks,
+            fAdded);
 
     m_bOneHitWasActive =
         true;
+
+    g_pLTServer->CPrint(
+        "Fireteam powerup: %s ONE HIT stack %u +%.1fs.",
+        m_sName,
+        (uint32)m_nOneHitStacks,
+        fAdded);
+
+    SendPowerupState();
+}
+
+void CPlayerSrvr::GrantGodMode(
+    float fSeconds)
+{
+    if(fSeconds <= 0.0f)
+    {
+        return;
+    }
+
+    float fAdded =
+        0.0f;
+
+    m_fGodUntil =
+        FT_StackedPowerupUntil(
+            m_fGodUntil,
+            fSeconds,
+            m_nGodStacks,
+            fAdded);
+
+    m_bGodWasActive =
+        true;
+
+    g_pLTServer->CPrint(
+        "Fireteam powerup: %s GOD MODE stack %u +%.1fs.",
+        m_sName,
+        (uint32)m_nGodStacks,
+        fAdded);
 
     SendPowerupState();
 }
@@ -1235,6 +1385,8 @@ void CPlayerSrvr::UpdatePowerups()
     {
         m_bBottomlessWasActive =
             false;
+        m_nBottomlessStacks =
+            0;
         bChanged = true;
     }
 
@@ -1243,6 +1395,18 @@ void CPlayerSrvr::UpdatePowerups()
     {
         m_bOneHitWasActive =
             false;
+        m_nOneHitStacks =
+            0;
+        bChanged = true;
+    }
+
+    if(m_bGodWasActive &&
+       fNow >= m_fGodUntil)
+    {
+        m_bGodWasActive =
+            false;
+        m_nGodStacks =
+            0;
         bChanged = true;
     }
 
