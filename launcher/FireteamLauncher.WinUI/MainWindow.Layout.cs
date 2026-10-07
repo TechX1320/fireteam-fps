@@ -82,6 +82,8 @@ public sealed partial class MainWindow
 
         BuildHomeView();
         BuildLoadoutView();
+        BuildPlayerGearView();
+        BuildWeaponModsView();
         BuildCaImportView();
         BuildArsenalView();
         BuildModsView();
@@ -89,6 +91,8 @@ public sealed partial class MainWindow
 
         content.Children.Add(HomeView);
         content.Children.Add(LoadoutView);
+        content.Children.Add(PlayerGearView);
+        content.Children.Add(WeaponModsView);
         content.Children.Add(CaImportView);
         content.Children.Add(ArsenalView);
         content.Children.Add(ModsView);
@@ -253,10 +257,31 @@ public sealed partial class MainWindow
         bar.Children.Add(
             playButton);
 
+        var loadoutButton =
+            SecondaryButton("LOADOUT  ▾");
+        var loadoutMenu =
+            new MenuFlyout();
+
+        loadoutMenu.Items.Add(
+            MenuItem(
+                "Weapon Loadout",
+                () => NavigateTo(
+                    "loadout")));
+        loadoutMenu.Items.Add(
+            MenuItem(
+                "Player Gear",
+                () => NavigateTo(
+                    "player-gear")));
+        loadoutMenu.Items.Add(
+            MenuItem(
+                "Weapon Mods",
+                () => NavigateTo(
+                    "weapon-mods")));
+
+        loadoutButton.Flyout =
+            loadoutMenu;
         bar.Children.Add(
-            NavButton(
-                "LOADOUT",
-                "loadout"));
+            loadoutButton);
 
         var toolsButton =
             SecondaryButton("TOOLS  ▾");
@@ -586,6 +611,288 @@ public sealed partial class MainWindow
         panel.Children.Add(header);
         return panel;
     }
+
+    private void BuildPlayerGearView()
+    {
+        PlayerGearView.HorizontalScrollBarVisibility =
+            ScrollBarVisibility.Disabled;
+        PlayerGearView.VerticalScrollBarVisibility =
+            ScrollBarVisibility.Auto;
+        PlayerGearView.HorizontalContentAlignment =
+            HorizontalAlignment.Center;
+
+        var page =
+            NewPagePanel(
+                "PLAYER LOADOUT",
+                "Player Gear",
+                "A dedicated equipment layer for backpacks, armor and wearable Combat Arms attachments. This page is the launcher home for the player-side loadout instead of mixing gear into weapon slots.");
+
+        var grid =
+            new Grid
+            {
+                ColumnSpacing = 16,
+                RowSpacing = 16
+            };
+
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+        grid.RowDefinitions.Add(
+            new RowDefinition
+            {
+                Height = GridLength.Auto
+            });
+        grid.RowDefinitions.Add(
+            new RowDefinition
+            {
+                Height = GridLength.Auto
+            });
+
+        Border GearCard(
+            string eyebrow,
+            string title,
+            string body,
+            string status)
+        {
+            var panel =
+                CardHeading(
+                    eyebrow,
+                    title,
+                    body,
+                    CyanBrush);
+
+            panel.Children.Add(
+                new TextBlock
+                {
+                    Text = status,
+                    FontFamily =
+                        new FontFamily(
+                            "Bahnschrift SemiCondensed"),
+                    FontSize = 12,
+                    FontWeight =
+                        Microsoft.UI.Text.FontWeights.Bold,
+                    Foreground = AccentBrush,
+                    Margin =
+                        new Thickness(
+                            0, 8, 0, 0)
+                });
+
+            return Card(
+                panel,
+                CyanBrush);
+        }
+
+        var backpack =
+            GearCard(
+                "BACKPACK SLOT",
+                "Backpack",
+                "Visual inventory/utility slot sourced from the staged Combat Arms attachment catalog. Capacity bonuses can be layered on later.",
+                "NOT EQUIPPED");
+
+        var armor =
+            GearCard(
+                "ARMOR SLOT",
+                "Body Armor",
+                "Reserved for the planned blue Armor bar above HP. Armor will absorb damage first and create another useful pickup/reward type.",
+                "NO ARMOR");
+
+        var head =
+            GearCard(
+                "HEAD SLOT",
+                "Headgear",
+                "Helmets and head attachments stay independent from backpack and armor so cosmetics do not need to change gameplay.",
+                "NOT EQUIPPED");
+
+        var face =
+            GearCard(
+                "FACE SLOT",
+                "Mask / Glasses",
+                "Face gear, glasses and masks from the attachment archive can live here without consuming a weapon slot.",
+                "NOT EQUIPPED");
+
+        Grid.SetRow(backpack, 0);
+        Grid.SetColumn(backpack, 0);
+        Grid.SetRow(armor, 0);
+        Grid.SetColumn(armor, 1);
+        Grid.SetRow(head, 1);
+        Grid.SetColumn(head, 0);
+        Grid.SetRow(face, 1);
+        Grid.SetColumn(face, 1);
+
+        grid.Children.Add(backpack);
+        grid.Children.Add(armor);
+        grid.Children.Add(head);
+        grid.Children.Add(face);
+
+        page.Children.Add(grid);
+
+        var source =
+            CardHeading(
+                "CONTENT SOURCE",
+                "Combat Arms Attachments",
+                "ATTACHMENTS.zip contains the player attachment models/textures we inspected. The next importer pass will turn those filenames into a filterable gear catalog instead of hard-coding hundreds of assets.",
+                AccentBrush);
+
+        page.Children.Add(
+            Card(
+                source,
+                AccentBrush));
+
+        PlayerGearView.Content =
+            page;
+    }
+
+    private void BuildWeaponModsView()
+    {
+        WeaponModsView.HorizontalScrollBarVisibility =
+            ScrollBarVisibility.Disabled;
+        WeaponModsView.VerticalScrollBarVisibility =
+            ScrollBarVisibility.Auto;
+        WeaponModsView.HorizontalContentAlignment =
+            HorizontalAlignment.Center;
+
+        var page =
+            NewPagePanel(
+                "WEAPON LOADOUT",
+                "Weapon Mods",
+                "Dedicated weapon modification space for optics, muzzle devices, magazines and carried ammunition. These are separate from the base Weapon Catalog definition.");
+
+        var grid =
+            new Grid
+            {
+                ColumnSpacing = 16,
+                RowSpacing = 16
+            };
+
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+        grid.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+        grid.RowDefinitions.Add(
+            new RowDefinition
+            {
+                Height = GridLength.Auto
+            });
+        grid.RowDefinitions.Add(
+            new RowDefinition
+            {
+                Height = GridLength.Auto
+            });
+
+        Border ModCard(
+            string eyebrow,
+            string title,
+            string body)
+        {
+            var panel =
+                CardHeading(
+                    eyebrow,
+                    title,
+                    body,
+                    AccentBrush);
+
+            panel.Children.Add(
+                new TextBlock
+                {
+                    Text = "NO MOD INSTALLED",
+                    FontFamily =
+                        new FontFamily(
+                            "Bahnschrift SemiCondensed"),
+                    FontSize = 12,
+                    FontWeight =
+                        Microsoft.UI.Text.FontWeights.Bold,
+                    Foreground = CyanBrush,
+                    Margin =
+                        new Thickness(
+                            0, 8, 0, 0)
+                });
+
+            return Card(
+                panel,
+                AccentBrush);
+        }
+
+        var optic =
+            ModCard(
+                "OPTIC SLOT",
+                "Scope / Sight",
+                "Future optics can change FOV, overlay/crosshair presentation and zoom behavior without creating a duplicate base weapon.");
+
+        var muzzle =
+            ModCard(
+                "MUZZLE SLOT",
+                "Suppressor / Muzzle",
+                "Suppressors are planned to reduce the sound radius used by zombie hearing once auditory aggro is added.");
+
+        var magazine =
+            ModCard(
+                "MAGAZINE SLOT",
+                "Magazine",
+                "Extended magazines can alter magazine capacity while preserving the weapon's core damage/fire-rate definition.");
+
+        var ammo =
+            ModCard(
+                "AMMO SLOT",
+                "Reserve / Ammo Stash",
+                "Extra carried ammunition can increase reserve capacity independently from magazine size and create useful backpack tradeoffs.");
+
+        Grid.SetRow(optic, 0);
+        Grid.SetColumn(optic, 0);
+        Grid.SetRow(muzzle, 0);
+        Grid.SetColumn(muzzle, 1);
+        Grid.SetRow(magazine, 1);
+        Grid.SetColumn(magazine, 0);
+        Grid.SetRow(ammo, 1);
+        Grid.SetColumn(ammo, 1);
+
+        grid.Children.Add(optic);
+        grid.Children.Add(muzzle);
+        grid.Children.Add(magazine);
+        grid.Children.Add(ammo);
+
+        page.Children.Add(grid);
+
+        var note =
+            CardHeading(
+                "DATA MODEL",
+                "Base weapon + installed mods",
+                "The launcher now has a separate destination for weapon customization. Gameplay hooks and the attachment importer come next; the Weapon Editor remains the base-stat/content-authoring tool.",
+                CyanBrush);
+
+        page.Children.Add(
+            Card(
+                note,
+                CyanBrush));
+
+        WeaponModsView.Content =
+            page;
+    }
+
 
     private void BuildHomeView()
     {
