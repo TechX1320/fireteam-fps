@@ -1413,6 +1413,19 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
                 m_hObject,
                 &vStop);
 
+            // A dying infected becomes a visual corpse immediately so it does
+            // not block teammates/players while its death animation finishes.
+            g_pLTSCommon->SetObjectFlags(
+                m_hObject,
+                OFT_Flags,
+                0,
+                FLAG_SOLID);
+            g_pLTSCommon->SetObjectFlags(
+                m_hObject,
+                OFT_Flags2,
+                0,
+                FLAG2_PLAYERCOLLIDE);
+
             SetZombieAnimation(
                 m_Def.sDeathAnim,
                 false);
