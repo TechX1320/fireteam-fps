@@ -34,6 +34,167 @@
 #define JUMP_TIME 0.18f
 #define JUMP_VELOCITY 400.0f
 #define DEFAULT_LEASHTIME 2.0f
+#define FT_WEAPON_QA_QUARANTINE_FILE "config/weapon-quarantine.txt"
+
+static bool FT_IsWeaponQaQuarantined(
+    const char *pSection)
+{
+    if(!pSection ||
+       !pSection[0])
+    {
+        return false;
+    }
+
+    FILE *pFile =
+        fopen(
+            FT_WEAPON_QA_QUARANTINE_FILE,
+            "rt");
+
+    if(!pFile)
+    {
+        return false;
+    }
+
+    char sLine[256];
+    bool bFound = false;
+
+    while(fgets(
+        sLine,
+        sizeof(sLine),
+        pFile))
+    {
+        char *pLine =
+            FT_TrimWeaponLine(
+                sLine);
+
+        if(!pLine[0] ||
+           pLine[0] == '#' ||
+           pLine[0] == ';')
+        {
+            continue;
+        }
+
+        if(_stricmp(
+               pLine,
+               pSection) == 0)
+        {
+            bFound = true;
+            break;
+        }
+    }
+
+    fclose(pFile);
+    return bFound;
+}
+
+static bool FT_SetWeaponQaQuarantined(
+    const char *pSection,
+    bool bQuarantined)
+{
+    if(!pSection ||
+       _strnicmp(
+           pSection,
+           "catalog.",
+           8) != 0)
+    {
+        return false;
+    }
+
+    const char *pTempPath =
+        "config/weapon-quarantine.tmp";
+
+    FILE *pOutput =
+        fopen(
+            pTempPath,
+            "wt");
+
+    if(!pOutput)
+    {
+        return false;
+    }
+
+    FILE *pInput =
+        fopen(
+            FT_WEAPON_QA_QUARANTINE_FILE,
+            "rt");
+
+    bool bFound = false;
+    bool bWroteAny = false;
+    char sLine[256];
+
+    if(pInput)
+    {
+        while(fgets(
+            sLine,
+            sizeof(sLine),
+            pInput))
+        {
+            char *pLine =
+                FT_TrimWeaponLine(
+                    sLine);
+
+            if(!pLine[0] ||
+               pLine[0] == '#' ||
+               pLine[0] == ';')
+            {
+                continue;
+            }
+
+            if(_stricmp(
+                   pLine,
+                   pSection) == 0)
+            {
+                bFound = true;
+
+                if(!bQuarantined)
+                {
+                    continue;
+                }
+            }
+
+            fprintf(
+                pOutput,
+                "%s\n",
+                pLine);
+            bWroteAny = true;
+        }
+
+        fclose(pInput);
+    }
+
+    if(bQuarantined &&
+       !bFound)
+    {
+        fprintf(
+            pOutput,
+            "%s\n",
+            pSection);
+        bWroteAny = true;
+    }
+
+    if(!bWroteAny)
+    {
+        fprintf(
+            pOutput,
+            "# FIRETEAM Weapon QA quarantine. One catalog section per line.\n");
+    }
+
+    fclose(pOutput);
+
+    remove(
+        FT_WEAPON_QA_QUARANTINE_FILE);
+
+    if(rename(
+           pTempPath,
+           FT_WEAPON_QA_QUARANTINE_FILE) != 0)
+    {
+        remove(
+            pTempPath);
+        return false;
+    }
+
+    return true;
+}
 
 
 
@@ -845,17 +1006,77 @@ void CPlayerClnt::CycleDevWeapon(int nDirection)
 
     if(pDef)
     {
+        const bool bQuarantined =
+            FT_IsWeaponQaQuarantined(
+                pDef->sSection);
+
         g_pLTClient->CPrint(
-            "Fireteam weapon QA [%u/%u]: %s | model=%s | texture=%s | view=<%.2f, %.2f, %.2f>",
+            "Fireteam weapon QA [%u/%u]: %s%s | section=%s | model=%s | texture=%s | view=<%.2f, %.2f, %.2f>",
             m_nDevWeaponIndex + 1,
             m_nDevWeaponCount,
+            bQuarantined
+                ? "[DISABLED] "
+                : "",
             pDef->sName,
+            pDef->sSection,
             pDef->sPVModel,
             pDef->sPVTexture,
             pDef->fViewX,
             pDef->fViewY,
             pDef->fViewZ);
     }
+}
+
+
+//----------------------------------------------------------------------------
+void CPlayerClnt::ToggleDevWeaponQuarantine()
+{
+    if(!m_bDevWeaponQa)
+    {
+        return;
+    }
+
+    const FTWeaponDef *pDef =
+        GetCurrentWeaponDef();
+
+    if(!pDef ||
+       _strnicmp(
+           pDef->sSection,
+           "catalog.",
+           8) != 0)
+    {
+        g_pLTClient->CPrint(
+            "Fireteam weapon QA: active loadout entries cannot be quarantined here. Scroll to the catalog copy first.");
+        return;
+    }
+
+    const bool bWasQuarantined =
+        FT_IsWeaponQaQuarantined(
+            pDef->sSection);
+
+    const bool bQuarantined =
+        !bWasQuarantined;
+
+    if(!FT_SetWeaponQaQuarantined(
+           pDef->sSection,
+           bQuarantined))
+    {
+        g_pLTClient->CPrint(
+            "Fireteam weapon QA: failed to update quarantine file for %s.",
+            pDef->sName);
+        return;
+    }
+
+    FT_WeaponHudSetQaQuarantined(
+        bQuarantined);
+
+    g_pLTClient->CPrint(
+        "Fireteam weapon QA: %s %s (%s).",
+        pDef->sName,
+        bQuarantined
+            ? "DISABLED"
+            : "ENABLED",
+        pDef->sSection);
 }
 
 
@@ -1161,12 +1382,17 @@ void CPlayerClnt::CreateViewWeapon()
         FT_WeaponHudSetQaProgress(
             m_nDevWeaponIndex + 1,
             m_nDevWeaponCount);
+        FT_WeaponHudSetQaQuarantined(
+            FT_IsWeaponQaQuarantined(
+                pDef->sSection));
     }
     else
     {
         FT_WeaponHudSetQaProgress(
             0,
             0);
+        FT_WeaponHudSetQaQuarantined(
+            false);
     }
 
     char sLocalModelPath[256];
