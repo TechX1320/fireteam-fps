@@ -292,6 +292,9 @@ void CPlayerClnt::Update()
 
 //----------------------------------------------------------------------------
 // void CPlayerClnt::UpdateMovement()
+//
+//----------------------------------------------------------------------------
+void CPlayerClnt::UpdateMovement()
 {
     LTVector vPos, vVel;
     LTRotation rRot;
