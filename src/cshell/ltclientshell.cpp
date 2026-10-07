@@ -947,7 +947,10 @@ LTRESULT CLTClientShell::Render()
                        !m_pCamera->IsWeaponZoomed() &&
                        !m_pChatGui->IsChatInputActive())
                     : false,
-                pHudWeapon ? (pHudWeapon->nClipSize > 0) : false,
+                pHudWeapon
+                    ? (pHudWeapon->nClipSize > 0 &&
+                       !m_pPlayer->IsDevWeaponQa())
+                    : false,
                 m_pPlayer->IsMoving(),
                 m_pCamera->IsWeaponZoomed());
         }
