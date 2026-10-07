@@ -415,6 +415,94 @@ bool FireteamZombie::IsMovementStepClear(
         &info);
 }
 
+bool FireteamZombie::BuildLocalEscapeWaypoint(
+    const LTVector &vPos,
+    const LTVector &vGoal)
+{
+    LTVector vForward =
+        vGoal - vPos;
+    vForward.y = 0.0f;
+
+    if(vForward.MagSqr() < 0.001f)
+    {
+        return false;
+    }
+
+    vForward.Normalize();
+
+    LTVector vRight(
+        -vForward.z,
+        0.0f,
+        vForward.x);
+
+    // Prefer shallow sidesteps that keep making progress.  Pure lateral
+    // movement is a fallback.  We intentionally do not reverse direction:
+    // NOLF2's dynamic avoidance similarly constrains steering to <= 90 deg.
+    LTVector aDirections[4];
+    aDirections[0] =
+        vForward +
+        (vRight * 0.80f);
+    aDirections[1] =
+        vForward -
+        (vRight * 0.80f);
+    aDirections[2] = vRight;
+    aDirections[3] = vRight * -1.0f;
+
+    const uint32 nStart =
+        (m_nPathLane & 1) ? 1 : 0;
+
+    for(uint32 nPass = 0;
+        nPass < 4;
+        ++nPass)
+    {
+        uint32 nIndex = nPass;
+
+        if(nPass < 2)
+        {
+            nIndex =
+                (nStart + nPass) % 2;
+        }
+
+        LTVector vDir =
+            aDirections[nIndex];
+
+        if(vDir.MagSqr() < 0.001f)
+        {
+            continue;
+        }
+
+        vDir.Normalize();
+
+        if(!IsMovementStepClear(
+            vPos,
+            vDir,
+            72.0f))
+        {
+            continue;
+        }
+
+        const LTVector vEscape =
+            vPos +
+            (vDir * 72.0f);
+
+        if(m_nWaypoint >
+           m_aPath.size())
+        {
+            m_nWaypoint =
+                (uint32)m_aPath.size();
+        }
+
+        m_aPath.insert(
+            m_aPath.begin() +
+                m_nWaypoint,
+            vEscape);
+
+        return true;
+    }
+
+    return false;
+}
+
 HOBJECT FireteamZombie::FindNearestPlayer()
 {
     HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
@@ -560,64 +648,49 @@ bool FireteamZombie::HasDirectPathToTarget(
 void FireteamZombie::RebuildPath(const LTVector &vTarget)
 {
     LTVector vPos;
-    g_pLTServer->GetObjectPos(m_hObject, &vPos);
+    g_pLTServer->GetObjectPos(
+        m_hObject,
+        &vPos);
 
     m_aPath.clear();
 
-    float fAgentHalfWidth = m_vCollisionDims.x;
-    if(m_vCollisionDims.z > fAgentHalfWidth)
+    float fAgentHalfWidth =
+        m_vCollisionDims.x;
+
+    if(m_vCollisionDims.z >
+       fAgentHalfWidth)
     {
-        fAgentHalfWidth = m_vCollisionDims.z;
+        fAgentHalfWidth =
+            m_vCollisionDims.z;
     }
 
-    if(!FT_BuildNavigationPath(
-        vPos,
-        vTarget,
-        fAgentHalfWidth,
-        m_nPathLane,
-        m_aPath))
+    if(fAgentHalfWidth < 6.0f)
     {
-        // If the authored volume graph has a gap, do not immediately repeat
-        // the same straight-line wall collision. Build a short alternating
-        // dog-leg recovery waypoint, then try the target again. This mirrors
-        // the practical intent of NOLF2's obstacle/path recovery without
-        // importing its entire CAIHuman stack.
-        LTVector vForward =
-            vTarget - vPos;
-        vForward.y = 0.0f;
+        fAgentHalfWidth = 6.0f;
+    }
 
-        if(vForward.MagSqr() > 0.001f)
-        {
-            vForward.Normalize();
+    const bool bBuilt =
+        FT_BuildNavigationPath(
+            vPos,
+            vTarget,
+            fAgentHalfWidth,
+            m_nPathLane,
+            m_aPath);
 
-            LTVector vRight(
-                -vForward.z,
-                0.0f,
-                vForward.x);
-
-            const float fSide =
-                fAgentHalfWidth + 42.0f;
-
-            const float fSign =
-                (m_nPathLane & 1)
-                ? 1.0f
-                : -1.0f;
-
-            LTVector vRecovery =
-                vPos +
-                (vForward * 64.0f) +
-                (vRight *
-                 (fSide * fSign));
-
-            m_aPath.push_back(
-                vRecovery);
-        }
-
-        m_aPath.push_back(vTarget);
+    // If source and target are already in the same authored volume, a direct
+    // endpoint is still a valid path.  For a genuine graph failure across
+    // volumes, do not invent a blind dog-leg through unknown geometry.
+    if(!bBuilt &&
+       FT_ArePositionsInSameNavigationVolume(
+           vPos,
+           vTarget))
+    {
+        m_aPath.push_back(
+            vTarget);
     }
 
     m_nWaypoint = 0;
-    m_fRepathCooldown = 0.75f + ((float)m_nPathLane * 0.15f);
+    m_fRepathCooldown = 1.50f;
 }
 
 void FireteamZombie::UpdateZombie()
@@ -626,18 +699,25 @@ void FireteamZombie::UpdateZombie()
         (m_Def.fUpdateSeconds > 0.0f)
         ? m_Def.fUpdateSeconds
         : 0.10f;
+
     const float kMoveSpeed =
         m_Def.fRunSpeed;
+
     const float kAttackRange =
         m_Def.fAttackRange;
 
-    const float kWaypointRadius = 30.0f;
-    const float kSeparationRadius = 58.0f;
+    const float kWaypointRadius = 24.0f;
+    const float kSeparationRadius = 96.0f;
+    const float kSeparationRadiusSqr =
+        kSeparationRadius *
+        kSeparationRadius;
 
     if(m_fAttackCooldown > 0.0f)
         m_fAttackCooldown -= kUpdate;
+
     if(m_fRepathCooldown > 0.0f)
         m_fRepathCooldown -= kUpdate;
+
     if(m_fForcePathTime > 0.0f)
         m_fForcePathTime -= kUpdate;
 
@@ -646,27 +726,36 @@ void FireteamZombie::UpdateZombie()
 
     if(!hTarget)
     {
-        LTVector vStop(0.0f, 0.0f, 0.0f);
+        LTVector vStop(
+            0.0f,
+            0.0f,
+            0.0f);
+
         g_pLTSPhysics->SetVelocity(
             m_hObject,
             &vStop);
+
         SetZombieAnimation(
             m_Def.sIdleAnim,
             true);
+
         return;
     }
 
     LTVector vPos;
     LTVector vTarget;
+
     g_pLTServer->GetObjectPos(
         m_hObject,
         &vPos);
+
     g_pLTServer->GetObjectPos(
         hTarget,
         &vTarget);
 
     LTVector vToPlayer =
         vTarget - vPos;
+
     vToPlayer.y = 0.0f;
 
     const float fPlayerDistance =
@@ -674,7 +763,11 @@ void FireteamZombie::UpdateZombie()
 
     if(fPlayerDistance <= kAttackRange)
     {
-        LTVector vStop(0.0f, 0.0f, 0.0f);
+        LTVector vStop(
+            0.0f,
+            0.0f,
+            0.0f);
+
         g_pLTSPhysics->SetVelocity(
             m_hObject,
             &vStop);
@@ -686,9 +779,14 @@ void FireteamZombie::UpdateZombie()
         if(fPlayerDistance > 1.0f)
         {
             vToPlayer.Normalize();
+
             LTRotation rLook(
                 vToPlayer,
-                LTVector(0.0f, 1.0f, 0.0f));
+                LTVector(
+                    0.0f,
+                    1.0f,
+                    0.0f));
+
             g_pLTServer->SetObjectRotation(
                 m_hObject,
                 &rLook);
@@ -716,11 +814,18 @@ void FireteamZombie::UpdateZombie()
         return;
     }
 
-    // Direct pursuit is useful in open space, but once an infected proves it
-    // is stuck we temporarily force the authored AIVolume path instead of
-    // immediately choosing the same blocked player ray again.
+    // NOLF2 only takes a simple direct movement route when source and
+    // destination share an authored navigation volume.  Crossing rooms,
+    // doorways or stairs stays on the AIVolume graph instead of repeatedly
+    // shortcutting through visible-but-unwalkable geometry.
+    const bool bSameVolume =
+        FT_ArePositionsInSameNavigationVolume(
+            vPos,
+            vTarget);
+
     const bool bDirectPursuit =
         m_fForcePathTime <= 0.0f &&
+        bSameVolume &&
         HasDirectPathToTarget(
             hTarget,
             vPos,
@@ -733,18 +838,38 @@ void FireteamZombie::UpdateZombie()
     }
     else
     {
-        if(m_fRepathCooldown <= 0.0f ||
-           m_aPath.empty() ||
-           m_nWaypoint >= m_aPath.size())
+        bool bTargetMoved =
+            false;
+
+        if(!m_aPath.empty())
+        {
+            LTVector vTargetDelta =
+                m_aPath.back() -
+                vTarget;
+
+            vTargetDelta.y = 0.0f;
+
+            bTargetMoved =
+                vTargetDelta.MagSqr() >
+                (160.0f * 160.0f);
+        }
+
+        if(m_aPath.empty() ||
+           m_nWaypoint >=
+               m_aPath.size() ||
+           (bTargetMoved &&
+            m_fRepathCooldown <= 0.0f))
         {
             RebuildPath(vTarget);
         }
 
-        while(m_nWaypoint < m_aPath.size())
+        while(m_nWaypoint <
+              m_aPath.size())
         {
             LTVector vCheck =
                 m_aPath[m_nWaypoint] -
                 vPos;
+
             vCheck.y = 0.0f;
 
             if(vCheck.Mag() >
@@ -756,169 +881,199 @@ void FireteamZombie::UpdateZombie()
             ++m_nWaypoint;
         }
 
-        if(m_nWaypoint >= m_aPath.size())
+        if(m_nWaypoint >=
+           m_aPath.size() &&
+           m_fRepathCooldown <= 0.0f)
         {
             RebuildPath(vTarget);
         }
     }
 
-    LTVector vMoveTarget =
+    const LTVector vMoveTarget =
         bDirectPursuit
         ? vTarget
-        : ((m_nWaypoint < m_aPath.size())
+        : ((m_nWaypoint <
+            m_aPath.size())
             ? m_aPath[m_nWaypoint]
-            : vTarget);
+            : vPos);
 
     LTVector vMove =
-        vMoveTarget - vPos;
+        vMoveTarget -
+        vPos;
+
     vMove.y = 0.0f;
 
-    LTVector vSeparation(
-        0.0f,
-        0.0f,
-        0.0f);
-
-    HCLASS hZombieClass =
-        g_pLTServer->GetClass(
-            "FireteamZombie");
-
-    if(hZombieClass)
+    if(vMove.MagSqr() > 1.0f)
     {
-        for(HOBJECT hObj =
-                g_pLTServer->GetNextObject(
-                    LTNULL);
-            hObj;
-            hObj =
-                g_pLTServer->GetNextObject(
-                    hObj))
+        vMove.Normalize();
+
+        const float fStepDistance =
+            kMoveSpeed *
+            kUpdate;
+
+        // NOLF2-style dynamic character avoidance.  Other infected close to
+        // our current waypoint are intentionally ignored so they cannot form
+        // a permanent wall across a doorway.  Repulsion is also constrained
+        // so it can never reverse the desired direction of travel.
+        LTVector vDesiredStep =
+            vMove *
+            fStepDistance;
+
+        LTVector vTotalForce(
+            0.0f,
+            0.0f,
+            0.0f);
+
+        HCLASS hZombieClass =
+            g_pLTServer->GetClass(
+                "FireteamZombie");
+
+        if(hZombieClass)
         {
-            if(hObj == m_hObject)
-                continue;
-
-            HCLASS hClass =
-                g_pLTServer->GetObjectClass(
-                    hObj);
-
-            if(!hClass ||
-               !g_pLTServer->IsKindOf(
-                    hClass,
-                    hZombieClass))
+            for(HOBJECT hObj =
+                    g_pLTServer->GetNextObject(
+                        LTNULL);
+                hObj;
+                hObj =
+                    g_pLTServer->GetNextObject(
+                        hObj))
             {
-                continue;
-            }
+                if(hObj == m_hObject)
+                {
+                    continue;
+                }
 
-            LTVector vOther;
-            g_pLTServer->GetObjectPos(
-                hObj,
-                &vOther);
+                HCLASS hClass =
+                    g_pLTServer->GetObjectClass(
+                        hObj);
 
-            LTVector vAway =
-                vPos - vOther;
-            vAway.y = 0.0f;
+                if(!hClass ||
+                   !g_pLTServer->IsKindOf(
+                        hClass,
+                        hZombieClass))
+                {
+                    continue;
+                }
 
-            const float fDistance =
-                vAway.Mag();
+                FireteamZombie *pOther =
+                    (FireteamZombie*)
+                    g_pLTServer->HandleToObject(
+                        hObj);
 
-            if(fDistance > 0.5f &&
-               fDistance <
-                    kSeparationRadius)
-            {
-                vAway.Normalize();
+                if(pOther &&
+                   pOther->m_bDying)
+                {
+                    continue;
+                }
 
-                const float fStrength =
+                LTVector vOther;
+                g_pLTServer->GetObjectPos(
+                    hObj,
+                    &vOther);
+
+                LTVector vOtherToDest =
+                    vOther -
+                    vMoveTarget;
+
+                vOtherToDest.y = 0.0f;
+
+                if(vOtherToDest.MagSqr() <=
+                   kSeparationRadiusSqr)
+                {
+                    continue;
+                }
+
+                LTVector vAway =
+                    vPos -
+                    vOther;
+
+                vAway.y = 0.0f;
+
+                const float fDistanceSqr =
+                    vAway.MagSqr();
+
+                if(fDistanceSqr <= 0.25f ||
+                   fDistanceSqr >=
+                       kSeparationRadiusSqr)
+                {
+                    continue;
+                }
+
+                const float fDistance =
+                    (float)sqrt(
+                        fDistanceSqr);
+
+                float fStrength =
                     (kSeparationRadius -
                      fDistance) /
                     kSeparationRadius;
 
-                vSeparation +=
-                    vAway * fStrength;
+                fStrength *=
+                    fStrength;
+
+                vAway.Normalize();
+
+                vTotalForce +=
+                    vAway *
+                    (fStrength *
+                     2.0f *
+                     fStepDistance);
             }
         }
-    }
 
-    if(vMove.Mag() > 1.0f)
-    {
-        vMove.Normalize();
+        LTVector vSteerStep =
+            vDesiredStep +
+            vTotalForce;
 
-        const float fSeparationWeight =
-            bDirectPursuit
-            ? 0.25f
-            : 0.70f;
-
-        LTVector vSteer =
-            vMove +
-            (vSeparation *
-             fSeparationWeight);
-
-        if(vSteer.Mag() > 0.1f)
-            vSteer.Normalize();
-        else
-            vSteer = vMove;
-
-        const float fStepDistance =
-            kMoveSpeed * kUpdate;
-
-        // Local obstacle recovery inspired by NOLF2's movement strategy:
-        // when the immediate steering ray is blocked, try sliding around the
-        // obstruction before declaring the path stuck.
-        if(!IsMovementStepClear(
-            vPos,
-            vSteer,
-            fStepDistance))
+        if(vSteerStep.Dot(
+            vDesiredStep) < 0.0f)
         {
             LTVector vRight(
-                -vSteer.z,
+                -vMove.z,
                 0.0f,
-                vSteer.x);
+                vMove.x);
 
-            LTVector vSlideA =
-                vSteer +
-                (vRight * 0.85f);
-            LTVector vSlideB =
-                vSteer -
-                (vRight * 0.85f);
-
-            vSlideA.Normalize();
-            vSlideB.Normalize();
-
-            const bool bA =
-                IsMovementStepClear(
-                    vPos,
-                    vSlideA,
-                    fStepDistance);
-            const bool bB =
-                IsMovementStepClear(
-                    vPos,
-                    vSlideB,
-                    fStepDistance);
-
-            if(bA && bB)
+            if(vRight.Dot(
+                vSteerStep) < 0.0f)
             {
-                vSteer =
-                    (m_nPathLane & 1)
-                    ? vSlideA
-                    : vSlideB;
-            }
-            else if(bA)
-            {
-                vSteer = vSlideA;
-            }
-            else if(bB)
-            {
-                vSteer = vSlideB;
+                vSteerStep =
+                    vRight * -1.0f;
             }
             else
             {
-                // Let the stuck detector below force a fresh volume path.
-                vSteer.Init(0.0f, 0.0f, 0.0f);
+                vSteerStep =
+                    vRight;
             }
         }
 
+        if(vSteerStep.MagSqr() >
+           0.001f)
+        {
+            vSteerStep.Normalize();
+            vSteerStep *=
+                fStepDistance;
+        }
+        else
+        {
+            vSteerStep =
+                vDesiredStep;
+        }
+
+        LTVector vSteer =
+            vSteerStep;
+
+        vSteer.y = 0.0f;
+
         if(vSteer.MagSqr() > 0.001f)
         {
+            vSteer.Normalize();
+
             LTRotation rLook(
                 vSteer,
-                LTVector(0.0f, 1.0f, 0.0f));
+                LTVector(
+                    0.0f,
+                    1.0f,
+                    0.0f));
 
             g_pLTServer->SetObjectRotation(
                 m_hObject,
@@ -935,6 +1090,10 @@ void FireteamZombie::UpdateZombie()
                 (vSteer *
                  fStepDistance);
 
+            // Match NOLF2's cheap-ground movement: trace below the desired
+            // horizontal position, then let MoveObject + STAIRSTEP perform
+            // collision resolution.  Do not reject solid WorldModels merely
+            // because they are not the root BSP.
             IntersectQuery floorQuery;
             IntersectInfo floorInfo;
 
@@ -942,14 +1101,15 @@ void FireteamZombie::UpdateZombie()
                 LTVector(
                     vDesired.x,
                     vPos.y +
-                        m_vCollisionDims.y +
-                        48.0f,
+                        m_vCollisionDims.y,
                     vDesired.z);
 
             floorQuery.m_To =
                 LTVector(
                     vDesired.x,
-                    vPos.y - 530.0f,
+                    vPos.y -
+                        (m_vCollisionDims.y *
+                         10.0f),
                     vDesired.z);
 
             floorQuery.m_Flags =
@@ -957,18 +1117,18 @@ void FireteamZombie::UpdateZombie()
                 IGNORE_NONSOLID |
                 INTERSECT_HPOLY;
 
-            FTZombieMovementFilterData floorFilter;
+            FTZombieMovementFilterData
+                floorFilter;
+
             floorFilter.hZombie =
                 m_hObject;
+
             floorQuery.m_FilterFn =
                 FTZombieMovementFilter;
+
             floorQuery.m_pUserData =
                 &floorFilter;
 
-            // Do not require IsWorldObject here. Cabin Fever stairs and other
-            // authored walkable geometry may be solid WorldModels rather than
-            // the main BSP world. NOLF2's floor logic accepts the walkable
-            // collision surface, not only the root world object.
             if(g_pLTServer->IntersectSegment(
                 &floorQuery,
                 &floorInfo))
@@ -978,24 +1138,25 @@ void FireteamZombie::UpdateZombie()
                     m_vCollisionDims.y;
 
                 const float fHeightDelta =
-                    fFloorY - vPos.y;
+                    fFloorY -
+                    vPos.y;
 
-                // Step onto stairs/low ledges, but do not snap through a
-                // ceiling or teleport to another floor when several solid
-                // WorldModels overlap the vertical probe.
-                if(fHeightDelta <= 40.0f &&
+                if(fHeightDelta <= 42.0f &&
                    fHeightDelta >= -80.0f)
                 {
-                    vDesired.y = fFloorY;
+                    vDesired.y =
+                        fFloorY;
                 }
                 else
                 {
-                    vDesired.y = vPos.y;
+                    vDesired.y =
+                        vPos.y;
                 }
             }
             else
             {
-                vDesired.y = vPos.y;
+                vDesired.y =
+                    vPos.y;
             }
 
             LTVector vZero(
@@ -1011,12 +1172,6 @@ void FireteamZombie::UpdateZombie()
                 m_hObject,
                 &vDesired);
         }
-        else
-        {
-            SetZombieAnimation(
-                m_Def.sIdleAnim,
-                true);
-        }
     }
     else
     {
@@ -1026,32 +1181,48 @@ void FireteamZombie::UpdateZombie()
     }
 
     LTVector vNewPos;
+
     g_pLTServer->GetObjectPos(
         m_hObject,
         &vNewPos);
 
     LTVector vMoved =
-        vNewPos - m_vLastPos;
+        vNewPos -
+        m_vLastPos;
+
     vMoved.y = 0.0f;
 
-    if(vMoved.Mag() < 0.75f)
+    if(vMoved.Mag() < 0.75f &&
+       fPlayerDistance >
+           kAttackRange)
     {
-        m_fStuckTime += kUpdate;
+        m_fStuckTime +=
+            kUpdate;
 
-        if(m_fStuckTime >= 0.60f)
+        if(m_fStuckTime >= 1.50f)
         {
-            m_nPathLane =
-                (m_nPathLane + 1) % 5;
+            const bool bEscaped =
+                BuildLocalEscapeWaypoint(
+                    vNewPos,
+                    vMoveTarget);
 
-            m_fForcePathTime = 2.0f;
-            m_fRepathCooldown = 0.0f;
-            m_aPath.clear();
-            m_nWaypoint = 0;
-            RebuildPath(vTarget);
+            if(!bEscaped)
+            {
+                m_aPath.clear();
+                m_nWaypoint = 0;
+                m_fRepathCooldown = 0.0f;
+                RebuildPath(vTarget);
+            }
+
+            m_fForcePathTime = 3.0f;
+            ++m_nPathLane;
 
             g_pLTServer->CPrint(
-                "Fireteam infected: stuck recovery lane=%u path=%u.",
-                m_nPathLane,
+                "Fireteam infected: recovery %s waypoint=%u/%u.",
+                bEscaped
+                    ? "local-steer"
+                    : "repath",
+                m_nWaypoint,
                 (uint32)m_aPath.size());
 
             m_fStuckTime = 0.0f;
@@ -1062,7 +1233,8 @@ void FireteamZombie::UpdateZombie()
         m_fStuckTime = 0.0f;
     }
 
-    m_vLastPos = vNewPos;
+    m_vLastPos =
+        vNewPos;
 }
 
 uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
@@ -1076,7 +1248,8 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
             {
                 pOCS->m_ObjectType = OT_MODEL;
                 pOCS->m_Flags |= FLAG_SOLID | FLAG_VISIBLE | FLAG_GRAVITY |
-                                 FLAG_YROTATION | FLAG_FORCECLIENTUPDATE | FLAG_SHADOW;
+                                 FLAG_STAIRSTEP | FLAG_YROTATION |
+                                 FLAG_FORCECLIENTUPDATE | FLAG_SHADOW;
                 pOCS->m_Flags2 |= FLAG2_PLAYERCOLLIDE;
 
                 if(!m_bDefLoaded)
