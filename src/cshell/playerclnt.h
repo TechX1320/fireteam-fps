@@ -44,12 +44,25 @@ public:
     bool                SelectWeaponSlot(uint8 nSlot);
     void                CycleWeapon(int nDirection);
     bool                ReloadWeapon();
+    bool                IsDevWeaponQa() const { return m_bDevWeaponQa; }
     void                ReleaseAttackTrigger() { m_bSemiAutoTriggerHeld = false; }
     bool                IsMoving();
     bool                IsCrouching() const { return m_bCrouching; }
     float               GetEyeHeight() const { return m_bCrouching ? 42.0f : 65.0f; }
     uint8               GetWeaponSlot() const { return m_nWeaponSlot; }
-    const FTWeaponDef*  GetCurrentWeaponDef() const { return FT_GetWeaponDef(m_WeaponDefs, m_nWeaponSlot); }
+    const FTWeaponDef*  GetCurrentWeaponDef() const
+    {
+        if(m_bDevWeaponQa &&
+           m_pDevWeaponDefs &&
+           m_nDevWeaponCount > 0)
+        {
+            return &m_pDevWeaponDefs[m_nDevWeaponIndex];
+        }
+
+        return FT_GetWeaponDef(
+            m_WeaponDefs,
+            m_nWeaponSlot);
+    }
 
 	bool        		Attack();
     void        		SetClub(HOBJECT hObj);
@@ -68,6 +81,7 @@ private:
     void        		PlayMovementAnimation(const char* sAnimName, uint8 nTracker);
     void        		PlayAttackAnimation(const char* sAnimName, uint8 nTracker);
     void                CreateViewWeapon();
+    void                CycleDevWeapon(int nDirection);
     bool                PlayViewWeaponAnimation(const char* sAnimName, bool bLooping);
     void                UpdateViewWeaponAnimation();
     void                PlayViewWeaponSound(const char* sFilename);
@@ -106,6 +120,10 @@ private:
     bool                m_bReloading;
     float               m_fReloadComplete;
     FTWeaponDef         m_WeaponDefs[6];
+    FTWeaponDef*        m_pDevWeaponDefs;
+    uint32              m_nDevWeaponCount;
+    uint32              m_nDevWeaponIndex;
+    bool                m_bDevWeaponQa;
     FTPlayerDef         m_PlayerDef;
     bool                m_bPlayerDefLoaded;
 
