@@ -1,6 +1,8 @@
 #ifndef __FIRETEAM_WEAPON_HUD_H__
 #define __FIRETEAM_WEAPON_HUD_H__
 
+struct FTWeaponDef;
+
 #include <ltbasedefs.h>
 
 void FT_WeaponHudInit();
