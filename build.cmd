@@ -160,6 +160,8 @@ copy /y "config\session.cfg" "%BUILT_DIR%\config\session.cfg" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\powerups.cfg" "%BUILT_DIR%\config\powerups.cfg" >nul
 if errorlevel 1 goto :copyfail
+copy /y "config\loadouts.cfg" "%BUILT_DIR%\config\loadouts.cfg" >nul
+if errorlevel 1 goto :copyfail
 
 echo.
 echo [4/6] Installing freshly built modules...

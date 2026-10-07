@@ -6,12 +6,14 @@ public sealed class LauncherServices
     {
         Settings = new SettingsService();
         Weapons = new WeaponCatalogService();
+        Loadouts = new LoadoutPresetService(Weapons);
         WeaponImports = new WeaponImportService();
         Game = new GameLaunchService(Settings);
     }
 
     public SettingsService Settings { get; }
     public WeaponCatalogService Weapons { get; }
+    public LoadoutPresetService Loadouts { get; }
     public WeaponImportService WeaponImports { get; }
     public GameLaunchService Game { get; }
 }

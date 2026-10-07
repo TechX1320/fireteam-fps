@@ -23,7 +23,13 @@ public sealed partial class MainWindow : Window
 
     private IReadOnlyList<WeaponDefinition> _arsenal = [];
     private IReadOnlyList<WeaponDefinition> _choices = [];
+    private IReadOnlyList<LoadoutPreset> _loadoutPresets = [];
+    private readonly WeaponDefinition?[] _draftLoadout =
+        new WeaponDefinition?[5];
     private WeaponDefinition? _selectedWeapon;
+    private WeaponDefinition? _selectedLoadoutWeapon;
+    private string _loadoutCategory = "AR";
+    private int _selectedLoadoutPresetIndex = 1;
 
     private readonly Grid AppTitleBar = new();
 
@@ -43,11 +49,21 @@ public sealed partial class MainWindow : Window
     private readonly Button PlayButton = new();
 
     private readonly ScrollViewer LoadoutView = new();
-    private readonly ComboBox PrimaryCombo = new();
-    private readonly ComboBox SidearmCombo = new();
-    private readonly ComboBox MeleeCombo = new();
-    private readonly ComboBox SecondaryCombo = new();
-    private readonly ComboBox SpecialCombo = new();
+    private readonly ListView LoadoutPresetList = new();
+    private readonly TextBox LoadoutPresetNameBox = new();
+    private readonly Button LoadoutSlot1Button = new();
+    private readonly Button LoadoutSlot2Button = new();
+    private readonly Button LoadoutSlot3Button = new();
+    private readonly Button LoadoutSlot4Button = new();
+    private readonly Button LoadoutSlot5Button = new();
+    private readonly TextBox LoadoutInventorySearchBox = new();
+    private readonly ListView LoadoutInventoryList = new();
+    private readonly TextBlock LoadoutCategoryStatusText = new();
+    private readonly TextBlock LoadoutWeaponTitleText = new();
+    private readonly TextBlock LoadoutWeaponMetaText = new();
+    private readonly TextBlock LoadoutWeaponStatsText = new();
+    private readonly ComboBox LoadoutEquipSlotCombo = new();
+    private readonly Button LoadoutEquipButton = new();
     private readonly TextBlock LoadoutStatusText = new();
 
     private readonly Grid ArsenalView = new();
@@ -202,45 +218,79 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            var all = App.Instance.Services.Weapons.Load();
-            var active = all
-                .Where(w => w.IsActiveSlot)
-                .OrderBy(w => w.Section)
-                .ToList();
+            var all =
+                App.Instance.Services.Weapons.Load();
 
-            _choices = App.Instance.Services.Weapons.GetArsenalChoices();
-
-            foreach(var combo in LoadoutCombos())
-            {
-                combo.ItemsSource = _choices;
-            }
-
-            for(var slot = 0; slot < LoadoutCombos().Count; ++slot)
-            {
-                var current = slot < active.Count ? active[slot] : null;
-                var index = current is null
-                    ? 0
-                    : FindChoiceIndex(current.Id, current.Name);
-
-                LoadoutCombos()[slot].SelectedIndex =
-                    _choices.Count == 0
-                    ? -1
-                    : Math.Clamp(index, 0, _choices.Count - 1);
-            }
+            var active =
+                all
+                    .Where(
+                        weapon =>
+                            weapon.IsActiveSlot)
+                    .OrderBy(
+                        weapon =>
+                            weapon.Section)
+                    .ToList();
 
             _arsenal = all;
+            _choices =
+                App.Instance.Services.Weapons.GetArsenalChoices();
+
             ApplyArsenalFilter();
-            RefreshHomeLoadoutSummary(active);
+            RefreshHomeLoadoutSummary(
+                active);
+
+            _loadoutPresets =
+                App.Instance.Services.Loadouts.Load();
+
+            LoadoutPresetList.ItemsSource =
+                null;
+            LoadoutPresetList.ItemsSource =
+                _loadoutPresets;
+
+            var selectedIndex =
+                App.Instance.Services.Loadouts.GetSelectedIndex();
+
+            var preset =
+                _loadoutPresets.FirstOrDefault(
+                    item =>
+                        item.Index == selectedIndex) ??
+                _loadoutPresets.FirstOrDefault();
+
+            if(preset is not null)
+            {
+                _selectedLoadoutPresetIndex =
+                    preset.Index;
+
+                LoadoutPresetList.SelectedItem =
+                    preset;
+
+                LoadPresetIntoDraft(
+                    preset,
+                    active);
+            }
+
+            ApplyLoadoutInventoryFilter();
+
+            var catalogCount =
+                all.Count(
+                    weapon =>
+                        weapon.Section.StartsWith(
+                            "catalog.",
+                            StringComparison.OrdinalIgnoreCase));
 
             LoadoutStatusText.Text =
-                _choices.Count == 0
-                ? "No weapon definitions are available."
-                : $"{_choices.Count} weapon definitions are available to the current loadout.";
+                $"{_choices.Count} enabled weapons available • " +
+                $"{catalogCount} catalog definitions installed.";
         }
         catch(Exception ex)
         {
-            LoadoutStatusText.Text = "Loadout error: " + ex.Message;
-            ArsenalStatusText.Text = "Arsenal error: " + ex.Message;
+            LoadoutStatusText.Text =
+                "Loadout error: " +
+                ex.Message;
+
+            ArsenalStatusText.Text =
+                "Arsenal error: " +
+                ex.Message;
         }
     }
 
@@ -249,14 +299,20 @@ public sealed partial class MainWindow : Window
         ReloadWeapons();
     }
 
-    private void RefreshHomeLoadoutSummary(IReadOnlyList<WeaponDefinition>? active = null)
+    private void RefreshHomeLoadoutSummary(
+        IReadOnlyList<WeaponDefinition>? active = null)
     {
         try
         {
-            active ??= App.Instance.Services.Weapons.Load()
-                .Where(w => w.IsActiveSlot)
-                .OrderBy(w => w.Section)
-                .ToList();
+            active ??=
+                App.Instance.Services.Weapons.Load()
+                    .Where(
+                        weapon =>
+                            weapon.IsActiveSlot)
+                    .OrderBy(
+                        weapon =>
+                            weapon.Section)
+                    .ToList();
 
             var labels = new[]
             {
@@ -272,11 +328,13 @@ public sealed partial class MainWindow : Window
                 "PRIMARY  •  ",
                 "SIDEARM  •  ",
                 "MELEE  •  ",
-                "EXTRA  •  ",
-                "SPECIAL  •  "
+                "BACKPACK 1  •  ",
+                "BACKPACK 2  •  "
             };
 
-            for(var i = 0; i < labels.Length; ++i)
+            for(var i = 0;
+                i < labels.Length;
+                ++i)
             {
                 labels[i].Text =
                     prefixes[i] +
@@ -287,7 +345,542 @@ public sealed partial class MainWindow : Window
         }
         catch(Exception ex)
         {
-            PrimarySummaryText.Text = "LOADOUT ERROR  •  " + ex.Message;
+            PrimarySummaryText.Text =
+                "LOADOUT ERROR  •  " +
+                ex.Message;
+        }
+    }
+
+    private void LoadoutPresetList_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if(LoadoutPresetList.SelectedItem is not LoadoutPreset preset)
+        {
+            return;
+        }
+
+        _selectedLoadoutPresetIndex =
+            preset.Index;
+
+        var active =
+            _arsenal
+                .Where(
+                    weapon =>
+                        weapon.IsActiveSlot)
+                .OrderBy(
+                    weapon =>
+                        weapon.Section)
+                .ToList();
+
+        LoadPresetIntoDraft(
+            preset,
+            active);
+
+        LoadoutStatusText.Text =
+            $"Editing {preset.Name}. Changes stay in the draft until you save or activate it.";
+    }
+
+    private void LoadPresetIntoDraft(
+        LoadoutPreset preset,
+        IReadOnlyList<WeaponDefinition> active)
+    {
+        LoadoutPresetNameBox.Text =
+            preset.Name;
+
+        for(var slot = 0;
+            slot < _draftLoadout.Length;
+            ++slot)
+        {
+            var id =
+                slot < preset.WeaponIds.Count
+                ? preset.WeaponIds[slot]
+                : string.Empty;
+
+            WeaponDefinition? weapon =
+                null;
+
+            if(!string.IsNullOrWhiteSpace(
+                id))
+            {
+                weapon =
+                    _arsenal.FirstOrDefault(
+                        candidate =>
+                            !candidate.IsActiveSlot &&
+                            candidate.Id.Equals(
+                                id,
+                                StringComparison.OrdinalIgnoreCase)) ??
+                    _arsenal.FirstOrDefault(
+                        candidate =>
+                            candidate.Id.Equals(
+                                id,
+                                StringComparison.OrdinalIgnoreCase));
+            }
+
+            if(weapon is null &&
+               slot < active.Count)
+            {
+                weapon =
+                    active[slot];
+            }
+
+            _draftLoadout[slot] =
+                weapon;
+        }
+
+        RefreshLoadoutSlotButtons();
+    }
+
+    private void RefreshLoadoutSlotButtons()
+    {
+        var buttons =
+            LoadoutSlotButtons();
+
+        var labels =
+            new[]
+            {
+                "PRIMARY",
+                "SIDEARM",
+                "MELEE",
+                "BACKPACK 1",
+                "BACKPACK 2"
+            };
+
+        for(var slot = 0;
+            slot < buttons.Count;
+            ++slot)
+        {
+            var weapon =
+                _draftLoadout[slot];
+
+            buttons[slot].Content =
+                labels[slot] +
+                "\n" +
+                (weapon?.Name ??
+                 "EMPTY");
+        }
+    }
+
+    private List<Button> LoadoutSlotButtons() =>
+    [
+        LoadoutSlot1Button,
+        LoadoutSlot2Button,
+        LoadoutSlot3Button,
+        LoadoutSlot4Button,
+        LoadoutSlot5Button
+    ];
+
+    private void SetLoadoutCategory(
+        string category)
+    {
+        _loadoutCategory =
+            category;
+
+        ApplyLoadoutInventoryFilter();
+    }
+
+    private void LoadoutInventorySearchBox_TextChanged(
+        object sender,
+        TextChangedEventArgs e)
+    {
+        ApplyLoadoutInventoryFilter();
+    }
+
+    private void ApplyLoadoutInventoryFilter()
+    {
+        var query =
+            LoadoutInventorySearchBox.Text?
+                .Trim() ??
+            string.Empty;
+
+        var visible =
+            _choices
+                .Where(
+                    weapon =>
+                        weapon.LoadoutCategory.Equals(
+                            _loadoutCategory,
+                            StringComparison.OrdinalIgnoreCase) &&
+                        (query.Length == 0 ||
+                         weapon.Name.Contains(
+                             query,
+                             StringComparison.OrdinalIgnoreCase) ||
+                         weapon.Id.Contains(
+                             query,
+                             StringComparison.OrdinalIgnoreCase)))
+                .OrderBy(
+                    weapon =>
+                        weapon.Name)
+                .ToList();
+
+        LoadoutInventoryList.ItemsSource =
+            visible;
+
+        LoadoutCategoryStatusText.Text =
+            $"{_loadoutCategory.ToUpperInvariant()}  •  {visible.Count} ENABLED";
+
+        if(visible.Count > 0)
+        {
+            LoadoutInventoryList.SelectedIndex =
+                0;
+        }
+        else
+        {
+            _selectedLoadoutWeapon =
+                null;
+
+            LoadoutWeaponTitleText.Text =
+                "No enabled weapons";
+
+            LoadoutWeaponMetaText.Text =
+                "Enable supported weapons in Tools → Weapon Editor.";
+
+            LoadoutWeaponStatsText.Text =
+                string.Empty;
+
+            LoadoutEquipSlotCombo.ItemsSource =
+                null;
+
+            LoadoutEquipButton.IsEnabled =
+                false;
+        }
+    }
+
+    private void LoadoutInventoryList_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if(LoadoutInventoryList.SelectedItem is not WeaponDefinition weapon)
+        {
+            return;
+        }
+
+        _selectedLoadoutWeapon =
+            weapon;
+
+        LoadoutWeaponTitleText.Text =
+            weapon.Name;
+
+        var timing =
+            weapon.Values.TryGetValue(
+                "ca_timing_verified",
+                out var verified) &&
+            verified == "1"
+                ? "TIMING VERIFIED"
+                : "DEV TIMING";
+
+        LoadoutWeaponMetaText.Text =
+            $"{weapon.LoadoutCategory.ToUpperInvariant()}  •  {timing}  •  {weapon.Source}";
+
+        LoadoutWeaponStatsText.Text =
+            "DAMAGE        " +
+            WeaponValue(
+                weapon,
+                "damage") +
+            "\nMAGAZINE      " +
+            WeaponValue(
+                weapon,
+                "clip") +
+            "\nRESERVE       " +
+            WeaponValue(
+                weapon,
+                "reserve") +
+            "\nRANGE         " +
+            WeaponValue(
+                weapon,
+                "range") +
+            "\nFIRE INTERVAL " +
+            WeaponValue(
+                weapon,
+                "fire_interval") +
+            " s\nRELOAD        " +
+            WeaponValue(
+                weapon,
+                "reload") +
+            " s";
+
+        var slots =
+            AllowedLoadoutSlots(
+                weapon.LoadoutCategory);
+
+        LoadoutEquipSlotCombo.ItemsSource =
+            slots;
+
+        LoadoutEquipSlotCombo.SelectedIndex =
+            slots.Count > 0
+            ? 0
+            : -1;
+
+        LoadoutEquipButton.IsEnabled =
+            slots.Count > 0;
+    }
+
+    private static string WeaponValue(
+        WeaponDefinition weapon,
+        string key,
+        string fallback = "—") =>
+        weapon.Values.TryGetValue(
+            key,
+            out var value) &&
+        !string.IsNullOrWhiteSpace(
+            value)
+            ? value
+            : fallback;
+
+    private static IReadOnlyList<string> AllowedLoadoutSlots(
+        string category)
+    {
+        if(category.Equals(
+            "Pistol",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "SIDEARM",
+                "BACKPACK 1",
+                "BACKPACK 2"
+            ];
+        }
+
+        if(category.Equals(
+            "Melee",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "MELEE",
+                "BACKPACK 1",
+                "BACKPACK 2"
+            ];
+        }
+
+        if(category.Equals(
+            "Throwing",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                "BACKPACK 1",
+                "BACKPACK 2"
+            ];
+        }
+
+        return
+        [
+            "PRIMARY",
+            "BACKPACK 1",
+            "BACKPACK 2"
+        ];
+    }
+
+    private void LoadoutEquipButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if(_selectedLoadoutWeapon is null ||
+           LoadoutEquipSlotCombo.SelectedItem is not string slotName)
+        {
+            return;
+        }
+
+        var slot =
+            slotName switch
+            {
+                "PRIMARY" => 0,
+                "SIDEARM" => 1,
+                "MELEE" => 2,
+                "BACKPACK 1" => 3,
+                "BACKPACK 2" => 4,
+                _ => -1
+            };
+
+        if(slot < 0)
+        {
+            return;
+        }
+
+        _draftLoadout[slot] =
+            _selectedLoadoutWeapon;
+
+        RefreshLoadoutSlotButtons();
+
+        LoadoutStatusText.Text =
+            $"Equipped {_selectedLoadoutWeapon.Name} to {slotName}. Save the preset or activate it for FIRETEAM.";
+    }
+
+    private void SaveLoadoutPresetButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            var selections =
+                GetDraftLoadout();
+
+            App.Instance.Services.Loadouts.SavePreset(
+                _selectedLoadoutPresetIndex,
+                LoadoutPresetNameBox.Text,
+                selections);
+
+            RefreshLoadoutPresetList(
+                _selectedLoadoutPresetIndex);
+
+            LoadoutStatusText.Text =
+                $"Saved {LoadoutPresetNameBox.Text.Trim()} without changing the active FIRETEAM loadout.";
+        }
+        catch(Exception ex)
+        {
+            LoadoutStatusText.Text =
+                "Could not save loadout: " +
+                ex.Message;
+        }
+    }
+
+    private void ApplyLoadoutButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            var selections =
+                GetDraftLoadout();
+
+            ValidateDraftLoadout(
+                selections);
+
+            App.Instance.Services.Loadouts.SavePreset(
+                _selectedLoadoutPresetIndex,
+                LoadoutPresetNameBox.Text,
+                selections);
+
+            App.Instance.Services.Loadouts.SetSelectedIndex(
+                _selectedLoadoutPresetIndex);
+
+            App.Instance.Services.Weapons.SaveLoadout(
+                selections);
+
+            RefreshHomeLoadoutSummary(
+                selections);
+
+            RefreshLoadoutPresetList(
+                _selectedLoadoutPresetIndex);
+
+            LoadoutStatusText.Text =
+                $"{LoadoutPresetNameBox.Text.Trim()} is now the active FIRETEAM loadout.";
+        }
+        catch(Exception ex)
+        {
+            LoadoutStatusText.Text =
+                "Could not activate loadout: " +
+                ex.Message;
+        }
+    }
+
+    private IReadOnlyList<WeaponDefinition> GetDraftLoadout()
+    {
+        var result =
+            new List<WeaponDefinition>(
+                5);
+
+        for(var slot = 0;
+            slot < _draftLoadout.Length;
+            ++slot)
+        {
+            var weapon =
+                _draftLoadout[slot];
+
+            if(weapon is null)
+            {
+                throw new InvalidOperationException(
+                    $"Loadout slot {slot + 1} is empty.");
+            }
+
+            result.Add(
+                weapon);
+        }
+
+        return result;
+    }
+
+    private static void ValidateDraftLoadout(
+        IReadOnlyList<WeaponDefinition> selections)
+    {
+        if(!IsMainCategory(
+            selections[0].LoadoutCategory))
+        {
+            throw new InvalidOperationException(
+                "PRIMARY must be an AR, SR, Launcher, MG, SG or SMG.");
+        }
+
+        if(!selections[1].LoadoutCategory.Equals(
+            "Pistol",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "SIDEARM must be a pistol.");
+        }
+
+        if(!selections[2].LoadoutCategory.Equals(
+            "Melee",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "MELEE must be a melee weapon.");
+        }
+
+        foreach(var weapon in selections)
+        {
+            if(!weapon.Supported ||
+               (!weapon.Enabled &&
+                !weapon.IsActiveSlot))
+            {
+                throw new InvalidOperationException(
+                    $"{weapon.Name} is disabled or unsupported.");
+            }
+        }
+    }
+
+    private static bool IsMainCategory(
+        string category) =>
+        category.Equals(
+            "AR",
+            StringComparison.OrdinalIgnoreCase) ||
+        category.Equals(
+            "SR",
+            StringComparison.OrdinalIgnoreCase) ||
+        category.Equals(
+            "Launcher",
+            StringComparison.OrdinalIgnoreCase) ||
+        category.Equals(
+            "MG",
+            StringComparison.OrdinalIgnoreCase) ||
+        category.Equals(
+            "SG",
+            StringComparison.OrdinalIgnoreCase) ||
+        category.Equals(
+            "SMG",
+            StringComparison.OrdinalIgnoreCase);
+
+    private void RefreshLoadoutPresetList(
+        int selectedIndex)
+    {
+        _loadoutPresets =
+            App.Instance.Services.Loadouts.Load();
+
+        LoadoutPresetList.ItemsSource =
+            null;
+
+        LoadoutPresetList.ItemsSource =
+            _loadoutPresets;
+
+        var preset =
+            _loadoutPresets.FirstOrDefault(
+                item =>
+                    item.Index == selectedIndex);
+
+        if(preset is not null)
+        {
+            LoadoutPresetList.SelectedItem =
+                preset;
         }
     }
 
@@ -318,60 +911,6 @@ public sealed partial class MainWindow : Window
     private void OpenArsenalButton_Click(object sender, RoutedEventArgs e)
     {
         NavigateTo("weapon-editor");
-    }
-
-    private void ApplyLoadoutButton_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var selections = new List<WeaponDefinition>(5);
-
-            foreach(var combo in LoadoutCombos())
-            {
-                if(combo.SelectedItem is not WeaponDefinition weapon)
-                {
-                    throw new InvalidOperationException(
-                        "Every loadout slot needs a weapon.");
-                }
-
-                selections.Add(weapon);
-            }
-
-            App.Instance.Services.Weapons.SaveLoadout(selections);
-            LoadoutStatusText.Text =
-                "Loadout applied to source + BUILT config. Start FIRETEAM to test it.";
-
-            ReloadWeapons();
-        }
-        catch(Exception ex)
-        {
-            LoadoutStatusText.Text =
-                "Could not apply loadout: " + ex.Message;
-        }
-    }
-
-    private List<ComboBox> LoadoutCombos() =>
-    [
-        PrimaryCombo,
-        SidearmCombo,
-        MeleeCombo,
-        SecondaryCombo,
-        SpecialCombo
-    ];
-
-    private int FindChoiceIndex(string id, string name)
-    {
-        for(var i = 0; i < _choices.Count; ++i)
-        {
-            if((!string.IsNullOrWhiteSpace(id) &&
-                _choices[i].Id.Equals(id, StringComparison.OrdinalIgnoreCase)) ||
-               _choices[i].Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-            {
-                return i;
-            }
-        }
-
-        return 0;
     }
 
     private void WeaponSearchBox_TextChanged(object sender, TextChangedEventArgs e)

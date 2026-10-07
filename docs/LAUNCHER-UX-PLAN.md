@@ -37,16 +37,24 @@ Top-nav menu:
 Selecting a mode returns to the Home/Ready Room with that mode active.
 
 ### Loadout
-Player-facing equipment builder:
-- Primary
-- Sidearm
-- Melee
-- Extra
-- Special
-- Apply Loadout
+Combat Arms-inspired player-facing armory:
+- three named saved loadouts on the left
+- active fighting load across the top
+- category tabs: AR, SR, Launcher, Melee, MG, Pistol, SG, SMG, Throwing
+- enabled weapon inventory list
+- selected-weapon stat inspection
+- explicit equip destination
+- Primary / Sidearm / Melee / Backpack 1 / Backpack 2
+- Save Loadout and Activate Loadout are separate actions
 - link to Weapon Editor under Tools
 
-Future: weapon cards, icons, stats, unlock state and progression.
+Slot rules:
+- Primary: AR / SR / Launcher / MG / SG / SMG
+- Sidearm: Pistol
+- Melee: Melee
+- Backpack 1 / 2: any enabled supported category
+
+Future: weapon imagery, icons, unlock state and progression.
 
 ### Tools
 Tools hub, inspired by Open1320's Modding page:
@@ -104,6 +112,12 @@ Weapon authoring is not a top-level player tab.
 - generate disabled catalog entries for testing
 - one-off asset/config scanner before gameplay testing
 - scanner command validates imported asset references in local source + BUILT runtime
+
+### Phase 1.2 — loadout armory
+- CA Guntype mapping drives launcher inventory categories
+- three saved loadout presets in config/loadouts.cfg
+- Combat Arms-inspired category browser + stat inspector
+- player equipment slots remain FIRETEAM-specific and data-driven
 
 ### Phase 2 — player-facing polish
 - weapon cards / icons

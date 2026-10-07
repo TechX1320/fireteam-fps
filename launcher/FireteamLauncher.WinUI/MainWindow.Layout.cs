@@ -1088,144 +1088,550 @@ public sealed partial class MainWindow
     {
         LoadoutView.Visibility =
             Visibility.Collapsed;
+
         LoadoutView.HorizontalScrollBarVisibility =
             ScrollBarVisibility.Disabled;
 
-        var page =
-            NewPagePanel(
-                "FIRETEAM / LOADOUT",
-                "Deployment Kit",
-                "Choose the equipment you take into the round. Player-facing loadout work stays here; authoring tools live under Tools.");
+        LoadoutView.VerticalScrollBarVisibility =
+            ScrollBarVisibility.Auto;
 
-        var columns =
+        var page =
+            new StackPanel
+            {
+                Spacing = 14,
+                Margin =
+                    new Thickness(
+                        26,
+                        18,
+                        26,
+                        24),
+                MaxWidth = 1280,
+                HorizontalAlignment =
+                    HorizontalAlignment.Stretch
+            };
+
+        var header =
+            new StackPanel
+            {
+                Spacing = 4
+            };
+
+        header.Children.Add(
+            Eyebrow(
+                "FIRETEAM / LOADOUT"));
+        header.Children.Add(
+            SectionTitle(
+                "Armory",
+                30));
+        header.Children.Add(
+            BodyText(
+                "Three saved fighting loads, a Combat Arms-inspired inventory and FIRETEAM slot rules. No rarity or progression layer yet."));
+
+        page.Children.Add(
+            header);
+
+        var workspace =
             new Grid
             {
-                ColumnSpacing = 18
+                ColumnSpacing = 16
             };
 
-        columns.ColumnDefinitions.Add(
+        workspace.ColumnDefinitions.Add(
             new ColumnDefinition
             {
                 Width =
                     new GridLength(
-                        1.45,
-                        GridUnitType.Star)
+                        230)
             });
-        columns.ColumnDefinitions.Add(
+
+        workspace.ColumnDefinitions.Add(
             new ColumnDefinition
             {
                 Width =
                     new GridLength(
-                        0.75,
+                        1,
                         GridUnitType.Star)
             });
+
+        var presets =
+            CardHeading(
+                "SAVED LOADOUTS",
+                "Gear Tabs",
+                "Switch between three saved kits. Saving does not change the active in-game kit until you activate it.");
+
+        LoadoutPresetList.DisplayMemberPath =
+            "DisplayName";
+
+        LoadoutPresetList.MinHeight =
+            150;
+
+        LoadoutPresetList.MaxHeight =
+            190;
+
+        LoadoutPresetList.SelectionChanged +=
+            LoadoutPresetList_SelectionChanged;
+
+        presets.Children.Add(
+            LoadoutPresetList);
+
+        presets.Children.Add(
+            Eyebrow(
+                "LOADOUT NAME",
+                MutedTextBrush));
+
+        LoadoutPresetNameBox.MaxLength =
+            24;
+
+        presets.Children.Add(
+            LoadoutPresetNameBox);
+
+        var savePreset =
+            SecondaryButton(
+                "SAVE LOADOUT");
+
+        savePreset.HorizontalAlignment =
+            HorizontalAlignment.Stretch;
+
+        savePreset.Click +=
+            SaveLoadoutPresetButton_Click;
+
+        presets.Children.Add(
+            savePreset);
+
+        var presetCard =
+            Card(
+                presets,
+                AccentBrush);
+
+        Grid.SetColumn(
+            presetCard,
+            0);
+
+        workspace.Children.Add(
+            presetCard);
+
+        var armory =
+            new StackPanel
+            {
+                Spacing = 12
+            };
+
+        var fightingLoad =
+            CardHeading(
+                "FIGHTING LOAD",
+                "Current Kit",
+                "Primary, sidearm and melee have fixed roles. The two backpack slots can carry additional enabled equipment.",
+                CyanBrush);
 
         var slots =
-            CardHeading(
-                "ACTIVE SLOTS",
-                "Loadout Builder",
-                "Available choices come directly from config/weapons.cfg.");
-
-        var combos =
-            new[]
+            new Grid
             {
-                PrimaryCombo,
-                SidearmCombo,
-                MeleeCombo,
-                SecondaryCombo,
-                SpecialCombo
+                ColumnSpacing = 8,
+                Margin =
+                    new Thickness(
+                        0,
+                        8,
+                        0,
+                        0)
             };
 
-        foreach(var combo in combos)
+        for(var i = 0;
+            i < 5;
+            ++i)
         {
-            combo.DisplayMemberPath =
-                "DisplayName";
-            combo.HorizontalAlignment =
-                HorizontalAlignment.Stretch;
+            slots.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width =
+                        new GridLength(
+                            1,
+                            GridUnitType.Star)
+                });
         }
 
-        slots.Children.Add(
-            LabeledControl(
-                "PRIMARY",
-                PrimaryCombo));
-        slots.Children.Add(
-            LabeledControl(
-                "SIDEARM",
-                SidearmCombo));
-        slots.Children.Add(
-            LabeledControl(
-                "MELEE",
-                MeleeCombo));
-        slots.Children.Add(
-            LabeledControl(
-                "EXTRA",
-                SecondaryCombo));
-        slots.Children.Add(
-            LabeledControl(
-                "SPECIAL",
-                SpecialCombo));
+        var slotButtons =
+            LoadoutSlotButtons();
+
+        for(var i = 0;
+            i < slotButtons.Count;
+            ++i)
+        {
+            var button =
+                slotButtons[i];
+
+            button.Background =
+                PanelRaisedBrush;
+
+            button.Foreground =
+                PrimaryTextBrush;
+
+            button.BorderBrush =
+                DividerBrush;
+
+            button.BorderThickness =
+                new Thickness(1);
+
+            button.CornerRadius =
+                new CornerRadius(3);
+
+            button.MinHeight =
+                64;
+
+            button.HorizontalAlignment =
+                HorizontalAlignment.Stretch;
+
+            button.IsHitTestVisible =
+                false;
+
+            Grid.SetColumn(
+                button,
+                i);
+
+            slots.Children.Add(
+                button);
+        }
+
+        fightingLoad.Children.Add(
+            slots);
+
+        armory.Children.Add(
+            Card(
+                fightingLoad,
+                CyanBrush));
+
+        var inventory =
+            CardHeading(
+                "INVENTORY",
+                "Weapon Locker",
+                "Only enabled + supported weapons appear here. Enable more through Tools → Weapon Editor.");
+
+        var categories =
+            new StackPanel
+            {
+                Orientation =
+                    Orientation.Horizontal,
+                Spacing = 5,
+                Margin =
+                    new Thickness(
+                        0,
+                        8,
+                        0,
+                        0)
+            };
+
+        foreach(var category in new[]
+        {
+            "AR",
+            "SR",
+            "Launcher",
+            "Melee",
+            "MG",
+            "Pistol",
+            "SG",
+            "SMG",
+            "Throwing"
+        })
+        {
+            categories.Children.Add(
+                LoadoutCategoryButton(
+                    category));
+        }
+
+        inventory.Children.Add(
+            categories);
+
+        var filterRow =
+            new Grid
+            {
+                ColumnSpacing = 10
+            };
+
+        filterRow.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+
+        filterRow.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    GridLength.Auto
+            });
+
+        LoadoutInventorySearchBox.PlaceholderText =
+            "Search enabled weapons...";
+
+        LoadoutInventorySearchBox.TextChanged +=
+            LoadoutInventorySearchBox_TextChanged;
+
+        LoadoutCategoryStatusText.Foreground =
+            AccentBrush;
+
+        LoadoutCategoryStatusText.FontFamily =
+            new FontFamily(
+                "Bahnschrift SemiCondensed");
+
+        LoadoutCategoryStatusText.FontWeight =
+            Microsoft.UI.Text.FontWeights.SemiBold;
+
+        LoadoutCategoryStatusText.VerticalAlignment =
+            VerticalAlignment.Center;
+
+        Grid.SetColumn(
+            LoadoutCategoryStatusText,
+            1);
+
+        filterRow.Children.Add(
+            LoadoutInventorySearchBox);
+
+        filterRow.Children.Add(
+            LoadoutCategoryStatusText);
+
+        inventory.Children.Add(
+            filterRow);
+
+        var browser =
+            new Grid
+            {
+                ColumnSpacing = 14,
+                MinHeight = 285
+            };
+
+        browser.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1.1,
+                        GridUnitType.Star)
+            });
+
+        browser.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        0.9,
+                        GridUnitType.Star)
+            });
+
+        LoadoutInventoryList.DisplayMemberPath =
+            "DisplayName";
+
+        LoadoutInventoryList.MinHeight =
+            280;
+
+        LoadoutInventoryList.MaxHeight =
+            330;
+
+        LoadoutInventoryList.SelectionChanged +=
+            LoadoutInventoryList_SelectionChanged;
+
+        Grid.SetColumn(
+            LoadoutInventoryList,
+            0);
+
+        browser.Children.Add(
+            LoadoutInventoryList);
+
+        var detail =
+            new StackPanel
+            {
+                Spacing = 8,
+                Margin =
+                    new Thickness(
+                        6,
+                        0,
+                        0,
+                        0)
+            };
+
+        LoadoutWeaponTitleText.Text =
+            "Select a weapon";
+
+        LoadoutWeaponTitleText.FontFamily =
+            new FontFamily(
+                "Bahnschrift SemiCondensed");
+
+        LoadoutWeaponTitleText.FontSize =
+            24;
+
+        LoadoutWeaponTitleText.FontWeight =
+            Microsoft.UI.Text.FontWeights.SemiBold;
+
+        LoadoutWeaponTitleText.Foreground =
+            PrimaryTextBrush;
+
+        LoadoutWeaponMetaText.Foreground =
+            AccentBrush;
+
+        LoadoutWeaponMetaText.TextWrapping =
+            TextWrapping.Wrap;
+
+        LoadoutWeaponStatsText.FontFamily =
+            new FontFamily(
+                "Consolas");
+
+        LoadoutWeaponStatsText.Foreground =
+            SecondaryTextBrush;
+
+        LoadoutWeaponStatsText.TextWrapping =
+            TextWrapping.Wrap;
+
+        detail.Children.Add(
+            LoadoutWeaponTitleText);
+
+        detail.Children.Add(
+            LoadoutWeaponMetaText);
+
+        detail.Children.Add(
+            LoadoutWeaponStatsText);
+
+        detail.Children.Add(
+            Eyebrow(
+                "EQUIP TO",
+                MutedTextBrush));
+
+        LoadoutEquipSlotCombo.HorizontalAlignment =
+            HorizontalAlignment.Stretch;
+
+        detail.Children.Add(
+            LoadoutEquipSlotCombo);
+
+        LoadoutEquipButton.Content =
+            "EQUIP WEAPON";
+
+        LoadoutEquipButton.Background =
+            AccentBrush;
+
+        LoadoutEquipButton.Foreground =
+            new SolidColorBrush(
+                Color.FromArgb(
+                    255,
+                    24,
+                    16,
+                    0));
+
+        LoadoutEquipButton.BorderBrush =
+            AccentBrush;
+
+        LoadoutEquipButton.Padding =
+            new Thickness(
+                18,
+                9,
+                18,
+                9);
+
+        LoadoutEquipButton.HorizontalAlignment =
+            HorizontalAlignment.Left;
+
+        LoadoutEquipButton.IsEnabled =
+            false;
+
+        LoadoutEquipButton.Click +=
+            LoadoutEquipButton_Click;
+
+        detail.Children.Add(
+            LoadoutEquipButton);
+
+        Grid.SetColumn(
+            detail,
+            1);
+
+        browser.Children.Add(
+            detail);
+
+        inventory.Children.Add(
+            browser);
 
         var actions =
             new StackPanel
             {
                 Orientation =
                     Orientation.Horizontal,
-                Spacing = 10,
-                Margin =
-                    new Thickness(0, 10, 0, 0)
+                Spacing = 10
             };
 
-        var apply =
+        var activate =
             PrimaryButton(
-                "APPLY LOADOUT");
-        apply.Click +=
+                "ACTIVATE LOADOUT");
+
+        activate.Click +=
             ApplyLoadoutButton_Click;
 
         var editor =
             SecondaryButton(
-                "WEAPON EDITOR");
+                "OPEN WEAPON EDITOR");
+
         editor.Click +=
             OpenArsenalButton_Click;
 
-        actions.Children.Add(apply);
-        actions.Children.Add(editor);
-        slots.Children.Add(actions);
+        actions.Children.Add(
+            activate);
 
-        var info =
-            CardHeading(
-                "LOADOUT STATUS",
-                "Equipment Rules",
-                "Five active slots are written back to both source and runtime config when available.",
-                CyanBrush);
+        actions.Children.Add(
+            editor);
+
+        inventory.Children.Add(
+            actions);
+
+        LoadoutStatusText.Foreground =
+            SecondaryTextBrush;
 
         LoadoutStatusText.TextWrapping =
             TextWrapping.Wrap;
-        LoadoutStatusText.Foreground =
-            SecondaryTextBrush;
-        LoadoutStatusText.Margin =
-            new Thickness(0, 10, 0, 0);
-        info.Children.Add(
+
+        inventory.Children.Add(
             LoadoutStatusText);
-        info.Children.Add(
-            BodyText(
-                "Future pass: weapon cards, icons, unlock state, stats and progression presentation."));
 
-        var slotCard =
+        armory.Children.Add(
             Card(
-                slots,
-                AccentBrush);
-        var infoCard =
-            Card(
-                info,
-                CyanBrush);
+                inventory,
+                AccentBrush));
 
-        Grid.SetColumn(slotCard, 0);
-        Grid.SetColumn(infoCard, 1);
-        columns.Children.Add(slotCard);
-        columns.Children.Add(infoCard);
+        Grid.SetColumn(
+            armory,
+            1);
 
-        page.Children.Add(columns);
-        LoadoutView.Content = page;
+        workspace.Children.Add(
+            armory);
+
+        page.Children.Add(
+            workspace);
+
+        LoadoutView.Content =
+            page;
+    }
+
+    private Button LoadoutCategoryButton(
+        string category)
+    {
+        var button =
+            SecondaryButton(
+                category.ToUpperInvariant());
+
+        button.MinWidth =
+            category.Length > 5
+            ? 92
+            : 66;
+
+        button.Padding =
+            new Thickness(
+                11,
+                7,
+                11,
+                7);
+
+        button.Click +=
+            (sender, args) =>
+                SetLoadoutCategory(
+                    category);
+
+        return button;
     }
 
     private void BuildModsView()

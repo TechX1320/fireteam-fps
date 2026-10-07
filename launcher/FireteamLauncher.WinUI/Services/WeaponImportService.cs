@@ -643,6 +643,12 @@ public sealed class WeaponImportService
                 Set(
                     doc,
                     section,
+                    "category",
+                    MapLoadoutCategory(
+                        guntype));
+                Set(
+                    doc,
+                    section,
                     "clip",
                     clip);
                 Set(
@@ -1609,6 +1615,22 @@ public sealed class WeaponImportService
             13 => "hitscan",
             15 => "grenade",
             _ => null
+        };
+
+    private static string MapLoadoutCategory(
+        int guntype) =>
+        guntype switch
+        {
+            0 => "Melee",
+            1 => "Pistol",
+            2 or 13 => "SG",
+            3 => "SMG",
+            4 => "AR",
+            5 => "MG",
+            6 => "SR",
+            7 => "Throwing",
+            9 or 15 => "Launcher",
+            _ => "Other"
         };
 
     private static bool IsAutomatic(
