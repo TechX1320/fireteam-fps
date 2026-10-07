@@ -168,7 +168,9 @@ static int FTFindContainingVolume(
     const LTVector &vPos)
 {
     int nBest = -1;
-    float fBest = FLT_MAX;
+    float fBestVerticalOutside = FLT_MAX;
+    float fBestVerticalCenter = FLT_MAX;
+    float fBestArea = FLT_MAX;
 
     for(uint32 i = 0; i < nCount; ++i)
     {
@@ -179,22 +181,52 @@ static int FTFindContainingVolume(
             (float)fabs(vPos.x - c.x) - d.x;
         const float dz =
             (float)fabs(vPos.z - c.z) - d.z;
-        const float dy =
-            (float)fabs(vPos.y - c.y) -
-            (d.y + 96.0f);
+        const float fVerticalCenter =
+            (float)fabs(vPos.y - c.y);
+        const float fVerticalOutside =
+            FTMax(
+                0.0f,
+                fVerticalCenter - d.y);
 
+        // Imported Cabin Fever volumes can overlap in X/Z on separate floors.
+        // Keep the old 96-unit vertical tolerance for actor origins that sit
+        // above a thin authored volume, but never let a smaller upstairs
+        // footprint beat the volume that is actually closest to this floor.
         if(dx <= 6.0f &&
            dz <= 6.0f &&
-           dy <= 0.0f)
+           fVerticalOutside <= 96.0f)
         {
             const float fArea =
                 FTMax(
                     1.0f,
                     d.x * d.z);
 
-            if(fArea < fBest)
+            const bool bBetterOutside =
+                fVerticalOutside <
+                    (fBestVerticalOutside - 0.01f);
+            const bool bSameOutside =
+                (float)fabs(
+                    fVerticalOutside -
+                    fBestVerticalOutside) <= 0.01f;
+            const bool bBetterCenter =
+                fVerticalCenter <
+                    (fBestVerticalCenter - 0.01f);
+            const bool bSameCenter =
+                (float)fabs(
+                    fVerticalCenter -
+                    fBestVerticalCenter) <= 0.01f;
+
+            if(bBetterOutside ||
+               (bSameOutside &&
+                (bBetterCenter ||
+                 (bSameCenter &&
+                  fArea < fBestArea))))
             {
-                fBest = fArea;
+                fBestVerticalOutside =
+                    fVerticalOutside;
+                fBestVerticalCenter =
+                    fVerticalCenter;
+                fBestArea = fArea;
                 nBest = (int)i;
             }
         }

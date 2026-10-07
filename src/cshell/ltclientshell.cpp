@@ -1748,6 +1748,27 @@ void CLTClientShell::OnKeyDown(int key, int rep)
 	//g_pLTClient->CPrint("OnKeyDown(%d,%d)", key, rep);
     if(m_bInWorld)
     {
+        if( VK_F9 == key &&
+            rep == 0 )
+        {
+            HLOCALOBJ hPlayer =
+                m_pPlayer->GetPlayerObject();
+
+            if(hPlayer)
+            {
+                LTVector vPos;
+                g_pLTClient->GetObjectPos(
+                    hPlayer,
+                    &vPos);
+
+                g_pLTClient->CPrint(
+                    "Fireteam position: X=%.1f Y=%.1f Z=%.1f",
+                    vPos.x,
+                    vPos.y,
+                    vPos.z);
+            }
+        }
+
         if( VK_F12 == key )
         {
             g_pLTClient->CPrint("Creating Cubic Environment Map...");
