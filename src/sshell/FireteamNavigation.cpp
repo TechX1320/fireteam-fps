@@ -40,6 +40,12 @@ static const uint32 kMaxNavVolumes = 256;
 
 static float FTMax(float a, float b) { return a > b ? a : b; }
 static float FTMin(float a, float b) { return a < b ? a : b; }
+static float FTClamp(float v, float lo, float hi)
+{
+    if(v < lo) return lo;
+    if(v > hi) return hi;
+    return v;
+}
 
 static uint32 FTCollectVolumes(FTNavVolume *pVolumes, uint32 nMax)
 {
@@ -130,42 +136,42 @@ static bool FTGetConnection(
     const FTNavVolume &a,
     const FTNavVolume &b,
     float fAgentHalfWidth,
-    uint32 nLane,
+    const LTVector &vReference,
     LTVector *pOut)
 {
     const float kSlack = 18.0f;
     const float kVerticalSlack = 96.0f;
 
-    // The old prototype assumed NOLF2's 24-unit human half-width everywhere,
-    // which made a 48-unit doorway mathematically have zero usable clearance.
-    // Use the actual infected model width instead.
-    float fHalfWidth = fAgentHalfWidth;
+    // NOLF2 chooses the opening nearest the current control point instead of
+    // rotating through arbitrary lane numbers. That keeps an AI committed to
+    // a sensible corridor and prevents the path from zig-zagging between
+    // opposite edges of adjacent AIVolumes.
+    float fHalfWidth = fAgentHalfWidth * 1.25f;
     if(fHalfWidth < 6.0f) fHalfWidth = 6.0f;
-    if(fHalfWidth > 40.0f) fHalfWidth = 40.0f;
+    if(fHalfWidth > 42.0f) fHalfWidth = 42.0f;
 
     const float kMinOpening = fHalfWidth * 2.0f;
-    const float kGateStride = (fHalfWidth * 2.0f) + 8.0f;
 
-    float aMinX = a.vCenter.x - a.vDims.x;
-    float aMaxX = a.vCenter.x + a.vDims.x;
-    float aMinY = a.vCenter.y - a.vDims.y;
-    float aMaxY = a.vCenter.y + a.vDims.y;
-    float aMinZ = a.vCenter.z - a.vDims.z;
-    float aMaxZ = a.vCenter.z + a.vDims.z;
+    const float aMinX = a.vCenter.x - a.vDims.x;
+    const float aMaxX = a.vCenter.x + a.vDims.x;
+    const float aMinY = a.vCenter.y - a.vDims.y;
+    const float aMaxY = a.vCenter.y + a.vDims.y;
+    const float aMinZ = a.vCenter.z - a.vDims.z;
+    const float aMaxZ = a.vCenter.z + a.vDims.z;
 
-    float bMinX = b.vCenter.x - b.vDims.x;
-    float bMaxX = b.vCenter.x + b.vDims.x;
-    float bMinY = b.vCenter.y - b.vDims.y;
-    float bMaxY = b.vCenter.y + b.vDims.y;
-    float bMinZ = b.vCenter.z - b.vDims.z;
-    float bMaxZ = b.vCenter.z + b.vDims.z;
+    const float bMinX = b.vCenter.x - b.vDims.x;
+    const float bMaxX = b.vCenter.x + b.vDims.x;
+    const float bMinY = b.vCenter.y - b.vDims.y;
+    const float bMaxY = b.vCenter.y + b.vDims.y;
+    const float bMinZ = b.vCenter.z - b.vDims.z;
+    const float bMaxZ = b.vCenter.z + b.vDims.z;
 
-    float overlapXMin = FTMax(aMinX, bMinX);
-    float overlapXMax = FTMin(aMaxX, bMaxX);
-    float overlapZMin = FTMax(aMinZ, bMinZ);
-    float overlapZMax = FTMin(aMaxZ, bMaxZ);
-    float overlapX = overlapXMax - overlapXMin;
-    float overlapZ = overlapZMax - overlapZMin;
+    const float overlapXMin = FTMax(aMinX, bMinX);
+    const float overlapXMax = FTMin(aMaxX, bMaxX);
+    const float overlapZMin = FTMax(aMinZ, bMinZ);
+    const float overlapZMax = FTMin(aMaxZ, bMaxZ);
+    const float overlapX = overlapXMax - overlapXMin;
+    const float overlapZ = overlapZMax - overlapZMin;
 
     float gapX = 0.0f;
     if(aMaxX < bMinX) gapX = bMinX - aMaxX;
@@ -184,19 +190,8 @@ static bool FTGetConnection(
         return false;
     }
 
-    // NOLF2's AIVolumeNeighbor divides a connection into 48-unit gates and
-    // places each gate at 24 + 48*n along the shared opening. This guarantees
-    // enough clearance for its default 24-unit human half-width.
     if(gapX <= kSlack && overlapZ >= kMinOpening)
     {
-        const float fUsable = overlapZ - (fHalfWidth * 2.0f);
-        uint32 nGates = 1;
-        if(fUsable > kGateStride)
-        {
-            nGates += (uint32)(fUsable / kGateStride);
-        }
-        uint32 nGate = nLane % nGates;
-
         if(overlapX >= 0.0f)
             pOut->x = (overlapXMin + overlapXMax) * 0.5f;
         else if(a.vCenter.x < b.vCenter.x)
@@ -204,15 +199,11 @@ static bool FTGetConnection(
         else
             pOut->x = (bMaxX + aMinX) * 0.5f;
 
-        if(nGates == 1)
-        {
-            pOut->z = (overlapZMin + overlapZMax) * 0.5f;
-        }
-        else
-        {
-            const float fStep = fUsable / (float)(nGates - 1);
-            pOut->z = overlapZMin + fHalfWidth + (fStep * (float)nGate);
-        }
+        const float fLo = overlapZMin + fHalfWidth;
+        const float fHi = overlapZMax - fHalfWidth;
+        pOut->z = (fLo <= fHi)
+            ? FTClamp(vReference.z, fLo, fHi)
+            : (overlapZMin + overlapZMax) * 0.5f;
 
         pOut->y = (a.vCenter.y + b.vCenter.y) * 0.5f;
         return true;
@@ -220,14 +211,6 @@ static bool FTGetConnection(
 
     if(gapZ <= kSlack && overlapX >= kMinOpening)
     {
-        const float fUsable = overlapX - (fHalfWidth * 2.0f);
-        uint32 nGates = 1;
-        if(fUsable > kGateStride)
-        {
-            nGates += (uint32)(fUsable / kGateStride);
-        }
-        uint32 nGate = nLane % nGates;
-
         if(overlapZ >= 0.0f)
             pOut->z = (overlapZMin + overlapZMax) * 0.5f;
         else if(a.vCenter.z < b.vCenter.z)
@@ -235,15 +218,11 @@ static bool FTGetConnection(
         else
             pOut->z = (bMaxZ + aMinZ) * 0.5f;
 
-        if(nGates == 1)
-        {
-            pOut->x = (overlapXMin + overlapXMax) * 0.5f;
-        }
-        else
-        {
-            const float fStep = fUsable / (float)(nGates - 1);
-            pOut->x = overlapXMin + fHalfWidth + (fStep * (float)nGate);
-        }
+        const float fLo = overlapXMin + fHalfWidth;
+        const float fHi = overlapXMax - fHalfWidth;
+        pOut->x = (fLo <= fHi)
+            ? FTClamp(vReference.x, fLo, fHi)
+            : (overlapXMin + overlapXMax) * 0.5f;
 
         pOut->y = (a.vCenter.y + b.vCenter.y) * 0.5f;
         return true;
@@ -251,39 +230,28 @@ static bool FTGetConnection(
 
     if(overlapX >= kMinOpening && overlapZ >= kMinOpening)
     {
-        // Fully overlapping volumes: treat the dominant center separation as
-        // the crossing direction and allocate gates on the other axis.
-        float dxCenter = (float)fabs(a.vCenter.x - b.vCenter.x);
-        float dzCenter = (float)fabs(a.vCenter.z - b.vCenter.z);
+        // Fully overlapping volumes. Choose the coordinate nearest the
+        // approach point on the non-crossing axis, just like NOLF2's
+        // FindNearestEntryPoint behavior.
+        const float dxCenter =
+            (float)fabs(a.vCenter.x - b.vCenter.x);
+        const float dzCenter =
+            (float)fabs(a.vCenter.z - b.vCenter.z);
 
         if(dxCenter >= dzCenter)
         {
-            const float fUsable = overlapZ - (fHalfWidth * 2.0f);
-            uint32 nGates = 1;
-            if(fUsable > kGateStride)
-                nGates += (uint32)(fUsable / kGateStride);
-            uint32 nGate = nLane % nGates;
-
             pOut->x = (overlapXMin + overlapXMax) * 0.5f;
-            pOut->z =
-                (nGates == 1)
-                ? (overlapZMin + overlapZMax) * 0.5f
-                : overlapZMin + fHalfWidth +
-                    ((fUsable / (float)(nGates - 1)) * (float)nGate);
+            pOut->z = FTClamp(
+                vReference.z,
+                overlapZMin + fHalfWidth,
+                overlapZMax - fHalfWidth);
         }
         else
         {
-            const float fUsable = overlapX - (fHalfWidth * 2.0f);
-            uint32 nGates = 1;
-            if(fUsable > kGateStride)
-                nGates += (uint32)(fUsable / kGateStride);
-            uint32 nGate = nLane % nGates;
-
-            pOut->x =
-                (nGates == 1)
-                ? (overlapXMin + overlapXMax) * 0.5f
-                : overlapXMin + fHalfWidth +
-                    ((fUsable / (float)(nGates - 1)) * (float)nGate);
+            pOut->x = FTClamp(
+                vReference.x,
+                overlapXMin + fHalfWidth,
+                overlapXMax - fHalfWidth);
             pOut->z = (overlapZMin + overlapZMax) * 0.5f;
         }
 
@@ -292,6 +260,37 @@ static bool FTGetConnection(
     }
 
     return false;
+}
+
+bool FT_ArePositionsInSameNavigationVolume(
+    const LTVector &vA,
+    const LTVector &vB)
+{
+    FTNavVolume aVolumes[kMaxNavVolumes];
+    const uint32 nCount =
+        FTCollectVolumes(
+            aVolumes,
+            kMaxNavVolumes);
+
+    if(nCount == 0)
+    {
+        return false;
+    }
+
+    const int nA =
+        FTFindVolume(
+            aVolumes,
+            nCount,
+            vA);
+    const int nB =
+        FTFindVolume(
+            aVolumes,
+            nCount,
+            vB);
+
+    return nA >= 0 &&
+           nB >= 0 &&
+           nA == nB;
 }
 
 uint32 FT_GetNavigationVolumeCount()
@@ -371,7 +370,12 @@ bool FT_BuildNavigationPath(
             }
 
             LTVector vConnection;
-            if(!FTGetConnection(aVolumes[nCurrent], aVolumes[i], fAgentHalfWidth, nLane + nStep, &vConnection))
+            if(!FTGetConnection(
+                aVolumes[nCurrent],
+                aVolumes[i],
+                fAgentHalfWidth,
+                aVolumes[nCurrent].vCenter,
+                &vConnection))
             {
                 continue;
             }
@@ -417,17 +421,65 @@ bool FT_BuildNavigationPath(
         return false;
     }
 
+    LTVector vReference = vStart;
+
     for(int i = (int)nReverseCount - 1; i > 0; --i)
     {
+        const FTNavVolume &from =
+            aVolumes[aReverse[i]];
+        const FTNavVolume &to =
+            aVolumes[aReverse[i - 1]];
+
+        // For the final crossing, bias the gate toward the actual player
+        // destination. Intermediate crossings stay near the preceding control
+        // point, matching the NOLF2 path builder's nearest-entry strategy.
+        const LTVector vGateReference =
+            (i == 1)
+            ? vDestination
+            : vReference;
+
         LTVector vConnection;
         if(FTGetConnection(
-            aVolumes[aReverse[i]],
-            aVolumes[aReverse[i - 1]],
+            from,
+            to,
             fAgentHalfWidth,
-            nLane + (uint32)i,
+            vGateReference,
             &vConnection))
         {
             aWaypoints.push_back(vConnection);
+
+            // Move the next control point just inside the destination volume.
+            // A point exactly on a shared boundary is easy for box collision
+            // to wedge against a jamb, especially in Cabin Fever doorways.
+            LTVector vCross = to.vCenter - from.vCenter;
+            vCross.y = 0.0f;
+
+            if(vCross.MagSqr() > 1.0f)
+            {
+                vCross.Normalize();
+                LTVector vInside =
+                    vConnection +
+                    (vCross * (fAgentHalfWidth + 4.0f));
+
+                const float fMargin =
+                    FTMax(4.0f, fAgentHalfWidth);
+
+                vInside.x = FTClamp(
+                    vInside.x,
+                    to.vCenter.x - to.vDims.x + fMargin,
+                    to.vCenter.x + to.vDims.x - fMargin);
+                vInside.z = FTClamp(
+                    vInside.z,
+                    to.vCenter.z - to.vDims.z + fMargin,
+                    to.vCenter.z + to.vDims.z - fMargin);
+
+                aWaypoints.push_back(vInside);
+                vReference = vInside;
+            }
+            else
+            {
+                vReference = vConnection;
+            }
         }
     }
 
