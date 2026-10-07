@@ -104,6 +104,26 @@ Expand-OptionalZip "RS.zip" "RenderStyles"
 Expand-OptionalZip "SHADERS.zip" "Shaders"
 Expand-OptionalZip "CLIENTFX.zip" "ClientFX"
 
+# Local custom render styles can live beside RS.zip without repacking the
+# archive.  This is used by FIRETEAM-only effects such as ZombieThroughWall.
+$customRenderStyles = Join-Path $assetRoot "RS"
+if(Test-Path -LiteralPath $customRenderStyles) {
+    $renderStyleDest = Join-Path $rezRoot "RenderStyles"
+    New-Item -ItemType Directory -Force -Path $renderStyleDest | Out-Null
+    Copy-Item -Path (Join-Path $customRenderStyles "*") -Destination $renderStyleDest -Recurse -Force
+    Write-Host "[OK] assets-local\RS -> rez\RenderStyles"
+}
+
+# The launcher attachment importer keeps commercial bytes in ignored local
+# storage.  Stage its generated tree into the runtime when it exists.
+$attachmentImportRoot = Join-Path $assetRoot "AttachmentImports\Attachments\ca"
+if(Test-Path -LiteralPath $attachmentImportRoot) {
+    $attachmentDest = Join-Path $rezRoot "Attachments\ca"
+    New-Item -ItemType Directory -Force -Path $attachmentDest | Out-Null
+    Copy-Item -Path (Join-Path $attachmentImportRoot "*") -Destination $attachmentDest -Recurse -Force
+    Write-Host "[OK] AttachmentImports -> rez\Attachments\ca"
+}
+
 $zombieAmbience = Join-Path $assetRoot "ZombieAmbience.wav"
 $zombieAmbienceMp3 = Join-Path $assetRoot "ZombieAmbience.mp3"
 
