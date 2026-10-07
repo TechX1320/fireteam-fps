@@ -55,6 +55,8 @@ public sealed partial class MainWindow : Window
     private readonly Button PlayButton = new();
 
     private readonly ScrollViewer LoadoutView = new();
+    private readonly ScrollViewer PlayerGearView = new();
+    private readonly ScrollViewer WeaponModsView = new();
     private readonly ListView LoadoutPresetList = new();
     private readonly TextBox LoadoutPresetNameBox = new();
     private readonly Button LoadoutSlot1Button = new();
@@ -179,6 +181,8 @@ public sealed partial class MainWindow : Window
     {
         HomeView.Visibility = tag == "home" ? Visibility.Visible : Visibility.Collapsed;
         LoadoutView.Visibility = tag == "loadout" ? Visibility.Visible : Visibility.Collapsed;
+        PlayerGearView.Visibility = tag == "player-gear" ? Visibility.Visible : Visibility.Collapsed;
+        WeaponModsView.Visibility = tag == "weapon-mods" ? Visibility.Visible : Visibility.Collapsed;
         CaImportView.Visibility = tag == "ca-importer" ? Visibility.Visible : Visibility.Collapsed;
         ArsenalView.Visibility = tag == "weapon-editor" ? Visibility.Visible : Visibility.Collapsed;
         ModsView.Visibility = tag == "tools" ? Visibility.Visible : Visibility.Collapsed;
@@ -187,6 +191,8 @@ public sealed partial class MainWindow : Window
         AppSectionTitleText.Text = tag switch
         {
             "loadout" => "ARMORY",
+            "player-gear" => "PLAYER GEAR",
+            "weapon-mods" => "WEAPON MODS",
             "weapon-editor" => "WEAPON CATALOG",
             "ca-importer" => "COMBAT ARMS IMPORTER",
             "tools" => "MODS & CONTENT TOOLS",
