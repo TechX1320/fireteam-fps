@@ -106,8 +106,14 @@ if not exist "%SHORT_OUTPUT%\FireteamLauncher.exe" (
 echo.
 echo [LAUNCHER 3/4] Staging clean launcher runtime...
 if not exist "%BUILT_DIR%" mkdir "%BUILT_DIR%" >nul
-if exist "%APP_DIR%" rmdir /s /q "%APP_DIR%"
+
+rem Remove the previous raw WinUI publish completely. This cleans the old
+rem DLL/language-folder sprawl that earlier FIRETEAM launcher builds left
+rem directly under BUILT\Launcher.
+if exist "%SUPPORT_DIR%" rmdir /s /q "%SUPPORT_DIR%"
+
 mkdir "%APP_DIR%" >nul 2>nul
+mkdir "%SUPPORT_DIR%\Logs" >nul 2>nul
 
 xcopy "%SHORT_OUTPUT%\*" "%APP_DIR%\" /E /I /Y /Q >nul
 if errorlevel 1 (
