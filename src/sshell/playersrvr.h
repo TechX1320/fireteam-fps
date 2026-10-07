@@ -86,7 +86,10 @@ public:
     void                SetClient(HCLIENT hClient){ m_hClient = hClient; SendHealth(); SendPrimaryAmmo(); SendPowerupState(); }
     void    			SetClubID();
     void                SetWeaponSlot(uint8 nSlot);
-    void                FirePrimary(const LTVector &vFrom, const LTVector &vDirection);
+    void                FirePrimary(
+                            const LTVector &vFrom,
+                            const LTVector &vDirection,
+                            bool bZoomed);
     void                ReloadWeapon();
     void                SyncPrimaryAmmo();
     void                SetClientID(uint32 id){ m_iClientID = id; }
