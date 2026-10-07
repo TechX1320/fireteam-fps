@@ -351,12 +351,15 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
         {
             LTVector vFrom = pMessage->ReadLTVector();
             LTVector vDirection = pMessage->ReadLTVector();
+            const bool bZoomed =
+                pMessage->Readbool();
 
             if(pPlayerClass)
             {
                 pPlayerClass->FirePrimary(
                     vFrom,
-                    vDirection);
+                    vDirection,
+                    bZoomed);
             }
         }
         break;
