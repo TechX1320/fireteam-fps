@@ -17,12 +17,28 @@ New-Item -ItemType Directory -Force -Path $stampRoot | Out-Null
 
 function Expand-OptionalZip([string]$ZipName, [string]$RezSubdir) {
     $zipPath = Join-Path $assetRoot $ZipName
+    $actualZipName = $ZipName
+
+    # Browser/Windows downloads often rename a second copy to FX(1).zip.
+    # Accept the newest local FX*.zip without requiring the player/modder to
+    # rename their private Combat Arms asset archive.
+    if (-not (Test-Path -LiteralPath $zipPath) -and $ZipName -ieq "FX.zip") {
+        $candidate = Get-ChildItem -LiteralPath $assetRoot -Filter "FX*.zip" -File |
+            Sort-Object LastWriteTimeUtc -Descending |
+            Select-Object -First 1
+
+        if($candidate) {
+            $zipPath = $candidate.FullName
+            $actualZipName = $candidate.Name
+        }
+    }
+
     if (-not (Test-Path -LiteralPath $zipPath)) {
         Write-Host "[SKIP] $ZipName not present"
         return
     }
 
-    $safeName = $ZipName.Replace(".", "_")
+    $safeName = $actualZipName.Replace(".", "_")
     $stampPath = Join-Path $stampRoot ($safeName + ".stamp")
     $zipInfo = Get-Item -LiteralPath $zipPath
 
@@ -37,11 +53,11 @@ function Expand-OptionalZip([string]$ZipName, [string]$RezSubdir) {
     $dest = Join-Path $rezRoot $RezSubdir
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
 
-    Write-Host "[UPDATE] Expanding $ZipName..."
+    Write-Host "[UPDATE] Expanding $actualZipName..."
     Expand-Archive -LiteralPath $zipPath -DestinationPath $dest -Force
     Set-Content -LiteralPath $stampPath -Value $zipInfo.LastWriteTimeUtc.Ticks
     (Get-Item -LiteralPath $stampPath).LastWriteTimeUtc = $zipInfo.LastWriteTimeUtc
-    Write-Host "[OK] $ZipName -> rez\$RezSubdir"
+    Write-Host "[OK] $actualZipName -> rez\$RezSubdir"
 }
 
 $mapPath = Join-Path $assetRoot "CABINFEVER.DAT"
