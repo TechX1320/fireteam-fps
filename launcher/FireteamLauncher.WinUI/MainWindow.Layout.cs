@@ -1288,7 +1288,13 @@ public sealed partial class MainWindow
                 HorizontalAlignment.Stretch;
 
             button.IsHitTestVisible =
-                false;
+                true;
+
+            button.Tag =
+                i;
+
+            button.Click +=
+                LoadoutSlotButton_Click;
 
             Grid.SetColumn(
                 button,
@@ -1643,6 +1649,9 @@ public sealed partial class MainWindow
             (sender, args) =>
                 SetLoadoutCategory(
                     category);
+
+        _loadoutCategoryButtons[category] =
+            button;
 
         return button;
     }

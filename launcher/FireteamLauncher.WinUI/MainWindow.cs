@@ -30,6 +30,9 @@ public sealed partial class MainWindow : Window
     private WeaponDefinition? _selectedLoadoutWeapon;
     private string _loadoutCategory = "AR";
     private int _selectedLoadoutPresetIndex = 1;
+    private int _selectedLoadoutSlot;
+    private readonly Dictionary<string, Button> _loadoutCategoryButtons =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private readonly Grid AppTitleBar = new();
     private readonly TextBlock AppSectionTitleText = new();
@@ -475,6 +478,8 @@ public sealed partial class MainWindow : Window
         }
 
         RefreshLoadoutSlotButtons();
+        SelectLoadoutSlot(
+            _selectedLoadoutSlot);
     }
 
     private void RefreshLoadoutSlotButtons()
@@ -504,6 +509,16 @@ public sealed partial class MainWindow : Window
                 "\n" +
                 (weapon?.Name ??
                  "EMPTY");
+
+            buttons[slot].BorderBrush =
+                slot == _selectedLoadoutSlot
+                    ? CyanBrush
+                    : DividerBrush;
+
+            buttons[slot].BorderThickness =
+                slot == _selectedLoadoutSlot
+                    ? new Thickness(2)
+                    : new Thickness(1);
         }
     }
 
@@ -515,6 +530,108 @@ public sealed partial class MainWindow : Window
         LoadoutSlot4Button,
         LoadoutSlot5Button
     ];
+
+    private void LoadoutSlotButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if(sender is Button button &&
+           button.Tag is int slot)
+        {
+            SelectLoadoutSlot(
+                slot);
+        }
+    }
+
+    private void SelectLoadoutSlot(
+        int slot)
+    {
+        _selectedLoadoutSlot =
+            Math.Clamp(
+                slot,
+                0,
+                4);
+
+        var allowed =
+            AllowedCategoriesForSlot(
+                _selectedLoadoutSlot);
+
+        foreach(var pair in _loadoutCategoryButtons)
+        {
+            pair.Value.IsEnabled =
+                allowed.Contains(
+                    pair.Key,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
+        var equippedCategory =
+            _draftLoadout[_selectedLoadoutSlot]?
+                .LoadoutCategory;
+
+        if(!string.IsNullOrWhiteSpace(
+               equippedCategory) &&
+           allowed.Contains(
+               equippedCategory,
+               StringComparer.OrdinalIgnoreCase))
+        {
+            _loadoutCategory =
+                equippedCategory;
+        }
+        else if(!allowed.Contains(
+                    _loadoutCategory,
+                    StringComparer.OrdinalIgnoreCase))
+        {
+            _loadoutCategory =
+                allowed[0];
+        }
+
+        RefreshLoadoutSlotButtons();
+        ApplyLoadoutInventoryFilter();
+    }
+
+    private static IReadOnlyList<string> AllowedCategoriesForSlot(
+        int slot) =>
+        slot switch
+        {
+            0 =>
+            [
+                "AR",
+                "SR",
+                "Launcher",
+                "MG",
+                "SG",
+                "SMG"
+            ],
+            1 =>
+            [
+                "Pistol"
+            ],
+            2 =>
+            [
+                "Melee"
+            ],
+            _ =>
+            [
+                "AR",
+                "SR",
+                "Launcher",
+                "Melee",
+                "MG",
+                "Pistol",
+                "SG",
+                "SMG",
+                "Throwing"
+            ]
+        };
+
+    private static bool CategoryAllowedForSlot(
+        string category,
+        int slot) =>
+        AllowedCategoriesForSlot(
+            slot)
+            .Contains(
+                category,
+                StringComparer.OrdinalIgnoreCase);
 
     private void SetLoadoutCategory(
         string category)
@@ -683,22 +800,29 @@ public sealed partial class MainWindow : Window
         }
 
         var slots =
-            AllowedLoadoutSlots(
-                weapon.LoadoutCategory);
+            CategoryAllowedForSlot(
+                weapon.LoadoutCategory,
+                _selectedLoadoutSlot)
+                ? new[]
+                {
+                    LoadoutSlotLabel(
+                        _selectedLoadoutSlot)
+                }
+                : Array.Empty<string>();
 
         LoadoutEquipSlotCombo.ItemsSource =
             slots;
 
         LoadoutEquipSlotCombo.SelectedIndex =
-            slots.Count > 0
-            ? 0
-            : -1;
+            slots.Length > 0
+                ? 0
+                : -1;
 
         LoadoutEquipButton.Content =
             "EQUIP WEAPON";
 
         LoadoutEquipButton.IsEnabled =
-            slots.Count > 0;
+            slots.Length > 0;
     }
 
     private static bool SameWeapon(
