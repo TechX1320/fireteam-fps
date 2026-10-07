@@ -77,6 +77,7 @@ public:
     void                SetWeaponSlot(uint8 nSlot);
     void                FirePrimary(const LTVector &vFrom, const LTVector &vDirection);
     void                ReloadWeapon();
+    void                SyncPrimaryAmmo();
     void                SetClientID(uint32 id){ m_iClientID = id; }
     uint32              GetClientID(){ return m_iClientID; }
     uint32              GetScore(){ return m_iScore; }
