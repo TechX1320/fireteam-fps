@@ -22,6 +22,17 @@ struct FTInfectedDef
     float fAttackCooldown;
     float fUpdateSeconds;
 
+    // Optional data-driven infected voice bank. Paths are relative to REZ.
+    char sVoiceDir[160];
+    char sVoiceAlert[64];
+    char sVoiceAttack1[64];
+    char sVoiceAttack2[64];
+    char sVoiceAttack3[64];
+    char sVoiceDeath[64];
+    float fVoiceRadius;
+    uint8 nVoiceAlertChance;
+    uint8 nVoiceAttackChance;
+
     char sCollisionMode[32];
     float fCollisionX;
     float fCollisionY;
@@ -135,6 +146,24 @@ inline void FT_ApplyInfectedValue(
         def.fAttackCooldown = (float)atof(pValue);
     else if(_stricmp(pKey, "update_seconds") == 0)
         def.fUpdateSeconds = (float)atof(pValue);
+    else if(_stricmp(pKey, "voice_dir") == 0)
+        FT_CopyInfectedString(def.sVoiceDir, sizeof(def.sVoiceDir), pValue);
+    else if(_stricmp(pKey, "voice_alert") == 0)
+        FT_CopyInfectedString(def.sVoiceAlert, sizeof(def.sVoiceAlert), pValue);
+    else if(_stricmp(pKey, "voice_attack1") == 0)
+        FT_CopyInfectedString(def.sVoiceAttack1, sizeof(def.sVoiceAttack1), pValue);
+    else if(_stricmp(pKey, "voice_attack2") == 0)
+        FT_CopyInfectedString(def.sVoiceAttack2, sizeof(def.sVoiceAttack2), pValue);
+    else if(_stricmp(pKey, "voice_attack3") == 0)
+        FT_CopyInfectedString(def.sVoiceAttack3, sizeof(def.sVoiceAttack3), pValue);
+    else if(_stricmp(pKey, "voice_death") == 0)
+        FT_CopyInfectedString(def.sVoiceDeath, sizeof(def.sVoiceDeath), pValue);
+    else if(_stricmp(pKey, "voice_radius") == 0)
+        def.fVoiceRadius = (float)atof(pValue);
+    else if(_stricmp(pKey, "voice_alert_chance") == 0)
+        def.nVoiceAlertChance = (uint8)atoi(pValue);
+    else if(_stricmp(pKey, "voice_attack_chance") == 0)
+        def.nVoiceAttackChance = (uint8)atoi(pValue);
     else if(_stricmp(pKey, "collision_mode") == 0)
         FT_CopyInfectedString(def.sCollisionMode, sizeof(def.sCollisionMode), pValue);
     else if(_stricmp(pKey, "collision_x") == 0)

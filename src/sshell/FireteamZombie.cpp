@@ -10,6 +10,7 @@
 #include <iltcommon.h>
 #include <iltmodel.h>
 #include <iltphysics.h>
+#include <iltsoundmgr.h>
 #include <ltobjectcreate.h>
 #include <float.h>
 #include <math.h>
@@ -32,6 +33,7 @@ FireteamZombie::FireteamZombie() :
     m_fNoProgressTime(0.0f),
     m_fBestProgressDistance(FLT_MAX),
     m_fTargetMemory(0.0f),
+    m_fVoiceCooldown(0.0f),
     m_bHasLastKnownTarget(false),
     m_eBehaviorState(kBehaviorSearch),
     m_bDying(false),
@@ -134,6 +136,86 @@ static bool FT_ZombieAssetExists(const char *pPath)
 
     fclose(pFile);
     return true;
+}
+
+void FireteamZombie::PlayVoiceSound(
+    const char *pFilename)
+{
+    if(!pFilename ||
+       !pFilename[0] ||
+       !m_Def.sVoiceDir[0])
+    {
+        return;
+    }
+
+    char sSound[256];
+    sprintf(
+        sSound,
+        "%s/%s",
+        m_Def.sVoiceDir,
+        pFilename);
+
+    PlaySoundInfo soundInfo;
+    PLAYSOUNDINFO_INIT(
+        soundInfo);
+
+    soundInfo.m_dwFlags =
+        PLAYSOUND_3D |
+        PLAYSOUND_ATTACHED |
+        PLAYSOUND_REVERB;
+    soundInfo.m_hObject =
+        m_hObject;
+    soundInfo.m_fOuterRadius =
+        m_Def.fVoiceRadius > 0.0f
+        ? m_Def.fVoiceRadius
+        : 850.0f;
+    soundInfo.m_fInnerRadius =
+        110.0f;
+
+    strncpy(
+        soundInfo.m_szSoundName,
+        sSound,
+        sizeof(soundInfo.m_szSoundName) - 1);
+    soundInfo.m_szSoundName[
+        sizeof(soundInfo.m_szSoundName) - 1] =
+        '\0';
+
+    HLTSOUND hSound =
+        LTNULL;
+
+    g_pLTServer->SoundMgr()->PlaySound(
+        &soundInfo,
+        hSound);
+}
+
+void FireteamZombie::PlayAttackVoice()
+{
+    const char *pVoice =
+        LTNULL;
+
+    const uint32 nChoice =
+        (uint32)(rand() % 3);
+
+    if(nChoice == 0)
+        pVoice = m_Def.sVoiceAttack1;
+    else if(nChoice == 1)
+        pVoice = m_Def.sVoiceAttack2;
+    else
+        pVoice = m_Def.sVoiceAttack3;
+
+    if(!pVoice ||
+       !pVoice[0])
+    {
+        if(m_Def.sVoiceAttack1[0])
+            pVoice = m_Def.sVoiceAttack1;
+        else if(m_Def.sVoiceAttack2[0])
+            pVoice = m_Def.sVoiceAttack2;
+        else
+            pVoice = m_Def.sVoiceAttack3;
+    }
+
+    PlayVoiceSound(
+        pVoice);
 }
 
 void FireteamZombie::CreateInfectedFace()
@@ -853,6 +935,12 @@ void FireteamZombie::UpdateZombie()
     if(m_fForcePathTime > 0.0f)
         m_fForcePathTime -= kUpdate;
 
+    if(m_fVoiceCooldown > 0.0f)
+        m_fVoiceCooldown -= kUpdate;
+
+    const BehaviorState ePreviousBehavior =
+        m_eBehaviorState;
+
     HOBJECT hTarget =
         FindNearestPlayer();
 
@@ -919,6 +1007,21 @@ void FireteamZombie::UpdateZombie()
             true;
         m_eBehaviorState =
             kBehaviorChase;
+
+        if(m_fVoiceCooldown <= 0.0f &&
+           (ePreviousBehavior ==
+                kBehaviorSearch ||
+            ePreviousBehavior ==
+                kBehaviorLostTarget) &&
+           m_Def.sVoiceAlert[0] &&
+           (rand() % 100) <
+                (int)m_Def.nVoiceAlertChance)
+        {
+            PlayVoiceSound(
+                m_Def.sVoiceAlert);
+            m_fVoiceCooldown =
+                2.5f;
+        }
     }
     else if(m_bHasLastKnownTarget &&
             m_fTargetMemory > 0.0f)
@@ -995,6 +1098,15 @@ void FireteamZombie::UpdateZombie()
             {
                 pPlayer->ApplyDamage(
                     m_Def.nAttackDamage);
+            }
+
+            if(m_fVoiceCooldown <= 0.0f &&
+               (rand() % 100) <
+                    (int)m_Def.nVoiceAttackChance)
+            {
+                PlayAttackVoice();
+                m_fVoiceCooldown =
+                    1.15f;
             }
 
             m_fAttackCooldown =
@@ -1951,6 +2063,9 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
             SetZombieAnimation(
                 m_Def.sDeathAnim,
                 false);
+
+            PlayVoiceSound(
+                m_Def.sVoiceDeath);
 
             LTVector vDeathPos;
             g_pLTServer->GetObjectPos(

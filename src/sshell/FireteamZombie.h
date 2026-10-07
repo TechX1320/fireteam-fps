@@ -39,6 +39,9 @@ private:
     void SetZombieAnimation(
         const char *pAnimation,
         bool bLooping);
+    void PlayVoiceSound(
+        const char *pFilename);
+    void PlayAttackVoice();
     bool IsMovementStepClear(
         const LTVector &vPos,
         const LTVector &vDirection,
@@ -55,6 +58,7 @@ private:
     float m_fNoProgressTime;
     float m_fBestProgressDistance;
     float m_fTargetMemory;
+    float m_fVoiceCooldown;
     bool m_bHasLastKnownTarget;
     BehaviorState m_eBehaviorState;
     bool m_bDying;
