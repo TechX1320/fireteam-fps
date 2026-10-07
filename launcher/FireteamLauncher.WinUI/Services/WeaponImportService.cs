@@ -254,6 +254,33 @@ public sealed class WeaponImportService
         Directory.CreateDirectory(
             localImportRoot);
 
+        // This folder is generated output, not a user-authored mod workspace.
+        // Clear the previous bulk-import tree so a new archive audit cannot
+        // leave thousands of stale assets from a different CA client version.
+        var generatedAssetRoot =
+            Path.Combine(
+                localImportRoot,
+                "Weapons",
+                "ca");
+
+        progress?.Report(
+            new WeaponImportProgress(
+                0,
+                weapons.Count,
+                "CLEANUP",
+                "Clearing the previous generated weapon-import asset tree..."));
+
+        if(Directory.Exists(
+            generatedAssetRoot))
+        {
+            Directory.Delete(
+                generatedAssetRoot,
+                true);
+        }
+
+        Directory.CreateDirectory(
+            generatedAssetRoot);
+
         // Import is intentionally local-only. Copying thousands of archive
         // files into the live runtime during the UI import made the operation
         // unnecessarily slow and doubled disk I/O. stage-imported-weapons.cmd
