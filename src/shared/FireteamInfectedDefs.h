@@ -52,6 +52,10 @@ struct FTInfectedDef
     float fFaceRotZ;
 
     char sIdleAnim[64];
+    char sWalkAnim[64];
+    char sRunAnim[64];
+    char sDeathAnim[64];
+    float fDeathSeconds;
 };
 
 inline void FT_CopyInfectedString(
@@ -176,6 +180,14 @@ inline void FT_ApplyInfectedValue(
         def.fFaceRotZ = (float)atof(pValue);
     else if(_stricmp(pKey, "idle_anim") == 0)
         FT_CopyInfectedString(def.sIdleAnim, sizeof(def.sIdleAnim), pValue);
+    else if(_stricmp(pKey, "walk_anim") == 0)
+        FT_CopyInfectedString(def.sWalkAnim, sizeof(def.sWalkAnim), pValue);
+    else if(_stricmp(pKey, "run_anim") == 0)
+        FT_CopyInfectedString(def.sRunAnim, sizeof(def.sRunAnim), pValue);
+    else if(_stricmp(pKey, "death_anim") == 0)
+        FT_CopyInfectedString(def.sDeathAnim, sizeof(def.sDeathAnim), pValue);
+    else if(_stricmp(pKey, "death_seconds") == 0)
+        def.fDeathSeconds = (float)atof(pValue);
 }
 
 inline bool FT_LoadInfectedSection(
