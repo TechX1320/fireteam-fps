@@ -4,7 +4,8 @@ public sealed record LauncherSettings(
     int Width,
     int Height,
     bool Windowed,
-    double SensitivityMultiplier,
+    double SensitivityXMultiplier,
+    double SensitivityYMultiplier,
     int Volume,
     double Gamma);
 

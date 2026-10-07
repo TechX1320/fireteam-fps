@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace FireteamLauncher.Infrastructure;
 
 public sealed class FireteamConfigDocument
@@ -16,9 +14,15 @@ public sealed class FireteamConfigDocument
 
     public IReadOnlyList<string> Sections =>
         _lines
-            .Select(line => Regex.Match(line.Trim(), @"^[([^]]+)]$"))
-            .Where(match => match.Success)
-            .Select(match => match.Groups[1].Value)
+            .Select(line => line.Trim())
+            .Where(line =>
+                line.Length >= 3 &&
+                line[0] == '[' &&
+                line[^1] == ']')
+            .Select(line =>
+                line[1..^1].Trim())
+            .Where(section =>
+                section.Length > 0)
             .ToList();
 
     public bool HasSection(string section) => FindSection(section).Start >= 0;

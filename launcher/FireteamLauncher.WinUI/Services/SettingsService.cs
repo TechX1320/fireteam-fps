@@ -23,8 +23,8 @@ public sealed class SettingsService
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 
         if(tokens.Length < 7 ||
-           !double.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var rawSensitivity) ||
-           !double.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out _) ||
+           !double.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var rawSensitivityX) ||
+           !double.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var rawSensitivityY) ||
            !int.TryParse(tokens[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var volume) ||
            !double.TryParse(tokens[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var gamma) ||
            !int.TryParse(tokens[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out var width) ||
@@ -38,7 +38,8 @@ public sealed class SettingsService
             width,
             height,
             windowed != 0,
-            Math.Clamp(rawSensitivity / NativeSensitivityBase, 0.01, 4.0),
+            Math.Clamp(rawSensitivityX / NativeSensitivityBase, 0.01, 4.0),
+            Math.Clamp(rawSensitivityY / NativeSensitivityBase, 0.01, 4.0),
             Math.Clamp(volume, 0, 100),
             Math.Clamp(gamma, 0.50, 6.00));
     }
@@ -48,11 +49,18 @@ public sealed class SettingsService
         var game = LauncherPaths.FindGameDirectory()
             ?? throw new InvalidOperationException("FIRETEAM BUILT folder was not found.");
 
-        var rawSensitivity = NativeSensitivityBase * settings.SensitivityMultiplier;
+        var rawSensitivityX =
+            NativeSensitivityBase *
+            settings.SensitivityXMultiplier;
+        var rawSensitivityY =
+            NativeSensitivityBase *
+            settings.SensitivityYMultiplier;
+
         var line = string.Format(
             CultureInfo.InvariantCulture,
-            "{0:F6} {0:F6} {1} {2:F3} {3} {4} {5}\n",
-            rawSensitivity,
+            "{0:F6} {1:F6} {2} {3:F3} {4} {5} {6}\n",
+            rawSensitivityX,
+            rawSensitivityY,
             settings.Volume,
             settings.Gamma,
             settings.Width,
@@ -104,5 +112,5 @@ public sealed class SettingsService
     }
 
     private static LauncherSettings Defaults() =>
-        new(1920, 1080, true, 0.32, 60, 1.00);
+        new(1920, 1080, true, 0.32, 0.32, 60, 1.00);
 }
