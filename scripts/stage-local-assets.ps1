@@ -30,7 +30,19 @@ function Expand-OptionalZip([string]$ZipName, [string]$RezSubdir) {
         $duplicatePattern = "SND*.zip"
     }
 
-    if (-not (Test-Path -LiteralPath $zipPath) -and $duplicatePattern) {
+    if($ZipName -ieq "SND.zip" -and $duplicatePattern) {
+        # An older partial SND.zip may live beside a later all-sounds dump
+        # such as SND(2).zip. Prefer the largest matching archive, then newest.
+        $candidate = Get-ChildItem -LiteralPath $assetRoot -Filter $duplicatePattern -File |
+            Sort-Object -Property @{Expression={$_.Length};Descending=$true}, @{Expression={$_.LastWriteTimeUtc};Descending=$true} |
+            Select-Object -First 1
+
+        if($candidate) {
+            $zipPath = $candidate.FullName
+            $actualZipName = $candidate.Name
+        }
+    }
+    elseif (-not (Test-Path -LiteralPath $zipPath) -and $duplicatePattern) {
         $candidate = Get-ChildItem -LiteralPath $assetRoot -Filter $duplicatePattern -File |
             Sort-Object LastWriteTimeUtc -Descending |
             Select-Object -First 1
@@ -234,6 +246,29 @@ function Extract-OptionalZipEntry([string]$ZipName, [string]$EntryName, [string]
         Write-Host "[INFO] Optional asset not present: $ZipName::$EntryName"
         return $false
     }
+}
+
+
+$uiZip = Join-Path $assetRoot "UI_Items.zip"
+if(Test-Path -LiteralPath $uiZip) {
+    Write-Host "[UPDATE] Staging Combat Arms combat-feedback HUD textures..."
+
+    foreach($entry in @(
+        "UI_HUD_MESSAGE/EFFECT/HEADSHOT.DTX",
+        "UI_HUD_MESSAGE/EFFECT/NUTSHOT.DTX",
+        "UI_HUD_MESSAGE/EFFECT/FIRSTKILL.DTX",
+        "UI_HUD_MESSAGE/EFFECT/DOUBLEKILL.DTX",
+        "UI_HUD_MESSAGE/EFFECT/MULTIKILL.DTX",
+        "UI_HUD_MESSAGE/EFFECT/ULTRAKILL.DTX",
+        "UI_HUD_MESSAGE/EFFECT/FANTASTIC.DTX",
+        "UI_HUD_MESSAGE/EFFECT/UNBELIEVABLE.DTX",
+        "UI_HUD_MESSAGE/EFFECT/ROUNDSTART.DTX",
+        "UI_HUD_WEAPON/CROSSHAIR/HUDEFFECT_HIT.DTX"
+    )) {
+        Extract-OptionalZipEntry "UI_Items.zip" $entry ($entry.Replace("/", "\")) | Out-Null
+    }
+} else {
+    Write-Host "[SKIP] UI_Items.zip not present - text fallback will be used for combat feedback"
 }
 
 

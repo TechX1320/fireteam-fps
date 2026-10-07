@@ -50,6 +50,8 @@ For Cabin Fever testing, put these in `assets-local\`:
 - `CABINFEVER.DAT`
 - `TEXTURES.zip`
 - `FX.zip`
+- `SND.zip` (or another `SND*.zip`; the largest is selected)
+- `UI_Items.zip` (optional CA combat-feedback HUD art)
 - `RS.zip`
 
 For Fireteam data research, local-only inputs may also include `GMS.zip`, `Decrypted Attributes_mpgh.net.rar`, and the CA reference binaries documented in `assets-local\README.md`. Current GMS format findings are tracked in `docs\GMS_RESEARCH.md`; run `scripts\inspect-gms.ps1` to reproduce the block/tail analysis.
@@ -104,15 +106,16 @@ Gameplay now defaults to first person. Press `C` while in-game to toggle back to
 - Cabin Fever's map-authored navigation metadata is preserved: `AIRegion`, `AIVolume` fields, and `AINodePatrol` objects load instead of being discarded.
 - Infected path through the authored AIVolume network using an NOLF2-inspired volume search and shared-opening gates. Collision prefers the staged CA model's authored animation dimensions. Direct pursuit uses agent-width clearance, stuck enemies temporarily force authored volume paths, local obstruction steering can slide around walls, incomplete volume paths get a short dog-leg recovery waypoint, and floor probing now accepts walkable solid WorldModels such as stairs instead of requiring the root BSP world.
 - Cabin Fever now has a temporary development round loop using all discovered `Spawner_01_*` perimeter points: staggered randomized spawns, a max-alive cap, round-clear intermission, and simple increasing DEV counts. These values are explicitly temporary until authentic GMS round data is recovered.
-- A 2% bonus crawler easter egg can spawn an original SealHunter seal from a perimeter point. Bonus seals do not count toward round completion.
+- A 2% bonus crawler easter egg can spawn an original SealHunter seal at a randomized authored cabin player start. Bonus seals do not count toward round completion.
 - Bowie melee keeps the Combat Arms 135-unit range during bring-up and can damage `FireteamZombie` objects. The old SealHunter single-OBB assumption is patched structurally so persistent local source trees are upgraded correctly.
 - Escape settings now include fine-grained horizontal/vertical mouse sensitivity, game volume, native LithTech/NOLF2 gamma, resolution, windowed/fullscreen, Apply Video, Resume and Quit.
 - The stock five-slot test loadout is now conventional firearms: `1 = AK-47`, `2 = Beretta M92FS`, `3 = Bowie`, `4 = Colt 1911A1 MEU`, `5 = L96A1`. Explosive weapons remain possible mod content but are intentionally not part of the stock game until their FX/projectile presentation is mature.
 - Weapon definitions live in `config/weapons.cfg`. The server owns ammo, damage, cadence and reload completion; clients request actions and render the selected weapon/HUD.
 - The L96A1 has a definition-driven right-mouse scope zoom with an initial FIRETEAM optic overlay. The same config format can support later scoped weapons without hardcoding one rifle.
 - `R` requests a server-authoritative reload. The HUD shows the selected weapon and server-synchronized ammo; crosshair visibility follows each weapon definition (the CA Bowie disables it).
-- Round state is server-broadcast and the client has `ROUND N BEGIN` / `ROUND N CLEAR` announcements plus a persistent round kill/alive line. The Tab scoreboard is Fireteam-oriented and ranks squad members by infected kills.
-- Normal infected presentation is external in `config/characters.cfg`. The default CA virus mapping now uses `VLST` idle, `VLWFR` walk, `VLRFR` run and `VDIE` death; corpses remain visible briefly for the death animation without blocking players.
+- Round state is server-broadcast and the client has `ROUND N BEGIN` / `ROUND N CLEAR` announcements plus a persistent round kill/alive line. Cabin Fever's original `SECTION1.WAV` / `SECTION2.WAV` stings now accompany round begin/clear. The Tab scoreboard is Fireteam-oriented and ranks squad members by infected kills.
+- Shooter feedback uses the original CA `HEADSHOT`, `NUTSHOT`, `FIRSTKILL`, `DOUBLEKILL`, `MULTIKILL`, `ULTRAKILL`, `FANTASTIC` and `UNBELIEVABLE` HUD textures when `UI_Items.zip` is present, with text fallback otherwise. Head/Nut hits also get short native CA target-hit sound cues.
+- Normal infected presentation is external in `config/characters.cfg`. The default CA virus mapping now uses `VLST` idle, `VLWFR` walk, `VLRFR` run and `VDIE` death; corpses remain visible briefly for the death animation without blocking players. Normal infected now also use the original Cabin Fever `NORMAL` SEEENEMY / ATTACK / DEATH voice bank.
 - Hitscan fire now validates the client's real first-person camera origin against the authoritative player body. NOLF2-style reverse-trace penetration is definition-driven; the L96 is the first stock shoot-through test while CA material-specific surface rules are still being mapped.
 - Reload completion explicitly reconciles server ammo back to the client HUD, preventing a completed zero-mag reload from visually staying at zero.
 - Player damage is real again. The earlier respawn loop was caused by stale PoisonGas hazard code surviving in the local generated source; the build now replaces that function body explicitly. Environmental PoisonGas damage remains disabled until Combat Arms safe/outside volume semantics are reproduced.

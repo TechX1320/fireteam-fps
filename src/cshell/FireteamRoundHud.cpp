@@ -4,7 +4,9 @@
 #include <iltclient.h>
 #include <iltfontmanager.h>
 #include <iltmessage.h>
+#include <iltsoundmgr.h>
 #include <stdio.h>
+#include <string.h>
 
 static CUIFont *s_pRoundFont = LTNULL;
 static CUIFont *s_pBuffFont = LTNULL;
@@ -20,6 +22,42 @@ static uint16 s_nAlive = 0;
 static float s_fAnnouncementUntil = 0.0f;
 static float s_fBottomlessUntil = 0.0f;
 static float s_fOneHitUntil = 0.0f;
+
+static void FT_PlayRoundCue(
+    const char *pSound)
+{
+    if(!g_pLTCSoundMgr ||
+       !pSound ||
+       !pSound[0])
+    {
+        return;
+    }
+
+    PlaySoundInfo soundInfo;
+    PLAYSOUNDINFO_INIT(
+        soundInfo);
+
+    soundInfo.m_dwFlags =
+        PLAYSOUND_LOCAL |
+        PLAYSOUND_CTRL_VOL;
+    soundInfo.m_nVolume =
+        74;
+
+    strncpy(
+        soundInfo.m_szSoundName,
+        pSound,
+        sizeof(soundInfo.m_szSoundName) - 1);
+    soundInfo.m_szSoundName[
+        sizeof(soundInfo.m_szSoundName) - 1] =
+        '\0';
+
+    HLTSOUND hSound =
+        LTNULL;
+
+    g_pLTCSoundMgr->PlaySound(
+        &soundInfo,
+        hSound);
+}
 
 void FT_RoundHudInit()
 {
@@ -180,6 +218,10 @@ void FT_RoundHudHandleMessage(
         s_pAnnouncement->SetText(szAnnouncement);
         s_fAnnouncementUntil =
             g_pLTClient->GetTime() + 3.0f;
+
+        // Original Cabin Fever section sting, borrowed as the round-start cue.
+        FT_PlayRoundCue(
+            "Snd/CABINFEVER/SECTION1.WAV");
     }
     else if(nState == 2)
     {
@@ -190,6 +232,10 @@ void FT_RoundHudHandleMessage(
         s_pAnnouncement->SetText(szAnnouncement);
         s_fAnnouncementUntil =
             g_pLTClient->GetTime() + 3.0f;
+
+        // Companion Cabin Fever section sting for a cleared round.
+        FT_PlayRoundCue(
+            "Snd/CABINFEVER/SECTION2.WAV");
     }
 }
 

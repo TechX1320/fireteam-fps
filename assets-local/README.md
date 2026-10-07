@@ -9,8 +9,11 @@ Place these files here:
 - `CABINFEVER.DAT`
 - `TEXTURES.zip`
 - `FX.zip`
-- `SND.zip` - Cabin Fever ambient, environmental, sting and map sound assets
+- `SND.zip` / `SND(2).zip` - sound archive; the largest `SND*.zip` is staged automatically
+- `UI_Items.zip` - optional CA HUD art for headshots, Nut Shots and kill-chain announcements
 - `RS.zip`
+
+The supplied all-sounds archive includes original Cabin Fever rain, screams, section stings and four NPC/infected voice banks (`NORMAL`, `LIGHT`, `HEAVY`, `EXPLODE`). The current normal infected uses the real `COOPMODE/NPC_VOICE/CABINFEVER/NORMAL` alert, attack and death WAVs.
 
 The staging script now reads the texture paths embedded in `CABINFEVER.DAT`. When the DAT expects a flattened path such as `Textures\Objects\roof01.dtx` but the extracted archive stores that file deeper (for example `Textures\OBJECTS\CLOTHINGS\ROOF01.DTX`), it creates a local alias automatically. Ambiguous non-identical matches are reported instead of guessed.
 
