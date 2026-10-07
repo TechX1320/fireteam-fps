@@ -1300,6 +1300,45 @@ bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
     return true;
 }
 
+bool CPlayerClnt::SelectFirstWeaponType(
+    FTWeaponType eType)
+{
+    if(m_bDevWeaponQa)
+    {
+        return false;
+    }
+
+    // Backpack slots are the intended home for grenades/equipment, so prefer
+    // them before scanning the fixed primary/sidearm/melee roles.
+    const uint8 aOrder[5] =
+    {
+        4, 5, 1, 2, 3
+    };
+
+    for(uint32 i = 0;
+        i < 5;
+        ++i)
+    {
+        const uint8 nSlot =
+            aOrder[i];
+
+        const FTWeaponDef *pDef =
+            FT_GetWeaponDef(
+                m_WeaponDefs,
+                nSlot);
+
+        if(pDef &&
+           pDef->eType == eType)
+        {
+            return SelectWeaponSlot(
+                nSlot);
+        }
+    }
+
+    return false;
+}
+
+
 void CPlayerClnt::CycleWeapon(int nDirection)
 {
     if(nDirection == 0)
