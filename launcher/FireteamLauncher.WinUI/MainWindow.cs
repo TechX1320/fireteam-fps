@@ -3,6 +3,7 @@ using FireteamLauncher.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Graphics;
+using Windows.Storage.Pickers;
 
 namespace FireteamLauncher;
 
@@ -508,6 +509,91 @@ public sealed partial class MainWindow : Window
         string? value)
     {
         values[key] = value?.Trim() ?? string.Empty;
+    }
+
+    private async void ImportCombatArmsButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            ArsenalStatusText.Text =
+                "Choose the decrypted Combat Arms WEAPONS.txt file...";
+
+            var weaponsPath =
+                await PickLauncherFileAsync(
+                    ".txt");
+
+            if(weaponsPath is null)
+            {
+                ArsenalStatusText.Text =
+                    "Combat Arms import cancelled.";
+                return;
+            }
+
+            ArsenalStatusText.Text =
+                "Choose Guns.zip. GunsHH.zip will be auto-detected beside it when available...";
+
+            var gunsPath =
+                await PickLauncherFileAsync(
+                    ".zip");
+
+            if(gunsPath is null)
+            {
+                ArsenalStatusText.Text =
+                    "Combat Arms import cancelled.";
+                return;
+            }
+
+            ArsenalStatusText.Text =
+                "Importing Combat Arms weapon attributes and assets...";
+
+            var result =
+                App.Instance.Services.WeaponImports.Import(
+                    weaponsPath,
+                    gunsPath);
+
+            ReloadWeapons();
+
+            ArsenalStatusText.Text =
+                result.Summary;
+        }
+        catch(Exception ex)
+        {
+            ArsenalStatusText.Text =
+                "Combat Arms import failed: " +
+                ex.Message;
+        }
+    }
+
+    private async Task<string?> PickLauncherFileAsync(
+        params string[] extensions)
+    {
+        var picker =
+            new FileOpenPicker
+            {
+                SuggestedStartLocation =
+                    PickerLocationId.DocumentsLibrary
+            };
+
+        foreach(var extension in extensions)
+        {
+            picker.FileTypeFilter.Add(
+                extension);
+        }
+
+        var hwnd =
+            WinRT.Interop.WindowNative.GetWindowHandle(
+                this);
+
+        WinRT.Interop.InitializeWithWindow.Initialize(
+            picker,
+            hwnd);
+
+        var file =
+            await picker.PickSingleFileAsync();
+
+        return file?.Path;
     }
 
     private void OpenModsButton_Click(object sender, RoutedEventArgs e)

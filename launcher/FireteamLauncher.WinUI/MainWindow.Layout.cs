@@ -1440,6 +1440,16 @@ public sealed partial class MainWindow
             BodyText(
                 "Development/content tool. Search an installed definition, edit supported values, then save back to config."));
 
+        var import =
+            SecondaryButton(
+                "IMPORT COMBAT ARMS...");
+        import.Click +=
+            ImportCombatArmsButton_Click;
+        left.Children.Add(import);
+        left.Children.Add(
+            BodyText(
+                "Reads decrypted WEAPONS.txt plus Guns.zip, auto-detects GunsHH.zip when it is beside the archive, stages matching assets locally and writes disabled catalog entries for review."));
+
         WeaponSearchBox.PlaceholderText =
             "Search name or ID...";
         WeaponSearchBox.TextChanged +=

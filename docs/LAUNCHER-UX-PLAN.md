@@ -98,9 +98,10 @@ Weapon authoring is not a top-level player tab.
 ### Phase 1.1 — weapon import workflow
 - Weapon Editor Enabled/Disabled control
 - import decrypted Combat Arms WEAPONS.txt
-- import/stage Guns.zip and optional GunsHH.zip assets
+- import/stage Guns.zip and auto-detect adjacent GunsHH.zip assets
 - generate disabled catalog entries for testing
 - one-off asset/config scanner before gameplay testing
+- scanner command validates imported asset references in local source + BUILT runtime
 
 ### Phase 2 — player-facing polish
 - weapon cards / icons

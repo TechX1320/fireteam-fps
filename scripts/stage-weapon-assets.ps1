@@ -226,4 +226,13 @@ if(Test-Path -LiteralPath $weaponImports) {
   }
 }
 
+$sharedCaRoot = Join-Path $weaponImports "Weapons\ca"
+if(Test-Path -LiteralPath $sharedCaRoot) {
+  Write-Host "[WEAPON] Staging shared Combat Arms importer assets..."
+  $sharedCaDest = Join-Path $rezRoot "Weapons\ca"
+  New-Item -ItemType Directory -Force -Path $sharedCaDest | Out-Null
+  Copy-Item -Path (Join-Path $sharedCaRoot "*") -Destination $sharedCaDest -Recurse -Force
+  Write-Host "[OK] Shared Combat Arms importer assets staged."
+}
+
 Write-Host "[OK] Fireteam stock/custom firearm asset staging complete."
