@@ -133,6 +133,35 @@ void FT_RoundHudHandleMessage(
     }
 }
 
+void FT_RoundHudShowAnnouncement(
+    const char *pText,
+    float fSeconds)
+{
+    if(!pText || !pText[0])
+    {
+        return;
+    }
+
+    if(!s_pRoundFont)
+    {
+        FT_RoundHudInit();
+    }
+
+    if(!s_pAnnouncement)
+    {
+        return;
+    }
+
+    s_pAnnouncement->SetText(
+        pText);
+
+    s_fAnnouncementUntil =
+        g_pLTClient->GetTime() +
+        (fSeconds > 0.0f
+            ? fSeconds
+            : 3.0f);
+}
+
 void FT_RenderRoundHud()
 {
     if(!s_pRoundFont || s_nRound == 0)
