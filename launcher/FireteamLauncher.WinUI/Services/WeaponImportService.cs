@@ -997,6 +997,18 @@ public sealed class WeaponImportService
                 Set(
                     doc,
                     section,
+                    "ca_hud_fire_mode",
+                    weapon.Get(
+                        "HudFireMode"));
+                Set(
+                    doc,
+                    section,
+                    "ca_rapid_fire_count",
+                    weapon.Get(
+                        "RapidFireCount"));
+                Set(
+                    doc,
+                    section,
                     "ca_pv_model",
                     weapon.Get(
                         "PVModelNormal"));
