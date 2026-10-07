@@ -1392,15 +1392,21 @@ void CPlayerSrvr::FirePrimary(
                 info.m_hObject)
             : LTNULL;
 
+        const bool bZombie =
+            hZombie && hTarget &&
+            g_pLTServer->IsKindOf(
+                hTarget,
+                hZombie);
+
+        const bool bSeal =
+            hSeal && hTarget &&
+            g_pLTServer->IsKindOf(
+                hTarget,
+                hSeal);
+
         const bool bEnemy =
-            (hZombie && hTarget &&
-             g_pLTServer->IsKindOf(
-                 hTarget,
-                 hZombie)) ||
-            (hSeal && hTarget &&
-             g_pLTServer->IsKindOf(
-                 hTarget,
-                 hSeal));
+            bZombie ||
+            bSeal;
 
         if(bEnemy)
         {
