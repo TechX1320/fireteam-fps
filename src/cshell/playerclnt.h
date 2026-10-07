@@ -39,6 +39,7 @@ public:
     void        		Update();
     void        		UpdateMoveFlags(uint8 flags)							{ m_dwInputFlags |= flags; }
     void        		UpdateRotation(float yaw, float pitch, float roll);
+    void                SetControllerMoveAxes(float fForward, float fRight);
     void                UpdateWeaponView(bool bFirstPerson);
     bool                AltAttack();
     bool                SelectWeaponSlot(uint8 nSlot);
@@ -106,6 +107,8 @@ private:
     float           	m_fPitch;
     float           	m_fYaw;
     float           	m_fRoll;
+    float               m_fControllerForward;
+    float               m_fControllerRight;
 
     ANIMTRACKERID   	m_idUpperBodyTracker;
     ANIMTRACKERID   	m_idLowerBodyTracker;
