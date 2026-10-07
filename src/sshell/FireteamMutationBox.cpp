@@ -1,6 +1,7 @@
 #include "FireteamMutationBox.h"
 #include "FireteamPowerupDefs.h"
 #include "playersrvr.h"
+#include "FireteamZombie.h"
 #include "serverinterfaces.h"
 
 #include <iltcommon.h>
@@ -271,6 +272,65 @@ void FireteamMutationBox::PlayPickupSound()
             hSound);
 }
 
+static void FT_GrantTeamWallhack(
+    float fSeconds)
+{
+    const float fRemaining =
+        FT_ExtendZombieWallhack(
+            fSeconds);
+
+    if(fRemaining <= 0.0f)
+    {
+        return;
+    }
+
+    HCLASS hPlayerClass =
+        g_pLTServer->GetClass(
+            "CPlayerSrvr");
+
+    if(!hPlayerClass)
+    {
+        return;
+    }
+
+    for(HOBJECT hObject =
+            g_pLTServer->GetNextObject(
+                LTNULL);
+        hObject;
+        hObject =
+            g_pLTServer->GetNextObject(
+                hObject))
+    {
+        HCLASS hClass =
+            g_pLTServer->GetObjectClass(
+                hObject);
+
+        if(!hClass ||
+           !g_pLTServer->IsKindOf(
+                hClass,
+                hPlayerClass))
+        {
+            continue;
+        }
+
+        CPlayerSrvr *pPlayer =
+            (CPlayerSrvr*)
+            g_pLTServer->HandleToObject(
+                hObject);
+
+        if(!pPlayer ||
+           !pPlayer->IsAlive())
+        {
+            continue;
+        }
+
+        pPlayer->SyncPowerupState();
+        pPlayer->NotifyPowerup(
+            "MUTATION BOX: ZOMBIE WALLHACK - TEAM",
+            4.0f);
+    }
+}
+
 uint32 FireteamMutationBox::TouchNotify(
     void *pData,
     float)
@@ -323,7 +383,9 @@ uint32 FireteamMutationBox::TouchNotify(
         def.nAmmoWeight +
         def.nHealthWeight +
         def.nBottomlessWeight +
-        def.nOneHitWeight;
+        def.nOneHitWeight +
+        def.nGodWeight +
+        def.nWallhackWeight;
 
     if(nTotalWeight == 0)
     {
@@ -347,44 +409,57 @@ uint32 FireteamMutationBox::TouchNotify(
             "MUTATION BOX: AMMO RESUPPLY",
             3.5f);
     }
+    else if(nRoll <
+            (nCursor +=
+                def.nHealthWeight))
+    {
+        pPlayer->GrantHealth(
+            def.nHealthAmount);
+
+        pPlayer->NotifyPowerup(
+            "MUTATION BOX: HEALTH BOOST",
+            3.5f);
+    }
+    else if(nRoll <
+            (nCursor +=
+                def.nBottomlessWeight))
+    {
+        pPlayer->GrantBottomless(
+            def.fBottomlessSeconds);
+
+        pPlayer->NotifyPowerup(
+            "MUTATION BOX: BOTTOMLESS MAG",
+            4.0f);
+    }
+    else if(nRoll <
+            (nCursor +=
+                def.nOneHitWeight))
+    {
+        pPlayer->GrantOneHit(
+            def.fOneHitSeconds);
+
+        pPlayer->NotifyPowerup(
+            "MUTATION BOX: ONE HIT KILL",
+            4.0f);
+    }
+    else if(nRoll <
+            (nCursor +=
+                def.nGodWeight))
+    {
+        pPlayer->GrantGodMode(
+            def.fGodSeconds);
+
+        pPlayer->NotifyPowerup(
+            "MUTATION BOX: GOD MODE",
+            4.0f);
+    }
     else
     {
-        nCursor +=
-            def.nHealthWeight;
-
-        if(nRoll < nCursor)
-        {
-            pPlayer->GrantHealth(
-                def.nHealthAmount);
-
-            pPlayer->NotifyPowerup(
-                "MUTATION BOX: HEALTH BOOST",
-                3.5f);
-        }
-        else
-        {
-            nCursor +=
-                def.nBottomlessWeight;
-
-            if(nRoll < nCursor)
-            {
-                pPlayer->GrantBottomless(
-                    def.fBottomlessSeconds);
-
-                pPlayer->NotifyPowerup(
-                    "MUTATION BOX: BOTTOMLESS MAG",
-                    4.0f);
-            }
-            else
-            {
-                pPlayer->GrantOneHit(
-                    def.fOneHitSeconds);
-
-                pPlayer->NotifyPowerup(
-                    "MUTATION BOX: ONE HIT KILL",
-                    4.0f);
-            }
-        }
+        // Wallhack is deliberately the first explicit team/global powerup.
+        // RenderStyle is authoritative on shared infected, so every player
+        // receives the effect and HUD timer together.
+        FT_GrantTeamWallhack(
+            def.fWallhackSeconds);
     }
 
     m_bConsumed =
