@@ -280,42 +280,29 @@ public sealed class MainForm : Form
 
         var weaponButton = new Button
         {
-            Text = "Weapon Tool",
+            Text = "Weapon Studio",
             Width = 190,
             Height = 38,
             FlatStyle = FlatStyle.Flat
         };
         weaponButton.Click += (_, _) =>
         {
-            using var tool = new WeaponToolForm();
+            using var tool = new WeaponStudioForm();
             tool.ShowDialog(this);
         };
         panel.Controls.Add(weaponButton);
 
         var characterButton = new Button
         {
-            Text = "Open Character Config",
+            Text = "Character Studio",
             Width = 190,
             Height = 38,
             FlatStyle = FlatStyle.Flat
         };
         characterButton.Click += (_, _) =>
         {
-            var path = FindEditableConfig("characters.cfg");
-            if(path is null)
-            {
-                MessageBox.Show(
-                    "Could not locate config\\characters.cfg.",
-                    "FIRETEAM",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
-                return;
-            }
-
-            Process.Start(new ProcessStartInfo(path)
-            {
-                UseShellExecute = true
-            });
+            using var tool = new CharacterStudioForm();
+            tool.ShowDialog(this);
         };
         panel.Controls.Add(characterButton);
 
