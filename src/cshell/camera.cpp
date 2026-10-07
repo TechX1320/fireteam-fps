@@ -173,7 +173,17 @@ void CCamera::UpdatePosition(HOBJECT hObject, float fEyeHeight)
 //----------------------------------------------------------------------------
 void CCamera::UpdatePitch(float pitch)
 {
-    float fNewPitch = m_fPitch + pitch;
+    // Preserve the original SealHunter/Jupiter mouse feel while storing
+    // pitch correctly in radians.  The old code accumulated pitch * 5 as
+    // degrees, then converted that accumulated value to radians at render
+    // time.  The previous radians cleanup accidentally removed that gain
+    // conversion and made vertical mouse input about 11.5x more aggressive.
+    const float kLegacyPitchInputScale =
+        5.0f * (MATH_PI / 180.0f);
+
+    float fNewPitch =
+        m_fPitch +
+        (pitch * kLegacyPitchInputScale);
 
     if(fNewPitch < -MAX_PITCH)
     {
