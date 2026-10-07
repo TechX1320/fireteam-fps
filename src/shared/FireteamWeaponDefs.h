@@ -19,6 +19,7 @@ enum FTWeaponType
 struct FTWeaponDef
 {
     uint8 nSlot;
+    char  sSection[96];
     char  sId[32];
     char  sName[64];
     FTWeaponType eType;
@@ -238,6 +239,10 @@ inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
             if(sscanf(pLine, "[weapon%d]", &nSlot) == 1 && nSlot >= 1 && nSlot <= 5)
             {
                 nCurrentSlot = nSlot;
+                sprintf(
+                    aDefs[nSlot].sSection,
+                    "weapon%u",
+                    (uint32)nSlot);
             }
             else
             {
@@ -333,6 +338,39 @@ inline uint32 FT_LoadCatalogWeaponDefs(
             {
                 nCurrent = (int)nLoaded;
                 FT_InitWeaponDef(pDefs[nLoaded], 1);
+
+                const char *pSectionStart =
+                    pLine + 1;
+                const char *pSectionEnd =
+                    strchr(
+                        pSectionStart,
+                        ']');
+
+                if(pSectionEnd &&
+                   pSectionEnd > pSectionStart)
+                {
+                    const uint32 nSectionLen =
+                        (uint32)(
+                            pSectionEnd -
+                            pSectionStart);
+
+                    const uint32 nCopyLen =
+                        nSectionLen <
+                        sizeof(
+                            pDefs[nLoaded].sSection) - 1
+                        ? nSectionLen
+                        : sizeof(
+                            pDefs[nLoaded].sSection) - 1;
+
+                    memcpy(
+                        pDefs[nLoaded].sSection,
+                        pSectionStart,
+                        nCopyLen);
+                    pDefs[nLoaded].sSection[
+                        nCopyLen] =
+                        '\0';
+                }
+
                 ++nLoaded;
             }
             else
