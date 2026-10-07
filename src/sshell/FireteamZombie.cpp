@@ -1,6 +1,7 @@
 #include "FireteamZombie.h"
 #include "FireteamNavigation.h"
 #include "FireteamSpawner.h"
+#include "FireteamMutationBox.h"
 #include "playersrvr.h"
 #include "serverinterfaces.h"
 #include "msgids.h"
@@ -1669,6 +1670,14 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
             SetZombieAnimation(
                 m_Def.sDeathAnim,
                 false);
+
+            LTVector vDeathPos;
+            g_pLTServer->GetObjectPos(
+                m_hObject,
+                &vDeathPos);
+
+            FT_MaybeSpawnMutationBoxOnKill(
+                vDeathPos);
 
             FT_OnFireteamEnemyKilled();
 
