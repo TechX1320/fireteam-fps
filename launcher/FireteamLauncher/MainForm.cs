@@ -278,6 +278,40 @@ public sealed class MainForm : Form
         };
         panel.Controls.Add(modsButton);
 
+        var modToolsButton = new Button
+        {
+            Text = "Open Mod Tools Folder",
+            Width = 190,
+            Height = 38,
+            FlatStyle = FlatStyle.Flat
+        };
+        modToolsButton.Click += (_, _) =>
+        {
+            var repoRoot = FindRepositoryDirectory();
+            var baseDir = repoRoot ?? FindGameDirectory();
+
+            if(baseDir is null)
+            {
+                MessageBox.Show(
+                    "Could not locate the FIRETEAM project/runtime.",
+                    "FIRETEAM",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            var toolsDir = Path.Combine(baseDir, "modTools");
+            Directory.CreateDirectory(toolsDir);
+
+            Process.Start(new ProcessStartInfo(
+                "explorer.exe",
+                toolsDir)
+            {
+                UseShellExecute = true
+            });
+        };
+        panel.Controls.Add(modToolsButton);
+
         var weaponButton = new Button
         {
             Text = "Weapon Studio",
@@ -679,6 +713,31 @@ public sealed class MainForm : Form
                 {
                     return direct;
                 }
+            }
+        }
+
+        return null;
+    }
+
+    private static string? FindRepositoryDirectory()
+    {
+        var current =
+            new DirectoryInfo(AppContext.BaseDirectory);
+
+        for(var i = 0;
+            current is not null && i < 8;
+            ++i, current = current.Parent)
+        {
+            if(File.Exists(
+                Path.Combine(
+                    current.FullName,
+                    "build.cmd")) &&
+               Directory.Exists(
+                   Path.Combine(
+                       current.FullName,
+                       "config")))
+            {
+                return current.FullName;
             }
         }
 
