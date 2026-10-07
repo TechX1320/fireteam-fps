@@ -1597,7 +1597,12 @@ void CLTClientShell::OnKeyDown(int key, int rep)
         }
         else
         {
-           if(key >= '1' && key <= '5')
+           if(m_pPlayer->IsDevWeaponQa() &&
+              'Q' == key)
+           {
+               m_pPlayer->ToggleDevWeaponQuarantine();
+           }
+           else if(key >= '1' && key <= '5')
            {
                m_pCamera->ClearWeaponZoom();
                m_pPlayer->SelectWeaponSlot((uint8)(key - '0'));
