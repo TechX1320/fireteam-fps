@@ -135,6 +135,15 @@ inline FTWeaponType FT_ParseWeaponType(const char *pValue)
     return FT_WEAPON_NONE;
 }
 
+inline void FT_InitWeaponDef(FTWeaponDef &def, uint8 nSlot)
+{
+    memset(&def, 0, sizeof(FTWeaponDef));
+    def.nSlot = nSlot;
+    def.fProjectileScale = 1.0f;
+    def.fPenetrationDamageMult = 1.0f;
+    def.fPenetrationRangeMult = 1.0f;
+}
+
 inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
 {
     // Content lives in config/weapons.cfg. Keep only format/engine semantics
@@ -143,11 +152,63 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
 
     for(uint8 nSlot = 1; nSlot <= 5; ++nSlot)
     {
-        aDefs[nSlot].nSlot = nSlot;
-        aDefs[nSlot].fProjectileScale = 1.0f;
-        aDefs[nSlot].fPenetrationDamageMult = 1.0f;
-        aDefs[nSlot].fPenetrationRangeMult = 1.0f;
+        FT_InitWeaponDef(aDefs[nSlot], nSlot);
     }
+}
+
+inline void FT_AssignWeaponField(
+    FTWeaponDef &def,
+    const char *pKey,
+    const char *pValue)
+{
+    if(_stricmp(pKey, "id") == 0) FT_CopyWeaponString(def.sId, sizeof(def.sId), pValue);
+    else if(_stricmp(pKey, "name") == 0) FT_CopyWeaponString(def.sName, sizeof(def.sName), pValue);
+    else if(_stricmp(pKey, "type") == 0) def.eType = FT_ParseWeaponType(pValue);
+    else if(_stricmp(pKey, "clip") == 0) def.nClipSize = (uint16)atoi(pValue);
+    else if(_stricmp(pKey, "reserve") == 0) def.nStartReserve = (uint16)atoi(pValue);
+    else if(_stricmp(pKey, "damage") == 0) def.nDamage = (uint8)atoi(pValue);
+    else if(_stricmp(pKey, "fire_interval") == 0) def.fFireInterval = (float)atof(pValue);
+    else if(_stricmp(pKey, "range") == 0) def.fRange = (float)atof(pValue);
+    else if(_stricmp(pKey, "effect_range0") == 0) def.fEffectRange0 = (float)atof(pValue);
+    else if(_stricmp(pKey, "effect_range1") == 0) def.fEffectRange1 = (float)atof(pValue);
+    else if(_stricmp(pKey, "effect_range2") == 0) def.fEffectRange2 = (float)atof(pValue);
+    else if(_stricmp(pKey, "damage_mult0") == 0) def.fDamageMult0 = (float)atof(pValue);
+    else if(_stricmp(pKey, "damage_mult1") == 0) def.fDamageMult1 = (float)atof(pValue);
+    else if(_stricmp(pKey, "damage_mult2") == 0) def.fDamageMult2 = (float)atof(pValue);
+    else if(_stricmp(pKey, "reload") == 0) def.fReloadSeconds = (float)atof(pValue);
+    else if(_stricmp(pKey, "penetration_max_thickness") == 0) def.fPenetrationMaxThickness = (float)atof(pValue);
+    else if(_stricmp(pKey, "penetration_damage_mult") == 0) def.fPenetrationDamageMult = (float)atof(pValue);
+    else if(_stricmp(pKey, "penetration_range_mult") == 0) def.fPenetrationRangeMult = (float)atof(pValue);
+    else if(_stricmp(pKey, "automatic") == 0) def.bAutomatic = atoi(pValue) != 0;
+    else if(_stricmp(pKey, "auto_reload") == 0) def.bAutoReload = atoi(pValue) != 0;
+    else if(_stricmp(pKey, "show_crosshair") == 0) def.bShowCrosshair = atoi(pValue) != 0;
+    else if(_stricmp(pKey, "zoom_fov") == 0) def.fZoomFovDegrees = (float)atof(pValue);
+    else if(_stricmp(pKey, "zoom_hide_weapon") == 0) def.bZoomHideWeapon = atoi(pValue) != 0;
+    else if(_stricmp(pKey, "crosshair_base_gap") == 0) def.fCrosshairBaseGap = (float)atof(pValue);
+    else if(_stricmp(pKey, "crosshair_shot_kick") == 0) def.fCrosshairShotKick = (float)atof(pValue);
+    else if(_stricmp(pKey, "crosshair_move_kick") == 0) def.fCrosshairMoveKick = (float)atof(pValue);
+    else if(_stricmp(pKey, "crosshair_max_gap") == 0) def.fCrosshairMaxGap = (float)atof(pValue);
+    else if(_stricmp(pKey, "crosshair_recover") == 0) def.fCrosshairRecover = (float)atof(pValue);
+    else if(_stricmp(pKey, "projectile_speed") == 0) def.fProjectileSpeed = (float)atof(pValue);
+    else if(_stricmp(pKey, "projectile_scale") == 0) def.fProjectileScale = (float)atof(pValue);
+    else if(_stricmp(pKey, "projectile_model") == 0) FT_CopyWeaponString(def.sProjectileModel, sizeof(def.sProjectileModel), pValue);
+    else if(_stricmp(pKey, "projectile_texture") == 0) FT_CopyWeaponString(def.sProjectileTexture, sizeof(def.sProjectileTexture), pValue);
+    else if(_stricmp(pKey, "splash_radius") == 0) def.fSplashRadius = (float)atof(pValue);
+    else if(_stricmp(pKey, "fuse") == 0) def.fFuseSeconds = (float)atof(pValue);
+    else if(_stricmp(pKey, "view_x") == 0) def.fViewX = (float)atof(pValue);
+    else if(_stricmp(pKey, "view_y") == 0) def.fViewY = (float)atof(pValue);
+    else if(_stricmp(pKey, "view_z") == 0) def.fViewZ = (float)atof(pValue);
+    else if(_stricmp(pKey, "pv_model") == 0) FT_CopyWeaponString(def.sPVModel, sizeof(def.sPVModel), pValue);
+    else if(_stricmp(pKey, "pv_anim") == 0) FT_CopyWeaponString(def.sPVAnim, sizeof(def.sPVAnim), pValue);
+    else if(_stricmp(pKey, "pv_texture") == 0) FT_CopyWeaponString(def.sPVTexture, sizeof(def.sPVTexture), pValue);
+    else if(_stricmp(pKey, "hh_model") == 0) FT_CopyWeaponString(def.sHHModel, sizeof(def.sHHModel), pValue);
+    else if(_stricmp(pKey, "hh_texture") == 0) FT_CopyWeaponString(def.sHHTexture, sizeof(def.sHHTexture), pValue);
+    else if(_stricmp(pKey, "sound_dir") == 0) FT_CopyWeaponString(def.sSoundDir, sizeof(def.sSoundDir), pValue);
+    else if(_stricmp(pKey, "anim_select") == 0) FT_CopyWeaponString(def.sAnimSelect, sizeof(def.sAnimSelect), pValue);
+    else if(_stricmp(pKey, "anim_idle") == 0) FT_CopyWeaponString(def.sAnimIdle, sizeof(def.sAnimIdle), pValue);
+    else if(_stricmp(pKey, "anim_fire") == 0) FT_CopyWeaponString(def.sAnimFire, sizeof(def.sAnimFire), pValue);
+    else if(_stricmp(pKey, "anim_alt_fire") == 0) FT_CopyWeaponString(def.sAnimAltFire, sizeof(def.sAnimAltFire), pValue);
+    else if(_stricmp(pKey, "anim_reload") == 0) FT_CopyWeaponString(def.sAnimReload, sizeof(def.sAnimReload), pValue);
 }
 
 inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
@@ -200,59 +261,111 @@ inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
         char *pKey = FT_TrimWeaponLine(pLine);
         char *pValue = FT_TrimWeaponLine(pEquals + 1);
         FTWeaponDef &def = aDefs[nCurrentSlot];
-
-        if(_stricmp(pKey, "id") == 0) FT_CopyWeaponString(def.sId, sizeof(def.sId), pValue);
-        else if(_stricmp(pKey, "name") == 0) FT_CopyWeaponString(def.sName, sizeof(def.sName), pValue);
-        else if(_stricmp(pKey, "type") == 0) def.eType = FT_ParseWeaponType(pValue);
-        else if(_stricmp(pKey, "clip") == 0) def.nClipSize = (uint16)atoi(pValue);
-        else if(_stricmp(pKey, "reserve") == 0) def.nStartReserve = (uint16)atoi(pValue);
-        else if(_stricmp(pKey, "damage") == 0) def.nDamage = (uint8)atoi(pValue);
-        else if(_stricmp(pKey, "fire_interval") == 0) def.fFireInterval = (float)atof(pValue);
-        else if(_stricmp(pKey, "range") == 0) def.fRange = (float)atof(pValue);
-        else if(_stricmp(pKey, "effect_range0") == 0) def.fEffectRange0 = (float)atof(pValue);
-        else if(_stricmp(pKey, "effect_range1") == 0) def.fEffectRange1 = (float)atof(pValue);
-        else if(_stricmp(pKey, "effect_range2") == 0) def.fEffectRange2 = (float)atof(pValue);
-        else if(_stricmp(pKey, "damage_mult0") == 0) def.fDamageMult0 = (float)atof(pValue);
-        else if(_stricmp(pKey, "damage_mult1") == 0) def.fDamageMult1 = (float)atof(pValue);
-        else if(_stricmp(pKey, "damage_mult2") == 0) def.fDamageMult2 = (float)atof(pValue);
-        else if(_stricmp(pKey, "reload") == 0) def.fReloadSeconds = (float)atof(pValue);
-        else if(_stricmp(pKey, "penetration_max_thickness") == 0) def.fPenetrationMaxThickness = (float)atof(pValue);
-        else if(_stricmp(pKey, "penetration_damage_mult") == 0) def.fPenetrationDamageMult = (float)atof(pValue);
-        else if(_stricmp(pKey, "penetration_range_mult") == 0) def.fPenetrationRangeMult = (float)atof(pValue);
-        else if(_stricmp(pKey, "automatic") == 0) def.bAutomatic = atoi(pValue) != 0;
-        else if(_stricmp(pKey, "auto_reload") == 0) def.bAutoReload = atoi(pValue) != 0;
-        else if(_stricmp(pKey, "show_crosshair") == 0) def.bShowCrosshair = atoi(pValue) != 0;
-        else if(_stricmp(pKey, "zoom_fov") == 0) def.fZoomFovDegrees = (float)atof(pValue);
-        else if(_stricmp(pKey, "zoom_hide_weapon") == 0) def.bZoomHideWeapon = atoi(pValue) != 0;
-        else if(_stricmp(pKey, "crosshair_base_gap") == 0) def.fCrosshairBaseGap = (float)atof(pValue);
-        else if(_stricmp(pKey, "crosshair_shot_kick") == 0) def.fCrosshairShotKick = (float)atof(pValue);
-        else if(_stricmp(pKey, "crosshair_move_kick") == 0) def.fCrosshairMoveKick = (float)atof(pValue);
-        else if(_stricmp(pKey, "crosshair_max_gap") == 0) def.fCrosshairMaxGap = (float)atof(pValue);
-        else if(_stricmp(pKey, "crosshair_recover") == 0) def.fCrosshairRecover = (float)atof(pValue);
-        else if(_stricmp(pKey, "projectile_speed") == 0) def.fProjectileSpeed = (float)atof(pValue);
-        else if(_stricmp(pKey, "projectile_scale") == 0) def.fProjectileScale = (float)atof(pValue);
-        else if(_stricmp(pKey, "projectile_model") == 0) FT_CopyWeaponString(def.sProjectileModel, sizeof(def.sProjectileModel), pValue);
-        else if(_stricmp(pKey, "projectile_texture") == 0) FT_CopyWeaponString(def.sProjectileTexture, sizeof(def.sProjectileTexture), pValue);
-        else if(_stricmp(pKey, "splash_radius") == 0) def.fSplashRadius = (float)atof(pValue);
-        else if(_stricmp(pKey, "fuse") == 0) def.fFuseSeconds = (float)atof(pValue);
-        else if(_stricmp(pKey, "view_x") == 0) def.fViewX = (float)atof(pValue);
-        else if(_stricmp(pKey, "view_y") == 0) def.fViewY = (float)atof(pValue);
-        else if(_stricmp(pKey, "view_z") == 0) def.fViewZ = (float)atof(pValue);
-        else if(_stricmp(pKey, "pv_model") == 0) FT_CopyWeaponString(def.sPVModel, sizeof(def.sPVModel), pValue);
-        else if(_stricmp(pKey, "pv_anim") == 0) FT_CopyWeaponString(def.sPVAnim, sizeof(def.sPVAnim), pValue);
-        else if(_stricmp(pKey, "pv_texture") == 0) FT_CopyWeaponString(def.sPVTexture, sizeof(def.sPVTexture), pValue);
-        else if(_stricmp(pKey, "hh_model") == 0) FT_CopyWeaponString(def.sHHModel, sizeof(def.sHHModel), pValue);
-        else if(_stricmp(pKey, "hh_texture") == 0) FT_CopyWeaponString(def.sHHTexture, sizeof(def.sHHTexture), pValue);
-        else if(_stricmp(pKey, "sound_dir") == 0) FT_CopyWeaponString(def.sSoundDir, sizeof(def.sSoundDir), pValue);
-        else if(_stricmp(pKey, "anim_select") == 0) FT_CopyWeaponString(def.sAnimSelect, sizeof(def.sAnimSelect), pValue);
-        else if(_stricmp(pKey, "anim_idle") == 0) FT_CopyWeaponString(def.sAnimIdle, sizeof(def.sAnimIdle), pValue);
-        else if(_stricmp(pKey, "anim_fire") == 0) FT_CopyWeaponString(def.sAnimFire, sizeof(def.sAnimFire), pValue);
-        else if(_stricmp(pKey, "anim_alt_fire") == 0) FT_CopyWeaponString(def.sAnimAltFire, sizeof(def.sAnimAltFire), pValue);
-        else if(_stricmp(pKey, "anim_reload") == 0) FT_CopyWeaponString(def.sAnimReload, sizeof(def.sAnimReload), pValue);
+        FT_AssignWeaponField(def, pKey, pValue);
     }
 
     fclose(pFile);
     return true;
+}
+
+inline bool FT_IsCatalogWeaponSection(const char *pLine)
+{
+    return pLine &&
+           _strnicmp(pLine, "[catalog.", 9) == 0;
+}
+
+inline uint32 FT_CountCatalogWeaponDefs(const char *pFilename)
+{
+    FILE *pFile = fopen(pFilename, "rt");
+    if(!pFile)
+    {
+        return 0;
+    }
+
+    uint32 nCount = 0;
+    char sLine[512];
+
+    while(fgets(sLine, sizeof(sLine), pFile))
+    {
+        char *pLine = FT_TrimWeaponLine(sLine);
+        if(FT_IsCatalogWeaponSection(pLine))
+        {
+            ++nCount;
+        }
+    }
+
+    fclose(pFile);
+    return nCount;
+}
+
+inline uint32 FT_LoadCatalogWeaponDefs(
+    const char *pFilename,
+    FTWeaponDef *pDefs,
+    uint32 nMaxDefs)
+{
+    if(!pDefs || nMaxDefs == 0)
+    {
+        return 0;
+    }
+
+    FILE *pFile = fopen(pFilename, "rt");
+    if(!pFile)
+    {
+        return 0;
+    }
+
+    uint32 nLoaded = 0;
+    int nCurrent = -1;
+    char sLine[512];
+
+    while(fgets(sLine, sizeof(sLine), pFile))
+    {
+        char *pLine = FT_TrimWeaponLine(sLine);
+        if(!pLine[0] || pLine[0] == '#' || pLine[0] == ';')
+        {
+            continue;
+        }
+
+        if(pLine[0] == '[')
+        {
+            if(FT_IsCatalogWeaponSection(pLine) &&
+               nLoaded < nMaxDefs)
+            {
+                nCurrent = (int)nLoaded;
+                FT_InitWeaponDef(pDefs[nLoaded], 1);
+                ++nLoaded;
+            }
+            else
+            {
+                nCurrent = -1;
+            }
+
+            continue;
+        }
+
+        if(nCurrent < 0)
+        {
+            continue;
+        }
+
+        char *pEquals = strchr(pLine, '=');
+        if(!pEquals)
+        {
+            continue;
+        }
+
+        *pEquals = '\0';
+        char *pKey = FT_TrimWeaponLine(pLine);
+        char *pValue = FT_TrimWeaponLine(pEquals + 1);
+
+        FT_AssignWeaponField(
+            pDefs[nCurrent],
+            pKey,
+            pValue);
+    }
+
+    fclose(pFile);
+    return nLoaded;
 }
 
 inline const FTWeaponDef* FT_GetWeaponDef(const FTWeaponDef aDefs[6], uint8 nSlot)
