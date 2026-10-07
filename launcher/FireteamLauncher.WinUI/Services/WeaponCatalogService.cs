@@ -452,9 +452,16 @@ public sealed class WeaponCatalogService
                 continue;
             }
 
-            if(catalog &&
-               quarantined.Contains(
-                   section))
+            var id =
+                doc.GetValue(
+                    section,
+                    "id",
+                    section);
+
+            if(IsQaQuarantined(
+                   quarantined,
+                   section,
+                   id))
             {
                 continue;
             }
@@ -470,12 +477,6 @@ public sealed class WeaponCatalogService
                         section,
                         key);
             }
-
-            var id =
-                doc.GetValue(
-                    section,
-                    "id",
-                    section);
 
             var name =
                 doc.GetValue(
@@ -526,6 +527,22 @@ public sealed class WeaponCatalogService
         }
 
         return result;
+    }
+
+    private static bool IsQaQuarantined(
+        HashSet<string> quarantined,
+        string section,
+        string id)
+    {
+        return
+            quarantined.Contains(
+                section) ||
+            quarantined.Contains(
+                "section:" + section) ||
+            (!string.IsNullOrWhiteSpace(
+                 id) &&
+             quarantined.Contains(
+                 "id:" + id));
     }
 
     private static HashSet<string> LoadQaQuarantinedSections()
