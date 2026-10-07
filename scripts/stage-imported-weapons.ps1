@@ -28,6 +28,14 @@ New-Item -ItemType Directory -Force -Path $dest | Out-Null
 $sourceFiles =
     @(Get-ChildItem -LiteralPath $source -File -Recurse)
 
+if($sourceFiles.Count -eq 0) {
+    Write-Host "[ERROR] The importer produced zero Combat Arms asset files."
+    Write-Host "        Do not continue with a zero-file stage."
+    Write-Host "        Review: assets-local\WeaponImports\last-import.txt"
+    Write-Host "        Then rerun Tools -> Combat Arms Importer."
+    exit 2
+}
+
 Write-Host "[WEAPON] Staging $($sourceFiles.Count) imported Combat Arms asset files..."
 Copy-Item -Path (Join-Path $source "*") -Destination $dest -Recurse -Force
 
