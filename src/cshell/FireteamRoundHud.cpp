@@ -15,6 +15,8 @@ static CUIFormattedPolyString *s_pAnnouncement = LTNULL;
 static CUIFormattedPolyString *s_pRoundStatus = LTNULL;
 static CUIFormattedPolyString *s_pBottomlessStatus = LTNULL;
 static CUIFormattedPolyString *s_pOneHitStatus = LTNULL;
+static CUIFormattedPolyString *s_pGodStatus = LTNULL;
+static CUIFormattedPolyString *s_pWallhackStatus = LTNULL;
 
 static uint16 s_nRound = 0;
 static uint16 s_nTarget = 0;
@@ -23,6 +25,8 @@ static uint16 s_nAlive = 0;
 static float s_fAnnouncementUntil = 0.0f;
 static float s_fBottomlessUntil = 0.0f;
 static float s_fOneHitUntil = 0.0f;
+static float s_fGodUntil = 0.0f;
+static float s_fWallhackUntil = 0.0f;
 
 static void FT_PlayRoundCue(
     const char *pSound)
@@ -116,6 +120,16 @@ void FT_RoundHudInit()
             g_pLTCFontManager->CreateFormattedPolyString(
                 s_pBuffFont,
                 "");
+
+        s_pGodStatus =
+            g_pLTCFontManager->CreateFormattedPolyString(
+                s_pBuffFont,
+                "");
+
+        s_pWallhackStatus =
+            g_pLTCFontManager->CreateFormattedPolyString(
+                s_pBuffFont,
+                "");
     }
 
     if(s_pAnnouncement)
@@ -129,6 +143,12 @@ void FT_RoundHudInit()
 
     if(s_pOneHitStatus)
         s_pOneHitStatus->SetColor(0xFFFFB000);
+
+    if(s_pGodStatus)
+        s_pGodStatus->SetColor(0xFFFFF06A);
+
+    if(s_pWallhackStatus)
+        s_pWallhackStatus->SetColor(0xFFFF5AE0);
 }
 
 void FT_RoundHudTerm()
@@ -161,6 +181,20 @@ void FT_RoundHudTerm()
         s_pOneHitStatus = LTNULL;
     }
 
+    if(s_pGodStatus)
+    {
+        g_pLTCFontManager->DestroyPolyString(
+            s_pGodStatus);
+        s_pGodStatus = LTNULL;
+    }
+
+    if(s_pWallhackStatus)
+    {
+        g_pLTCFontManager->DestroyPolyString(
+            s_pWallhackStatus);
+        s_pWallhackStatus = LTNULL;
+    }
+
     if(s_pBuffFont)
     {
         g_pLTCFontManager->DestroyFont(
@@ -182,6 +216,8 @@ void FT_RoundHudTerm()
     s_fAnnouncementUntil = 0.0f;
     s_fBottomlessUntil = 0.0f;
     s_fOneHitUntil = 0.0f;
+    s_fGodUntil = 0.0f;
+    s_fWallhackUntil = 0.0f;
 }
 
 void FT_RoundHudHandleMessage(
@@ -272,7 +308,9 @@ void FT_RoundHudShowAnnouncement(
 
 void FT_RoundHudSetTimedPowerups(
     float fBottomlessSeconds,
-    float fOneHitSeconds)
+    float fOneHitSeconds,
+    float fGodSeconds,
+    float fWallhackSeconds)
 {
     if(!s_pRoundFont)
     {
@@ -290,6 +328,16 @@ void FT_RoundHudSetTimedPowerups(
     s_fOneHitUntil =
         fOneHitSeconds > 0.0f
         ? fNow + fOneHitSeconds
+        : 0.0f;
+
+    s_fGodUntil =
+        fGodSeconds > 0.0f
+        ? fNow + fGodSeconds
+        : 0.0f;
+
+    s_fWallhackUntil =
+        fWallhackSeconds > 0.0f
+        ? fNow + fWallhackSeconds
         : 0.0f;
 }
 
@@ -383,6 +431,56 @@ void FT_RenderRoundHud()
             fBuffY);
 
         s_pOneHitStatus->Render();
+        fBuffY -= 28.0f;
+    }
+
+    if(s_pGodStatus &&
+       fNow < s_fGodUntil)
+    {
+        const float fRemaining =
+            s_fGodUntil - fNow;
+
+        char szBuff[64];
+        sprintf(
+            szBuff,
+            "GOD MODE  %us",
+            (uint32)(fRemaining + 0.999f));
+
+        s_pGodStatus->SetText(
+            szBuff);
+
+        s_pGodStatus->SetPosition(
+            (float)nScreenW -
+                s_pGodStatus->GetWidth() -
+                34.0f,
+            fBuffY);
+
+        s_pGodStatus->Render();
+        fBuffY -= 28.0f;
+    }
+
+    if(s_pWallhackStatus &&
+       fNow < s_fWallhackUntil)
+    {
+        const float fRemaining =
+            s_fWallhackUntil - fNow;
+
+        char szBuff[64];
+        sprintf(
+            szBuff,
+            "ZOMBIE WALLHACK  %us",
+            (uint32)(fRemaining + 0.999f));
+
+        s_pWallhackStatus->SetText(
+            szBuff);
+
+        s_pWallhackStatus->SetPosition(
+            (float)nScreenW -
+                s_pWallhackStatus->GetWidth() -
+                34.0f,
+            fBuffY);
+
+        s_pWallhackStatus->Render();
     }
 
     if(s_pAnnouncement &&
