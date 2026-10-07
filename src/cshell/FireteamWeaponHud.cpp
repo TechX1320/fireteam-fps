@@ -20,6 +20,7 @@ static float s_fLastCrosshairTime = 0.0f;
 static uint8 s_nCrosshairSlot = 0;
 static uint32 s_nQaCurrent = 0;
 static uint32 s_nQaTotal = 0;
+static bool s_bQaQuarantined = false;
 
 static void FT_SetupQuad(
     LT_POLYF4 &poly,
@@ -160,6 +161,13 @@ void FT_WeaponHudSetQaProgress(
 {
     s_nQaCurrent = nCurrent;
     s_nQaTotal = nTotal;
+}
+
+void FT_WeaponHudSetQaQuarantined(
+    bool bQuarantined)
+{
+    s_bQaQuarantined =
+        bQuarantined;
 }
 
 void FT_WeaponHudOnShot(uint8 nWeaponSlot)
@@ -354,9 +362,12 @@ void FT_RenderWeaponHud(
         {
             sprintf(
                 szWeaponLabel,
-                "QA %u/%u  %s",
+                "QA %u/%u  %s%s",
                 s_nQaCurrent,
                 s_nQaTotal,
+                s_bQaQuarantined
+                    ? "[DISABLED] "
+                    : "",
                 pDef->sName);
         }
         else
@@ -371,9 +382,21 @@ void FT_RenderWeaponHud(
         }
 
         s_pWeaponName->SetText(szWeaponLabel);
-        s_pWeaponName->SetPosition(
-            (float)nScreenW - 210.0f,
-            (float)nScreenH - 102.0f);
+        if(s_nQaTotal > 0)
+        {
+            // QA names can be much longer than production weapon labels.
+            // Anchor them from the left so variant names never disappear off
+            // the right edge while rapidly auditing the catalog.
+            s_pWeaponName->SetPosition(
+                18.0f,
+                28.0f);
+        }
+        else
+        {
+            s_pWeaponName->SetPosition(
+                (float)nScreenW - 210.0f,
+                (float)nScreenH - 102.0f);
+        }
         s_pWeaponName->Render();
     }
 
