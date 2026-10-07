@@ -138,6 +138,7 @@ private:
     bool        			IsInWorld(){return m_bInWorld;}
     void        			SendPlayerName();
     void                    SendQaZombieSetting();
+    void                    SetStatsVisible(bool bVisible);
 
 private:
 
@@ -153,6 +154,10 @@ private:
     bool                    m_bQaZombiesEnabled;
     bool                    m_bQaZombieSettingSent;
     uint8                   m_nQaMoveStepIndex;
+    bool                    m_bControllerWasConnected;
+    bool                    m_bControllerMenuDown;
+    bool                    m_bControllerMenuHoldActivated;
+    float                   m_fControllerMenuDownAt;
 
 	LTVector				m_vPlayerStartPos;
 	LTRotation				m_rPlayerStartRot;
