@@ -773,7 +773,7 @@ public sealed class WeaponStudioForm : Form
     {
         foreach(var pattern in patterns)
         {
-            var found = Directory.GetFiles(root, pattern, SearchOption.TopDirectoryOnly)
+            var found = Directory.GetFiles(root, pattern, SearchOption.AllDirectories)
                 .OrderByDescending(File.GetLastWriteTimeUtc)
                 .FirstOrDefault();
             if(found is not null)
@@ -1103,6 +1103,17 @@ public sealed class WeaponStudioForm : Form
                 _doc.SetValue(section, "damage_mult2", "0.35");
                 _doc.SetValue(section, "auto_reload", type == "melee" ? "0" : "1");
 
+                var fireType = Read(block, "FireType");
+                if(fireType.Length > 0)
+                {
+                    _doc.SetValue(
+                        section,
+                        "automatic",
+                        fireType.Contains("auto", StringComparison.OrdinalIgnoreCase)
+                            ? "1"
+                            : "0");
+                }
+
                 var disableCrosshair = ParseInt(Read(block, "DisableCrosshair"));
                 _doc.SetValue(section, "show_crosshair", disableCrosshair != 0 ? "0" : "1");
 
@@ -1115,9 +1126,17 @@ public sealed class WeaponStudioForm : Form
                 }
 
                 var caPv = Leaf(Read(block, "PVModelNormal"));
+                if(caPv.Length == 0)
+                    caPv = Leaf(Read(block, "PVModel"));
+
                 var caSkin = Leaf(Read(block, "PVSkin1"));
+                if(caSkin.Length == 0)
+                    caSkin = Leaf(Read(block, "PVSkin0"));
+
                 var caHh = Leaf(Read(block, "HHModel"));
                 var caHhSkin = Leaf(Read(block, "HHSkin0"));
+                if(caHhSkin.Length == 0)
+                    caHhSkin = Leaf(Read(block, "HHSkin1"));
 
                 _doc.SetValue(section, "ca_pv_model", caPv);
                 _doc.SetValue(section, "ca_pv_skin", caSkin);
