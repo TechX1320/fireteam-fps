@@ -149,8 +149,94 @@ if(Test-Path -LiteralPath $gunsHHPath) {
 
 $weaponImports = Join-Path $assetRoot "WeaponImports"
 if(Test-Path -LiteralPath $weaponImports) {
-  Write-Host "[WEAPON] Staging launcher/custom WeaponImports..."
-  Copy-Item -Path (Join-Path $weaponImports "*") -Destination $rezRoot -Recurse -Force
+  Write-Host "[WEAPON] Staging enabled launcher/catalog imports..."
+
+  $weaponsCfg = Join-Path $RepoRoot "config\weapons.cfg"
+  $enabledCatalogIds = New-Object System.Collections.Generic.List[string]
+  $catalogSectionCount = 0
+
+  if(Test-Path -LiteralPath $weaponsCfg) {
+    $currentCatalog = $null
+    $currentId = $null
+    $currentEnabled = $false
+
+    function Commit-CatalogSection {
+      if($script:currentCatalog) {
+        $script:catalogSectionCount++
+        if($script:currentEnabled) {
+          $id = $script:currentId
+          if(-not $id) { $id = $script:currentCatalog }
+          if(-not $script:enabledCatalogIds.Contains($id)) {
+            $script:enabledCatalogIds.Add($id)
+          }
+        }
+      }
+    }
+
+    foreach($rawLine in Get-Content -LiteralPath $weaponsCfg) {
+      $line = $rawLine.Trim()
+      if($line -match '^\[catalog\.(.+)\]) {
+        Commit-CatalogSection
+        $currentCatalog = $Matches[1]
+        $currentId = $null
+        $currentEnabled = $false
+        continue
+      }
+
+      if($line -match '^\[') {
+        Commit-CatalogSection
+        $currentCatalog = $null
+        $currentId = $null
+        $currentEnabled = $false
+        continue
+      }
+
+      if(-not $currentCatalog -or
+         -not $line -or
+         $line.StartsWith('#') -or
+         $line.StartsWith(';')) {
+        continue
+      }
+
+      if($line -match '^id\s*=\s*(.+)) {
+        $currentId = $Matches[1].Trim()
+      } elseif($line -match '^enabled\s*=\s*(1|true|yes|on)\s*) {
+        $currentEnabled = $true
+      } elseif($line -match '^enabled\s*=') {
+        $currentEnabled = $false
+      }
+    }
+
+    Commit-CatalogSection
+    Remove-Item function:Commit-CatalogSection -ErrorAction SilentlyContinue
+  }
+
+  $catalogImportRoot = Join-Path $weaponImports "Weapons\imported"
+  $runtimeImportRoot = Join-Path $rezRoot "Weapons\imported"
+
+  # BUILT preserves unrelated files, but imported weapon enable/disable needs
+  # deterministic output. Only this launcher-owned subtree is rebuilt cleanly.
+  if(Test-Path -LiteralPath $runtimeImportRoot) {
+    Remove-Item -LiteralPath $runtimeImportRoot -Recurse -Force
+  }
+
+  if($catalogSectionCount -gt 0) {
+    foreach($weaponId in $enabledCatalogIds) {
+      $sourceWeapon = Join-Path $catalogImportRoot $weaponId
+      if(-not (Test-Path -LiteralPath $sourceWeapon)) {
+        Write-Host "[SKIP] Enabled catalog weapon has no imported assets: $weaponId"
+        continue
+      }
+
+      $destWeapon = Join-Path $runtimeImportRoot $weaponId
+      New-Item -ItemType Directory -Force -Path $destWeapon | Out-Null
+      Copy-Item -Path (Join-Path $sourceWeapon "*") -Destination $destWeapon -Recurse -Force
+      Write-Host "[OK] Catalog weapon -> Weapons\imported\$weaponId"
+    }
+  } else {
+    # Compatibility with imports created by older launcher builds.
+    Copy-Item -Path (Join-Path $weaponImports "*") -Destination $rezRoot -Recurse -Force
+  }
 }
 
 Write-Host "[OK] Fireteam stock/custom firearm asset staging complete."
