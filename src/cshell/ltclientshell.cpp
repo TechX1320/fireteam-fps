@@ -678,6 +678,23 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             FT_RoundHudHandleMessage(pMessage);
         }
         break;
+    case MSG_SC_POWERUP:
+        {
+            char szReward[128];
+            szReward[0] = '\0';
+
+            pMessage->ReadString(
+                szReward,
+                sizeof(szReward));
+
+            const float fSeconds =
+                pMessage->Readfloat();
+
+            FT_RoundHudShowAnnouncement(
+                szReward,
+                fSeconds);
+        }
+        break;
     case MSG_SC_AMMO:
         {
             uint16 nClip = pMessage->Readuint16();
