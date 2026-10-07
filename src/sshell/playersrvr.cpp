@@ -56,6 +56,57 @@ static bool FTFireFilter(HOBJECT hObject, void *pUserData)
 
 
 
+static bool FTPenetrationGeometryFilter(
+    HOBJECT hObject,
+    void *pUserData)
+{
+    FTFireFilterData *pData =
+        (FTFireFilterData*)pUserData;
+
+    if(pData &&
+       (hObject == pData->hPlayer ||
+        hObject == pData->hWeapon))
+    {
+        return false;
+    }
+
+    HCLASS hClass =
+        g_pLTServer->GetObjectClass(
+            hObject);
+
+    HCLASS hZombie =
+        g_pLTServer->GetClass(
+            "FireteamZombie");
+    HCLASS hSeal =
+        g_pLTServer->GetClass(
+            "Seal");
+    HCLASS hPlayer =
+        g_pLTServer->GetClass(
+            "CPlayerSrvr");
+
+    // Exit-thickness probes are only looking for the far side of the solid
+    // geometry. Characters behind the wall must not be mistaken for its exit.
+    if(hClass &&
+       ((hZombie &&
+         g_pLTServer->IsKindOf(
+             hClass,
+             hZombie)) ||
+        (hSeal &&
+         g_pLTServer->IsKindOf(
+             hClass,
+             hSeal)) ||
+        (hPlayer &&
+         g_pLTServer->IsKindOf(
+             hClass,
+             hPlayer))))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+
 
 //-----------------------------------------------------------------------------
 //	CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
@@ -1082,7 +1133,7 @@ void CPlayerSrvr::FirePrimary(
             IGNORE_NONSOLID |
             INTERSECT_HPOLY;
         exitQuery.m_FilterFn =
-            FTFireFilter;
+            FTPenetrationGeometryFilter;
         exitQuery.m_pUserData =
             &filterData;
 
