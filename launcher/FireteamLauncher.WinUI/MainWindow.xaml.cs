@@ -24,9 +24,66 @@ public sealed partial class MainWindow : Window
     private IReadOnlyList<WeaponDefinition> _choices = [];
     private WeaponDefinition? _selectedWeapon;
 
+    private readonly Grid AppTitleBar = new();
+    private readonly NavigationView RootNavigation = new();
+    private readonly NavigationViewItem HomeItem = new();
+    private readonly NavigationViewItem LoadoutItem = new();
+    private readonly NavigationViewItem ArsenalItem = new();
+    private readonly NavigationViewItem ModsItem = new();
+
+    private readonly ScrollViewer HomeView = new();
+    private readonly TextBox PlayerNameBox = new();
+    private readonly ComboBox ModeCombo = new();
+    private readonly ComboBox DifficultyCombo = new();
+    private readonly TextBlock JoinIpLabel = new();
+    private readonly TextBox JoinIpBox = new();
+    private readonly TextBox CommandsBox = new();
+    private readonly TextBlock PrimarySummaryText = new();
+    private readonly TextBlock SidearmSummaryText = new();
+    private readonly TextBlock MeleeSummaryText = new();
+    private readonly TextBlock SecondarySummaryText = new();
+    private readonly TextBlock SpecialSummaryText = new();
+    private readonly TextBlock RunStatusText = new();
+    private readonly Button PlayButton = new();
+
+    private readonly ScrollViewer LoadoutView = new();
+    private readonly ComboBox PrimaryCombo = new();
+    private readonly ComboBox SidearmCombo = new();
+    private readonly ComboBox MeleeCombo = new();
+    private readonly ComboBox SecondaryCombo = new();
+    private readonly ComboBox SpecialCombo = new();
+    private readonly TextBlock LoadoutStatusText = new();
+
+    private readonly Grid ArsenalView = new();
+    private readonly TextBox WeaponSearchBox = new();
+    private readonly ListView WeaponList = new();
+    private readonly TextBlock WeaponTitleText = new();
+    private readonly TextBlock WeaponSectionText = new();
+    private readonly TextBox WeaponNameBox = new();
+    private readonly TextBox WeaponIdBox = new();
+    private readonly ComboBox WeaponTypeCombo = new();
+    private readonly TextBox DamageBox = new();
+    private readonly TextBox ClipBox = new();
+    private readonly TextBox ReserveBox = new();
+    private readonly TextBox FireIntervalBox = new();
+    private readonly TextBox ReloadBox = new();
+    private readonly TextBlock ArsenalStatusText = new();
+
+    private readonly ScrollViewer ModsView = new();
+    private readonly TextBlock ModsPathText = new();
+    private readonly TextBlock ToolsPathText = new();
+
+    private readonly ScrollViewer SettingsView = new();
+    private readonly ComboBox ResolutionCombo = new();
+    private readonly ToggleSwitch WindowedToggle = new();
+    private readonly NumberBox SensitivityBox = new();
+    private readonly NumberBox VolumeBox = new();
+    private readonly NumberBox GammaBox = new();
+    private readonly TextBlock SettingsStatusText = new();
+
     public MainWindow()
     {
-        InitializeComponent();
+        BuildUi();
 
         Title = "FIRETEAM Launcher";
         ExtendsContentIntoTitleBar = true;
@@ -65,6 +122,502 @@ public sealed partial class MainWindow : Window
 
         RootNavigation.SelectedItem = HomeItem;
         ShowView("home");
+    }
+
+    private void BuildUi()
+    {
+        StartupDiagnostics.Write("MainWindow.BuildUi starting.");
+
+        var root = new Grid();
+        root.RowDefinitions.Add(
+            new RowDefinition { Height = new GridLength(50) });
+        root.RowDefinitions.Add(
+            new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        var title = new TextBlock
+        {
+            Text = "FIRETEAM  /  CABIN FEVER",
+            FontSize = 18,
+            FontWeight = Windows.UI.Text.FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(18, 0, 0, 0)
+        };
+
+        AppTitleBar.Children.Add(title);
+        Grid.SetRow(AppTitleBar, 0);
+        root.Children.Add(AppTitleBar);
+
+        HomeItem.Content = "Home";
+        HomeItem.Tag = "home";
+        LoadoutItem.Content = "Loadout";
+        LoadoutItem.Tag = "loadout";
+        ArsenalItem.Content = "Arsenal";
+        ArsenalItem.Tag = "arsenal";
+        ModsItem.Content = "Mods & Content Tools";
+        ModsItem.Tag = "mods";
+
+        RootNavigation.IsBackButtonVisible =
+            NavigationViewBackButtonVisible.Collapsed;
+        RootNavigation.IsPaneToggleButtonVisible = false;
+        RootNavigation.IsPaneOpen = true;
+        RootNavigation.IsSettingsVisible = true;
+        RootNavigation.OpenPaneLength = 220;
+        RootNavigation.PaneDisplayMode =
+            NavigationViewPaneDisplayMode.Left;
+        RootNavigation.MenuItems.Add(HomeItem);
+        RootNavigation.MenuItems.Add(LoadoutItem);
+        RootNavigation.MenuItems.Add(ArsenalItem);
+        RootNavigation.MenuItems.Add(ModsItem);
+        RootNavigation.SelectionChanged +=
+            RootNavigation_SelectionChanged;
+
+        var content = new Grid();
+        BuildHomeView();
+        BuildLoadoutView();
+        BuildArsenalView();
+        BuildModsView();
+        BuildSettingsView();
+
+        content.Children.Add(HomeView);
+        content.Children.Add(LoadoutView);
+        content.Children.Add(ArsenalView);
+        content.Children.Add(ModsView);
+        content.Children.Add(SettingsView);
+
+        RootNavigation.Content = content;
+        Grid.SetRow(RootNavigation, 1);
+        root.Children.Add(RootNavigation);
+
+        Content = root;
+
+        StartupDiagnostics.Write("MainWindow.BuildUi completed.");
+    }
+
+    private static StackPanel NewPagePanel(string title)
+    {
+        var panel = new StackPanel
+        {
+            Spacing = 12,
+            Margin = new Thickness(28)
+        };
+
+        panel.Children.Add(
+            new TextBlock
+            {
+                Text = title,
+                FontSize = 30,
+                FontWeight =
+                    Windows.UI.Text.FontWeights.SemiBold
+            });
+
+        return panel;
+    }
+
+    private static Grid LabeledControl(
+        string label,
+        FrameworkElement control)
+    {
+        var row = new Grid
+        {
+            ColumnSpacing = 12
+        };
+
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width = new GridLength(180)
+            });
+        row.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width = new GridLength(
+                    1,
+                    GridUnitType.Star)
+            });
+
+        var text = new TextBlock
+        {
+            Text = label,
+            VerticalAlignment =
+                VerticalAlignment.Center
+        };
+
+        Grid.SetColumn(text, 0);
+        Grid.SetColumn(control, 1);
+        row.Children.Add(text);
+        row.Children.Add(control);
+
+        return row;
+    }
+
+    private static Button ActionButton(
+        string text,
+        RoutedEventHandler handler)
+    {
+        var button = new Button
+        {
+            Content = text,
+            Padding = new Thickness(16, 8, 16, 8)
+        };
+
+        button.Click += handler;
+        return button;
+    }
+
+    private void BuildHomeView()
+    {
+        var panel = NewPagePanel("FIRETEAM");
+
+        panel.Children.Add(
+            new TextBlock
+            {
+                Text = "Configure the run, then deploy directly into Cabin Fever.",
+                TextWrapping = TextWrapping.Wrap
+            });
+
+        PlayerNameBox.MaxLength = 15;
+        panel.Children.Add(
+            LabeledControl(
+                "PLAYER NAME",
+                PlayerNameBox));
+
+        ModeCombo.SelectionChanged +=
+            ModeCombo_SelectionChanged;
+        panel.Children.Add(
+            LabeledControl(
+                "MODE",
+                ModeCombo));
+
+        panel.Children.Add(
+            LabeledControl(
+                "DIFFICULTY",
+                DifficultyCombo));
+
+        JoinIpLabel.Text = "SERVER IP";
+        JoinIpLabel.VerticalAlignment =
+            VerticalAlignment.Center;
+        JoinIpLabel.Visibility =
+            Visibility.Collapsed;
+        JoinIpBox.Visibility =
+            Visibility.Collapsed;
+
+        var joinRow = new Grid
+        {
+            ColumnSpacing = 12
+        };
+        joinRow.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width = new GridLength(180)
+            });
+        joinRow.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width = new GridLength(
+                    1,
+                    GridUnitType.Star)
+            });
+        Grid.SetColumn(JoinIpLabel, 0);
+        Grid.SetColumn(JoinIpBox, 1);
+        joinRow.Children.Add(JoinIpLabel);
+        joinRow.Children.Add(JoinIpBox);
+        panel.Children.Add(joinRow);
+
+        CommandsBox.PlaceholderText =
+            "+consoleenable 1 +SomeLithTechCommand value";
+        panel.Children.Add(
+            LabeledControl(
+                "ADVANCED COMMANDS",
+                CommandsBox));
+
+        panel.Children.Add(
+            new TextBlock
+            {
+                Text = "CURRENT LOADOUT",
+                FontWeight =
+                    Windows.UI.Text.FontWeights.SemiBold,
+                Margin = new Thickness(0, 12, 0, 0)
+            });
+
+        panel.Children.Add(PrimarySummaryText);
+        panel.Children.Add(SidearmSummaryText);
+        panel.Children.Add(MeleeSummaryText);
+        panel.Children.Add(SecondarySummaryText);
+        panel.Children.Add(SpecialSummaryText);
+
+        panel.Children.Add(
+            ActionButton(
+                "EDIT LOADOUT",
+                EditLoadoutButton_Click));
+
+        RunStatusText.TextWrapping =
+            TextWrapping.Wrap;
+        panel.Children.Add(RunStatusText);
+
+        PlayButton.Content = "PLAY FIRETEAM";
+        PlayButton.MinHeight = 48;
+        PlayButton.Click +=
+            PlayButton_Click;
+        panel.Children.Add(PlayButton);
+
+        HomeView.Content = panel;
+    }
+
+    private void BuildLoadoutView()
+    {
+        LoadoutView.Visibility =
+            Visibility.Collapsed;
+
+        var panel =
+            NewPagePanel("Build your deployment kit");
+
+        var combos = new[]
+        {
+            PrimaryCombo,
+            SidearmCombo,
+            MeleeCombo,
+            SecondaryCombo,
+            SpecialCombo
+        };
+
+        foreach(var combo in combos)
+        {
+            combo.DisplayMemberPath =
+                "DisplayName";
+            combo.HorizontalAlignment =
+                HorizontalAlignment.Stretch;
+        }
+
+        panel.Children.Add(
+            LabeledControl(
+                "PRIMARY",
+                PrimaryCombo));
+        panel.Children.Add(
+            LabeledControl(
+                "SIDEARM",
+                SidearmCombo));
+        panel.Children.Add(
+            LabeledControl(
+                "MELEE",
+                MeleeCombo));
+        panel.Children.Add(
+            LabeledControl(
+                "SECONDARY / EXTRA",
+                SecondaryCombo));
+        panel.Children.Add(
+            LabeledControl(
+                "SPECIAL",
+                SpecialCombo));
+
+        var buttons = new StackPanel
+        {
+            Orientation =
+                Orientation.Horizontal,
+            Spacing = 10
+        };
+        buttons.Children.Add(
+            ActionButton(
+                "OPEN ARSENAL",
+                OpenArsenalButton_Click));
+        buttons.Children.Add(
+            ActionButton(
+                "APPLY LOADOUT",
+                ApplyLoadoutButton_Click));
+        panel.Children.Add(buttons);
+
+        LoadoutStatusText.TextWrapping =
+            TextWrapping.Wrap;
+        panel.Children.Add(
+            LoadoutStatusText);
+
+        LoadoutView.Content = panel;
+    }
+
+    private void BuildArsenalView()
+    {
+        ArsenalView.Visibility =
+            Visibility.Collapsed;
+
+        var scroll = new ScrollViewer();
+        var panel =
+            NewPagePanel("Weapon Catalog");
+
+        WeaponSearchBox.PlaceholderText =
+            "Search name or ID...";
+        WeaponSearchBox.TextChanged +=
+            WeaponSearchBox_TextChanged;
+        panel.Children.Add(WeaponSearchBox);
+
+        WeaponList.DisplayMemberPath =
+            "DisplayName";
+        WeaponList.MinHeight = 180;
+        WeaponList.MaxHeight = 260;
+        WeaponList.SelectionChanged +=
+            WeaponList_SelectionChanged;
+        panel.Children.Add(WeaponList);
+
+        WeaponTitleText.Text =
+            "Select a weapon";
+        WeaponTitleText.FontSize = 22;
+        panel.Children.Add(
+            WeaponTitleText);
+
+        WeaponSectionText.TextWrapping =
+            TextWrapping.Wrap;
+        panel.Children.Add(
+            WeaponSectionText);
+
+        panel.Children.Add(
+            LabeledControl(
+                "NAME",
+                WeaponNameBox));
+        panel.Children.Add(
+            LabeledControl(
+                "ID",
+                WeaponIdBox));
+
+        panel.Children.Add(
+            LabeledControl(
+                "TYPE",
+                WeaponTypeCombo));
+        panel.Children.Add(
+            LabeledControl(
+                "DAMAGE",
+                DamageBox));
+        panel.Children.Add(
+            LabeledControl(
+                "MAGAZINE",
+                ClipBox));
+        panel.Children.Add(
+            LabeledControl(
+                "RESERVE",
+                ReserveBox));
+        panel.Children.Add(
+            LabeledControl(
+                "FIRE INTERVAL",
+                FireIntervalBox));
+        panel.Children.Add(
+            LabeledControl(
+                "RELOAD SEC",
+                ReloadBox));
+
+        var buttons = new StackPanel
+        {
+            Orientation =
+                Orientation.Horizontal,
+            Spacing = 10
+        };
+        buttons.Children.Add(
+            ActionButton(
+                "RELOAD CONFIG",
+                ReloadArsenalButton_Click));
+        buttons.Children.Add(
+            ActionButton(
+                "SAVE WEAPON",
+                SaveWeaponButton_Click));
+        panel.Children.Add(buttons);
+
+        ArsenalStatusText.TextWrapping =
+            TextWrapping.Wrap;
+        panel.Children.Add(
+            ArsenalStatusText);
+
+        scroll.Content = panel;
+        ArsenalView.Children.Add(scroll);
+    }
+
+    private void BuildModsView()
+    {
+        ModsView.Visibility =
+            Visibility.Collapsed;
+
+        var panel =
+            NewPagePanel("Mods & Content Tools");
+
+        panel.Children.Add(
+            ActionButton(
+                "OPEN MOD LIBRARY",
+                OpenModsButton_Click));
+
+        ModsPathText.TextWrapping =
+            TextWrapping.Wrap;
+        panel.Children.Add(
+            ModsPathText);
+
+        panel.Children.Add(
+            ActionButton(
+                "OPEN CONTENT TOOLS",
+                OpenToolsButton_Click));
+
+        ToolsPathText.TextWrapping =
+            TextWrapping.Wrap;
+        panel.Children.Add(
+            ToolsPathText);
+
+        ModsView.Content = panel;
+    }
+
+    private void BuildSettingsView()
+    {
+        SettingsView.Visibility =
+            Visibility.Collapsed;
+
+        var panel =
+            NewPagePanel("Game settings");
+
+        panel.Children.Add(
+            LabeledControl(
+                "RESOLUTION",
+                ResolutionCombo));
+
+        WindowedToggle.OnContent =
+            "Windowed";
+        WindowedToggle.OffContent =
+            "Fullscreen";
+        panel.Children.Add(
+            LabeledControl(
+                "DISPLAY MODE",
+                WindowedToggle));
+
+        SensitivityBox.Minimum = 0.01;
+        SensitivityBox.Maximum = 4.0;
+        SensitivityBox.SmallChange = 0.01;
+        SensitivityBox.SpinButtonPlacementMode =
+            NumberBoxSpinButtonPlacementMode.Inline;
+        panel.Children.Add(
+            LabeledControl(
+                "MOUSE SENSITIVITY",
+                SensitivityBox));
+
+        VolumeBox.Minimum = 0;
+        VolumeBox.Maximum = 100;
+        VolumeBox.SmallChange = 5;
+        VolumeBox.SpinButtonPlacementMode =
+            NumberBoxSpinButtonPlacementMode.Inline;
+        panel.Children.Add(
+            LabeledControl(
+                "GAME VOLUME",
+                VolumeBox));
+
+        GammaBox.Minimum = 0.5;
+        GammaBox.Maximum = 6.0;
+        GammaBox.SmallChange = 0.1;
+        GammaBox.SpinButtonPlacementMode =
+            NumberBoxSpinButtonPlacementMode.Inline;
+        panel.Children.Add(
+            LabeledControl(
+                "BRIGHTNESS / GAMMA",
+                GammaBox));
+
+        panel.Children.Add(
+            ActionButton(
+                "SAVE SETTINGS",
+                SaveSettingsButton_Click));
+
+        panel.Children.Add(
+            SettingsStatusText);
+
+        SettingsView.Content = panel;
     }
 
     public void ApplyInitialSize()
