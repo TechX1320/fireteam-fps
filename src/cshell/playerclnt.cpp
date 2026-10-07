@@ -495,6 +495,8 @@ m_dwInputFlags(0),
 m_fYaw(0.0f),
 m_fPitch(0.0f),
 m_fRoll(0.0f),
+m_fControllerForward(0.0f),
+m_fControllerRight(0.0f),
 m_hClientObject(NULL),
 m_hObject(NULL),
 //m_hCurAnim(NULL),
@@ -729,6 +731,19 @@ void CPlayerClnt::UpdateRotation(float yaw, float pitch, float roll)
     m_fRoll += roll;
 }
 
+void CPlayerClnt::SetControllerMoveAxes(
+    float fForward,
+    float fRight)
+{
+    if(fForward < -1.0f) fForward = -1.0f;
+    if(fForward > 1.0f) fForward = 1.0f;
+    if(fRight < -1.0f) fRight = -1.0f;
+    if(fRight > 1.0f) fRight = 1.0f;
+
+    m_fControllerForward = fForward;
+    m_fControllerRight = fRight;
+}
+
 bool CPlayerClnt::IsMoving()
 {
     if(!m_hObject)
@@ -847,13 +862,27 @@ void CPlayerClnt::UpdateMovement()
     m_bCrouching =
         (m_dwInputFlags & MOVE_CROUCH) != 0;
 
-    float fForward = 0.0f;
-    float fRight = 0.0f;
+    float fForward =
+        m_fControllerForward;
+    float fRight =
+        m_fControllerRight;
 
     if(m_dwInputFlags & MOVE_FORWARD)  fForward += 1.0f;
     if(m_dwInputFlags & MOVE_BACKWARD) fForward -= 1.0f;
     if(m_dwInputFlags & MOVE_RIGHT)    fRight += 1.0f;
     if(m_dwInputFlags & MOVE_LEFT)     fRight -= 1.0f;
+
+    float fInputMagnitude =
+        (float)sqrt(
+            (fForward * fForward) +
+            (fRight * fRight));
+
+    if(fInputMagnitude > 1.0f)
+    {
+        fForward /= fInputMagnitude;
+        fRight /= fInputMagnitude;
+        fInputMagnitude = 1.0f;
+    }
 
     LTVector vMove =
         (rRot.Forward() * fForward) +
@@ -874,8 +903,10 @@ void CPlayerClnt::UpdateMovement()
             fMaxSpeed = SPRINT_MAX_SPEED;
         }
 
-        // Direct target velocity gives predictable modern WASD response and
-        // keeps diagonal movement at the same speed as straight movement.
+        // Preserve analog stick travel while keeping keyboard movement at
+        // full speed and keyboard diagonals normalized.
+        fMaxSpeed *= fInputMagnitude;
+
         vVel.x = vMove.x * fMaxSpeed;
         vVel.z = vMove.z * fMaxSpeed;
 
