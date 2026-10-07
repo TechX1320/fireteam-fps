@@ -397,7 +397,7 @@ uint32 FireteamMutationBox::TouchNotify(
     // Keep the hidden object alive briefly so its attached GET.WAV starts.
     g_pLTServer->SetNextUpdate(
         m_hObject,
-        0.35f);
+        0.60f);
 
     return 1;
 }
