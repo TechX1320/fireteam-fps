@@ -36,6 +36,12 @@ struct FTWeaponDef
     float fDamageMult1;
     float fDamageMult2;
     float fReloadSeconds;
+
+    // NOLF2-style vector shoot-through. A thickness <= 0 disables it.
+    float fPenetrationMaxThickness;
+    float fPenetrationDamageMult;
+    float fPenetrationRangeMult;
+
     bool  bAutomatic;
     bool  bAutoReload;
     bool  bShowCrosshair;
@@ -131,6 +137,8 @@ inline void FT_InitWeaponDefaults(FTWeaponDef aDefs[6])
     {
         aDefs[nSlot].nSlot = nSlot;
         aDefs[nSlot].fProjectileScale = 1.0f;
+        aDefs[nSlot].fPenetrationDamageMult = 1.0f;
+        aDefs[nSlot].fPenetrationRangeMult = 1.0f;
     }
 }
 
@@ -200,6 +208,9 @@ inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
         else if(_stricmp(pKey, "damage_mult1") == 0) def.fDamageMult1 = (float)atof(pValue);
         else if(_stricmp(pKey, "damage_mult2") == 0) def.fDamageMult2 = (float)atof(pValue);
         else if(_stricmp(pKey, "reload") == 0) def.fReloadSeconds = (float)atof(pValue);
+        else if(_stricmp(pKey, "penetration_max_thickness") == 0) def.fPenetrationMaxThickness = (float)atof(pValue);
+        else if(_stricmp(pKey, "penetration_damage_mult") == 0) def.fPenetrationDamageMult = (float)atof(pValue);
+        else if(_stricmp(pKey, "penetration_range_mult") == 0) def.fPenetrationRangeMult = (float)atof(pValue);
         else if(_stricmp(pKey, "automatic") == 0) def.bAutomatic = atoi(pValue) != 0;
         else if(_stricmp(pKey, "auto_reload") == 0) def.bAutoReload = atoi(pValue) != 0;
         else if(_stricmp(pKey, "show_crosshair") == 0) def.bShowCrosshair = atoi(pValue) != 0;
