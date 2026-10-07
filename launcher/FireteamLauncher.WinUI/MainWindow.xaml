@@ -37,44 +37,25 @@
 
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Name="HomeItem" Content="Home" Tag="home">
-                    <NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
 
-                <NavigationViewItemSeparator />
-                <NavigationViewItemHeader Content="PLAY &amp; PROGRESSION" />
-
                 <NavigationViewItem x:Name="LoadoutItem" Content="Loadout" Tag="loadout">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8B7;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
 
                 <NavigationViewItem x:Name="ArsenalItem" Content="Arsenal" Tag="arsenal">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8D4;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-
-                <NavigationViewItemSeparator />
-                <NavigationViewItemHeader Content="MODDING" />
 
                 <NavigationViewItem x:Name="ModsItem" Content="Mods &amp; Content Tools" Tag="mods">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE943;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
-
-            <NavigationView.PaneFooter>
-                <StackPanel Margin="12,8,8,12" Spacing="2">
-                    <TextBlock Text="FIRETEAM LAUNCHER" FontFamily="Bahnschrift SemiCondensed" FontSize="11"
-                               FontWeight="SemiBold" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
-                    <TextBlock Text="0.3.0 • ALPHA" FontFamily="Bahnschrift SemiCondensed" FontSize="10"
-                               Foreground="{StaticResource LauncherMutedTextBrush}" />
-                </StackPanel>
-            </NavigationView.PaneFooter>
 
             <Grid>
                 <!-- HOME -->
                 <ScrollViewer x:Name="HomeView" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel MaxWidth="1050" HorizontalAlignment="Center" Margin="34,28,34,44" Spacing="18">
                         <StackPanel Spacing="5">
-                            <TextBlock Text="FIRETEAM / LOCAL ALPHA" Style="{StaticResource EyebrowTextStyle}" />
-                            <TextBlock Text="FIRETEAM" Style="{StaticResource HeroTextStyle}" />
+                            <TextBlock Text="FIRETEAM / LOCAL ALPHA" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
+                            <TextBlock Text="FIRETEAM" FontFamily="Bahnschrift SemiCondensed" FontSize="40" FontWeight="Bold" CharacterSpacing="20" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
                             <TextBlock Text="Build your loadout, configure the run, then drop directly into Cabin Fever."
                                        FontSize="15" Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                         </StackPanel>
@@ -85,10 +66,10 @@
                                 <ColumnDefinition Width="0.85*" />
                             </Grid.ColumnDefinitions>
 
-                            <Border Grid.Column="0" Style="{StaticResource LauncherCardStyle}">
+                            <Border Grid.Column="0" Background="{StaticResource LauncherPanelBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="20">
                                 <StackPanel Spacing="13">
-                                    <TextBlock Text="RUN SETUP" Style="{StaticResource EyebrowTextStyle}" />
-                                    <TextBlock Text="Cabin Fever" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock Text="RUN SETUP" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
+                                    <TextBlock Text="Cabin Fever" FontFamily="Bahnschrift SemiCondensed" FontSize="25" FontWeight="SemiBold" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
 
                                     <Grid ColumnSpacing="12" RowSpacing="10">
                                         <Grid.ColumnDefinitions>
@@ -102,43 +83,43 @@
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
 
-                                        <TextBlock Grid.Row="0" Text="PLAYER NAME" Style="{StaticResource FieldLabelTextStyle}" />
+                                        <TextBlock Grid.Row="0" Text="PLAYER NAME" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                         <TextBox x:Name="PlayerNameBox" Grid.Row="0" Grid.Column="1" MaxLength="15"
-                                                 Style="{StaticResource LauncherTextBoxStyle}" />
+                                                 Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" />
 
-                                        <TextBlock Grid.Row="1" Text="MODE" Style="{StaticResource FieldLabelTextStyle}" />
+                                        <TextBlock Grid.Row="1" Text="MODE" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                         <ComboBox x:Name="ModeCombo" Grid.Row="1" Grid.Column="1"
-                                                  Style="{StaticResource LauncherComboBoxStyle}"
+                                                  Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3"
                                                   SelectionChanged="ModeCombo_SelectionChanged" />
 
-                                        <TextBlock Grid.Row="2" Text="DIFFICULTY" Style="{StaticResource FieldLabelTextStyle}" />
+                                        <TextBlock Grid.Row="2" Text="DIFFICULTY" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                         <ComboBox x:Name="DifficultyCombo" Grid.Row="2" Grid.Column="1"
-                                                  Style="{StaticResource LauncherComboBoxStyle}" />
+                                                  Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" />
 
                                         <TextBlock x:Name="JoinIpLabel" Grid.Row="3" Text="SERVER IP"
-                                                   Style="{StaticResource FieldLabelTextStyle}" Visibility="Collapsed" />
+                                                   FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" Visibility="Collapsed" />
                                         <TextBox x:Name="JoinIpBox" Grid.Row="3" Grid.Column="1"
-                                                 Style="{StaticResource LauncherTextBoxStyle}" Visibility="Collapsed" />
+                                                 Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" Visibility="Collapsed" />
                                     </Grid>
 
-                                    <TextBlock Text="ADVANCED COMMANDS" Style="{StaticResource FieldLabelTextStyle}" />
-                                    <TextBox x:Name="CommandsBox" Style="{StaticResource LauncherTextBoxStyle}"
+                                    <TextBlock Text="ADVANCED COMMANDS" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
+                                    <TextBox x:Name="CommandsBox" Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3"
                                              PlaceholderText="+consoleenable 1 +SomeLithTechCommand value" />
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Column="1" Style="{StaticResource LauncherCardStyle}">
+                            <Border Grid.Column="1" Background="{StaticResource LauncherPanelBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="20">
                                 <StackPanel Spacing="12">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="CURRENT LOADOUT" Style="{StaticResource EyebrowTextStyle}" />
+                                        <TextBlock Text="CURRENT LOADOUT" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
                                         <Button Grid.Column="1" Content="EDIT" Click="EditLoadoutButton_Click"
-                                                Style="{StaticResource SecondaryActionButtonStyle}" Padding="12,5" />
+                                                Background="{StaticResource LauncherPanelRaisedBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" FontFamily="Bahnschrift SemiCondensed" FontWeight="SemiBold" Padding="12,5" />
                                     </Grid>
-                                    <TextBlock x:Name="PrimarySummaryText" Style="{StaticResource CardTitleTextStyle}" />
+                                    <TextBlock x:Name="PrimarySummaryText" FontFamily="Bahnschrift SemiCondensed" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
                                     <TextBlock x:Name="SidearmSummaryText" Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                                     <TextBlock x:Name="MeleeSummaryText" Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                                     <TextBlock x:Name="SecondarySummaryText" Foreground="{StaticResource LauncherSecondaryTextBrush}" />
@@ -147,21 +128,21 @@
                             </Border>
                         </Grid>
 
-                        <Border Style="{StaticResource LauncherCardStyle}">
+                        <Border Background="{StaticResource LauncherPanelBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="20">
                             <Grid ColumnSpacing="18">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="230" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Spacing="5" VerticalAlignment="Center">
-                                    <TextBlock Text="READY TO DEPLOY" Style="{StaticResource EyebrowTextStyle}" />
+                                    <TextBlock Text="READY TO DEPLOY" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
                                     <TextBlock x:Name="RunStatusText"
                                                Text="Checking FIRETEAM runtime..."
                                                Foreground="{StaticResource LauncherSecondaryTextBrush}"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
                                 <Button x:Name="PlayButton" Grid.Column="1" Content="PLAY FIRETEAM"
-                                        Click="PlayButton_Click" Style="{StaticResource PrimaryActionButtonStyle}"
+                                        Click="PlayButton_Click" Background="{StaticResource LauncherGreenBrush}" Foreground="#08100A" BorderBrush="{StaticResource LauncherGreenBrush}" BorderThickness="1" CornerRadius="3" FontFamily="Bahnschrift SemiCondensed" FontWeight="Bold"
                                         MinHeight="52" FontSize="16" />
                             </Grid>
                         </Border>
@@ -172,13 +153,13 @@
                 <ScrollViewer x:Name="LoadoutView" Visibility="Collapsed" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel MaxWidth="1000" HorizontalAlignment="Center" Margin="34,28,34,44" Spacing="18">
                         <StackPanel Spacing="5">
-                            <TextBlock Text="FIRETEAM / LOADOUT" Style="{StaticResource EyebrowTextStyle}" />
-                            <TextBlock Text="Build your deployment kit" Style="{StaticResource HeroTextStyle}" FontSize="36" />
+                            <TextBlock Text="FIRETEAM / LOADOUT" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
+                            <TextBlock Text="Build your deployment kit" FontFamily="Bahnschrift SemiCondensed" FontSize="40" FontWeight="Bold" CharacterSpacing="20" Foreground="{StaticResource LauncherPrimaryTextBrush}" FontSize="36" />
                             <TextBlock Text="This replaces the old fixed slot display with an actual launcher-side loadout editor."
                                        Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                         </StackPanel>
 
-                        <Border Style="{StaticResource LauncherCardStyle}">
+                        <Border Background="{StaticResource LauncherPanelBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="20">
                             <StackPanel Spacing="14">
                                 <Grid ColumnSpacing="14" RowSpacing="12">
                                     <Grid.ColumnDefinitions>
@@ -193,33 +174,33 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
-                                    <TextBlock Grid.Row="0" Text="PRIMARY" Style="{StaticResource FieldLabelTextStyle}" />
+                                    <TextBlock Grid.Row="0" Text="PRIMARY" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                     <ComboBox x:Name="PrimaryCombo" Grid.Row="0" Grid.Column="1" DisplayMemberPath="DisplayName"
-                                              Style="{StaticResource LauncherComboBoxStyle}" HorizontalAlignment="Stretch" />
-                                    <TextBlock Grid.Row="1" Text="SIDEARM" Style="{StaticResource FieldLabelTextStyle}" />
+                                              Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" HorizontalAlignment="Stretch" />
+                                    <TextBlock Grid.Row="1" Text="SIDEARM" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                     <ComboBox x:Name="SidearmCombo" Grid.Row="1" Grid.Column="1" DisplayMemberPath="DisplayName"
-                                              Style="{StaticResource LauncherComboBoxStyle}" HorizontalAlignment="Stretch" />
-                                    <TextBlock Grid.Row="2" Text="MELEE" Style="{StaticResource FieldLabelTextStyle}" />
+                                              Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" HorizontalAlignment="Stretch" />
+                                    <TextBlock Grid.Row="2" Text="MELEE" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                     <ComboBox x:Name="MeleeCombo" Grid.Row="2" Grid.Column="1" DisplayMemberPath="DisplayName"
-                                              Style="{StaticResource LauncherComboBoxStyle}" HorizontalAlignment="Stretch" />
-                                    <TextBlock Grid.Row="3" Text="SECONDARY / EXTRA" Style="{StaticResource FieldLabelTextStyle}" />
+                                              Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" HorizontalAlignment="Stretch" />
+                                    <TextBlock Grid.Row="3" Text="SECONDARY / EXTRA" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                     <ComboBox x:Name="SecondaryCombo" Grid.Row="3" Grid.Column="1" DisplayMemberPath="DisplayName"
-                                              Style="{StaticResource LauncherComboBoxStyle}" HorizontalAlignment="Stretch" />
-                                    <TextBlock Grid.Row="4" Text="SPECIAL" Style="{StaticResource FieldLabelTextStyle}" />
+                                              Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" HorizontalAlignment="Stretch" />
+                                    <TextBlock Grid.Row="4" Text="SPECIAL" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                     <ComboBox x:Name="SpecialCombo" Grid.Row="4" Grid.Column="1" DisplayMemberPath="DisplayName"
-                                              Style="{StaticResource LauncherComboBoxStyle}" HorizontalAlignment="Stretch" />
+                                              Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" HorizontalAlignment="Stretch" />
                                 </Grid>
 
-                                <Border Style="{StaticResource LauncherRaisedCardStyle}">
+                                <Border Background="{StaticResource LauncherPanelRaisedBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="14">
                                     <TextBlock Text="V1 uses the weapon definitions already known to FIRETEAM. The next pass grows this into unlocks, progression, mods and CA catalog-backed inventory."
                                                TextWrapping="Wrap" Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                                 </Border>
 
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
                                     <Button Content="OPEN ARSENAL" Click="OpenArsenalButton_Click"
-                                            Style="{StaticResource SecondaryActionButtonStyle}" Padding="16,8" />
+                                            Background="{StaticResource LauncherPanelRaisedBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" FontFamily="Bahnschrift SemiCondensed" FontWeight="SemiBold" Padding="16,8" />
                                     <Button Content="APPLY LOADOUT" Click="ApplyLoadoutButton_Click"
-                                            Style="{StaticResource PrimaryActionButtonStyle}" Padding="18,8" />
+                                            Background="{StaticResource LauncherGreenBrush}" Foreground="#08100A" BorderBrush="{StaticResource LauncherGreenBrush}" BorderThickness="1" CornerRadius="3" FontFamily="Bahnschrift SemiCondensed" FontWeight="Bold" Padding="18,8" />
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -235,7 +216,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Style="{StaticResource LauncherCardStyle}">
+                    <Border Grid.Column="0" Background="{StaticResource LauncherPanelBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="20">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -243,12 +224,12 @@
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
                             <StackPanel Grid.Row="0" Spacing="3" Margin="0,0,0,12">
-                                <TextBlock Text="ARSENAL" Style="{StaticResource EyebrowTextStyle}" />
-                                <TextBlock Text="Weapon Catalog" Style="{StaticResource CardTitleTextStyle}" />
+                                <TextBlock Text="ARSENAL" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
+                                <TextBlock Text="Weapon Catalog" FontFamily="Bahnschrift SemiCondensed" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
                             </StackPanel>
                             <TextBox x:Name="WeaponSearchBox" Grid.Row="1" Margin="0,0,0,12"
                                      PlaceholderText="Search name or ID..."
-                                     Style="{StaticResource LauncherTextBoxStyle}"
+                                     Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3"
                                      TextChanged="WeaponSearchBox_TextChanged" />
                             <ListView x:Name="WeaponList" Grid.Row="2" SelectionChanged="WeaponList_SelectionChanged"
                                       DisplayMemberPath="DisplayName" />
@@ -258,14 +239,14 @@
                     <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Spacing="14" Margin="0,0,8,22">
                             <StackPanel Spacing="3">
-                                <TextBlock Text="WEAPON AUTHORING LAB" Style="{StaticResource EyebrowTextStyle}" />
-                                <TextBlock x:Name="WeaponTitleText" Text="Select a weapon" Style="{StaticResource SectionTitleTextStyle}" />
+                                <TextBlock Text="WEAPON AUTHORING LAB" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
+                                <TextBlock x:Name="WeaponTitleText" Text="Select a weapon" FontFamily="Bahnschrift SemiCondensed" FontSize="25" FontWeight="SemiBold" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
                                 <TextBlock x:Name="WeaponSectionText" Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                             </StackPanel>
 
-                            <Border Style="{StaticResource LauncherCardStyle}">
+                            <Border Background="{StaticResource LauncherPanelBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="20">
                                 <StackPanel Spacing="13">
-                                    <TextBlock Text="CORE DEFINITION" Style="{StaticResource EyebrowTextStyle}" />
+                                    <TextBlock Text="CORE DEFINITION" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
                                     <Grid ColumnSpacing="12" RowSpacing="10">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="145" />
@@ -280,32 +261,32 @@
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
 
-                                        <TextBlock Grid.Row="0" Text="NAME" Style="{StaticResource FieldLabelTextStyle}" />
-                                        <TextBox x:Name="WeaponNameBox" Grid.Row="0" Grid.Column="1" Style="{StaticResource LauncherTextBoxStyle}" />
-                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="ID" Style="{StaticResource FieldLabelTextStyle}" />
-                                        <TextBox x:Name="WeaponIdBox" Grid.Row="0" Grid.Column="3" Style="{StaticResource LauncherTextBoxStyle}" />
+                                        <TextBlock Grid.Row="0" Text="NAME" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <TextBox x:Name="WeaponNameBox" Grid.Row="0" Grid.Column="1" Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" />
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="ID" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <TextBox x:Name="WeaponIdBox" Grid.Row="0" Grid.Column="3" Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" />
 
-                                        <TextBlock Grid.Row="1" Text="TYPE" Style="{StaticResource FieldLabelTextStyle}" />
-                                        <ComboBox x:Name="WeaponTypeCombo" Grid.Row="1" Grid.Column="1" Style="{StaticResource LauncherComboBoxStyle}" />
-                                        <TextBlock Grid.Row="1" Grid.Column="2" Text="DAMAGE" Style="{StaticResource FieldLabelTextStyle}" />
-                                        <TextBox x:Name="DamageBox" Grid.Row="1" Grid.Column="3" Style="{StaticResource LauncherTextBoxStyle}" />
+                                        <TextBlock Grid.Row="1" Text="TYPE" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <ComboBox x:Name="WeaponTypeCombo" Grid.Row="1" Grid.Column="1" Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" />
+                                        <TextBlock Grid.Row="1" Grid.Column="2" Text="DAMAGE" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <TextBox x:Name="DamageBox" Grid.Row="1" Grid.Column="3" Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" />
 
-                                        <TextBlock Grid.Row="2" Text="MAGAZINE" Style="{StaticResource FieldLabelTextStyle}" />
-                                        <TextBox x:Name="ClipBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource LauncherTextBoxStyle}" />
-                                        <TextBlock Grid.Row="2" Grid.Column="2" Text="RESERVE" Style="{StaticResource FieldLabelTextStyle}" />
-                                        <TextBox x:Name="ReserveBox" Grid.Row="2" Grid.Column="3" Style="{StaticResource LauncherTextBoxStyle}" />
+                                        <TextBlock Grid.Row="2" Text="MAGAZINE" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <TextBox x:Name="ClipBox" Grid.Row="2" Grid.Column="1" Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" />
+                                        <TextBlock Grid.Row="2" Grid.Column="2" Text="RESERVE" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <TextBox x:Name="ReserveBox" Grid.Row="2" Grid.Column="3" Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" />
 
-                                        <TextBlock Grid.Row="3" Text="FIRE INTERVAL" Style="{StaticResource FieldLabelTextStyle}" />
-                                        <TextBox x:Name="FireIntervalBox" Grid.Row="3" Grid.Column="1" Style="{StaticResource LauncherTextBoxStyle}" />
-                                        <TextBlock Grid.Row="3" Grid.Column="2" Text="RELOAD SEC" Style="{StaticResource FieldLabelTextStyle}" />
-                                        <TextBox x:Name="ReloadBox" Grid.Row="3" Grid.Column="3" Style="{StaticResource LauncherTextBoxStyle}" />
+                                        <TextBlock Grid.Row="3" Text="FIRE INTERVAL" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <TextBox x:Name="FireIntervalBox" Grid.Row="3" Grid.Column="1" Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" />
+                                        <TextBlock Grid.Row="3" Grid.Column="2" Text="RELOAD SEC" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
+                                        <TextBox x:Name="ReloadBox" Grid.Row="3" Grid.Column="3" Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" />
                                     </Grid>
 
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
                                         <Button Content="RELOAD" Click="ReloadArsenalButton_Click"
-                                                Style="{StaticResource SecondaryActionButtonStyle}" Padding="15,8" />
+                                                Background="{StaticResource LauncherPanelRaisedBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" FontFamily="Bahnschrift SemiCondensed" FontWeight="SemiBold" Padding="15,8" />
                                         <Button Content="SAVE WEAPON" Click="SaveWeaponButton_Click"
-                                                Style="{StaticResource PrimaryActionButtonStyle}" Padding="17,8" />
+                                                Background="{StaticResource LauncherGreenBrush}" Foreground="#08100A" BorderBrush="{StaticResource LauncherGreenBrush}" BorderThickness="1" CornerRadius="3" FontFamily="Bahnschrift SemiCondensed" FontWeight="Bold" Padding="17,8" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -321,8 +302,8 @@
                 <ScrollViewer x:Name="ModsView" Visibility="Collapsed" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel MaxWidth="1000" HorizontalAlignment="Center" Margin="34,28,34,44" Spacing="18">
                         <StackPanel Spacing="5">
-                            <TextBlock Text="FIRETEAM / MODDING" Style="{StaticResource EyebrowTextStyle}" />
-                            <TextBlock Text="Mods &amp; Content Tools" Style="{StaticResource HeroTextStyle}" FontSize="36" />
+                            <TextBlock Text="FIRETEAM / MODDING" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
+                            <TextBlock Text="Mods &amp; Content Tools" FontFamily="Bahnschrift SemiCondensed" FontSize="40" FontWeight="Bold" CharacterSpacing="20" Foreground="{StaticResource LauncherPrimaryTextBrush}" FontSize="36" />
                             <TextBlock Text="The launcher is the front door for both players and creators."
                                        Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                         </StackPanel>
@@ -332,28 +313,28 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Style="{StaticResource LauncherCardStyle}">
+                            <Border Grid.Column="0" Background="{StaticResource LauncherPanelBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="20">
                                 <StackPanel Spacing="12">
-                                    <TextBlock Text="MOD LIBRARY" Style="{StaticResource EyebrowTextStyle}" />
-                                    <TextBlock Text="Dedicated mod folders" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock Text="MOD LIBRARY" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
+                                    <TextBlock Text="Dedicated mod folders" FontFamily="Bahnschrift SemiCondensed" FontSize="25" FontWeight="SemiBold" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
                                     <TextBlock Text="FIRETEAM keeps custom content outside the base rez tree. Install/uninstall, versions and deterministic -rez load order come next."
                                                TextWrapping="Wrap" Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                                     <Button Content="OPEN MODS FOLDER" Click="OpenModsButton_Click"
-                                            Style="{StaticResource PrimaryActionButtonStyle}" Padding="16,8"
+                                            Background="{StaticResource LauncherGreenBrush}" Foreground="#08100A" BorderBrush="{StaticResource LauncherGreenBrush}" BorderThickness="1" CornerRadius="3" FontFamily="Bahnschrift SemiCondensed" FontWeight="Bold" Padding="16,8"
                                             HorizontalAlignment="Left" />
                                     <TextBlock x:Name="ModsPathText" FontSize="12" TextWrapping="Wrap"
                                                Foreground="{StaticResource LauncherMutedTextBrush}" />
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Column="1" Style="{StaticResource LauncherCardStyle}">
+                            <Border Grid.Column="1" Background="{StaticResource LauncherPanelBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="20">
                                 <StackPanel Spacing="12">
-                                    <TextBlock Text="CONTENT TOOLS" Style="{StaticResource EyebrowTextStyle}" />
-                                    <TextBlock Text="FIRETEAM SDK workspace" Style="{StaticResource SectionTitleTextStyle}" />
+                                    <TextBlock Text="CONTENT TOOLS" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
+                                    <TextBlock Text="FIRETEAM SDK workspace" FontFamily="Bahnschrift SemiCondensed" FontSize="25" FontWeight="SemiBold" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
                                     <TextBlock Text="Workspace for ModelEdit, DEdit, FXed, RenderStyleEditor, REZ utilities and future LTB/LTA conversion workflows."
                                                TextWrapping="Wrap" Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                                     <Button Content="OPEN MODTOOLS WORKSPACE" Click="OpenToolsButton_Click"
-                                            Style="{StaticResource PrimaryActionButtonStyle}" Padding="16,8"
+                                            Background="{StaticResource LauncherGreenBrush}" Foreground="#08100A" BorderBrush="{StaticResource LauncherGreenBrush}" BorderThickness="1" CornerRadius="3" FontFamily="Bahnschrift SemiCondensed" FontWeight="Bold" Padding="16,8"
                                             HorizontalAlignment="Left" />
                                     <TextBlock x:Name="ToolsPathText" FontSize="12" TextWrapping="Wrap"
                                                Foreground="{StaticResource LauncherMutedTextBrush}" />
@@ -361,9 +342,9 @@
                             </Border>
                         </Grid>
 
-                        <Border Style="{StaticResource LauncherCardStyle}">
+                        <Border Background="{StaticResource LauncherPanelBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="20">
                             <StackPanel Spacing="7">
-                                <TextBlock Text="NEXT" Style="{StaticResource EyebrowTextStyle}" />
+                                <TextBlock Text="NEXT" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
                                 <TextBlock Text="Launcher progression, unlocks, mods, external tool path management and packaging will build on this shell."
                                            TextWrapping="Wrap" Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                             </StackPanel>
@@ -375,13 +356,13 @@
                 <ScrollViewer x:Name="SettingsView" Visibility="Collapsed" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel MaxWidth="900" HorizontalAlignment="Center" Margin="34,28,34,44" Spacing="18">
                         <StackPanel Spacing="5">
-                            <TextBlock Text="FIRETEAM / SETTINGS" Style="{StaticResource EyebrowTextStyle}" />
-                            <TextBlock Text="Game settings" Style="{StaticResource HeroTextStyle}" FontSize="36" />
+                            <TextBlock Text="FIRETEAM / SETTINGS" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
+                            <TextBlock Text="Game settings" FontFamily="Bahnschrift SemiCondensed" FontSize="40" FontWeight="Bold" CharacterSpacing="20" Foreground="{StaticResource LauncherPrimaryTextBrush}" FontSize="36" />
                             <TextBlock Text="The launcher writes the same FIRETEAM settings file used by the in-game menu."
                                        Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                         </StackPanel>
 
-                        <Border Style="{StaticResource LauncherCardStyle}">
+                        <Border Background="{StaticResource LauncherPanelBrush}" BorderBrush="{StaticResource LauncherBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="20">
                             <StackPanel Spacing="14">
                                 <Grid ColumnSpacing="14" RowSpacing="12">
                                     <Grid.ColumnDefinitions>
@@ -396,24 +377,24 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
-                                    <TextBlock Grid.Row="0" Text="RESOLUTION" Style="{StaticResource FieldLabelTextStyle}" />
+                                    <TextBlock Grid.Row="0" Text="RESOLUTION" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                     <ComboBox x:Name="ResolutionCombo" Grid.Row="0" Grid.Column="1"
-                                              Style="{StaticResource LauncherComboBoxStyle}" HorizontalAlignment="Stretch" />
-                                    <TextBlock Grid.Row="1" Text="DISPLAY MODE" Style="{StaticResource FieldLabelTextStyle}" />
+                                              Background="{StaticResource LauncherInputBrush}" Foreground="{StaticResource LauncherPrimaryTextBrush}" BorderBrush="{StaticResource LauncherDividerBrush}" BorderThickness="1" CornerRadius="3" HorizontalAlignment="Stretch" />
+                                    <TextBlock Grid.Row="1" Text="DISPLAY MODE" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                     <ToggleSwitch x:Name="WindowedToggle" Grid.Row="1" Grid.Column="1"
                                                   OnContent="Windowed" OffContent="Fullscreen" />
-                                    <TextBlock Grid.Row="2" Text="MOUSE SENSITIVITY" Style="{StaticResource FieldLabelTextStyle}" />
+                                    <TextBlock Grid.Row="2" Text="MOUSE SENSITIVITY" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                     <NumberBox x:Name="SensitivityBox" Grid.Row="2" Grid.Column="1"
                                                Minimum="0.01" Maximum="4.0" SmallChange="0.01" SpinButtonPlacementMode="Inline" />
-                                    <TextBlock Grid.Row="3" Text="GAME VOLUME" Style="{StaticResource FieldLabelTextStyle}" />
+                                    <TextBlock Grid.Row="3" Text="GAME VOLUME" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                     <NumberBox x:Name="VolumeBox" Grid.Row="3" Grid.Column="1"
                                                Minimum="0" Maximum="100" SmallChange="5" SpinButtonPlacementMode="Inline" />
-                                    <TextBlock Grid.Row="4" Text="BRIGHTNESS / GAMMA" Style="{StaticResource FieldLabelTextStyle}" />
+                                    <TextBlock Grid.Row="4" Text="BRIGHTNESS / GAMMA" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource LauncherSecondaryTextBrush}" VerticalAlignment="Center" />
                                     <NumberBox x:Name="GammaBox" Grid.Row="4" Grid.Column="1"
                                                Minimum="0.5" Maximum="6.0" SmallChange="0.1" SpinButtonPlacementMode="Inline" />
                                 </Grid>
                                 <Button Content="SAVE SETTINGS" Click="SaveSettingsButton_Click"
-                                        Style="{StaticResource PrimaryActionButtonStyle}" Padding="18,8"
+                                        Background="{StaticResource LauncherGreenBrush}" Foreground="#08100A" BorderBrush="{StaticResource LauncherGreenBrush}" BorderThickness="1" CornerRadius="3" FontFamily="Bahnschrift SemiCondensed" FontWeight="Bold" Padding="18,8"
                                         HorizontalAlignment="Right" MinWidth="150" />
                             </StackPanel>
                         </Border>

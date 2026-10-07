@@ -38,7 +38,20 @@ public static class StartupDiagnostics
         string context,
         Exception exception)
     {
-        Write($"{context}: {exception}");
+        Write(
+            $"{context}: HResult=0x{exception.HResult:X8} {exception}");
+
+        var inner = exception.InnerException;
+        var depth = 0;
+
+        while(inner is not null &&
+              depth < 4)
+        {
+            Write(
+                $"{context} inner[{depth}]: HResult=0x{inner.HResult:X8} {inner}");
+            inner = inner.InnerException;
+            ++depth;
+        }
     }
 }
 
