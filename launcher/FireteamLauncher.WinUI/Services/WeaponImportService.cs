@@ -32,7 +32,25 @@ public sealed record WeaponImportResult(
     string ConfigPath,
     string ReportPath)
 {
+    public int Compared =>
+        Imported +
+        ArchiveSkipped;
+
+    public double MatchPercent =>
+        Compared <= 0
+            ? 0.0
+            : Imported * 100.0 / Compared;
+
+    public string Compatibility =>
+        MatchPercent >= 75.0
+            ? "GOOD VERSION MATCH"
+            : MatchPercent >= 45.0
+                ? "PARTIAL VERSION MATCH"
+                : "LIKELY VERSION MISMATCH";
+
     public string Summary =>
+        $"{Compatibility}: {Imported}/{Compared} attribute weapons matched the supplied archive " +
+        $"({MatchPercent:0.0}%). " +
         $"Imported {Imported} archive-backed Combat Arms weapon definitions. " +
         $"Skipped {ArchiveSkipped} WEAPONS.txt entries whose required first-person " +
         $"model/texture were not present in the supplied Guns.zip. " +
@@ -1059,6 +1077,35 @@ public sealed class WeaponImportService
                 Path.Combine(
                     localImportRoot,
                     "last-import.txt");
+
+            var compared =
+                imported +
+                archiveSkipped;
+
+            var matchPercent =
+                compared <= 0
+                    ? 0.0
+                    : imported * 100.0 / compared;
+
+            var compatibility =
+                matchPercent >= 75.0
+                    ? "GOOD VERSION MATCH"
+                    : matchPercent >= 45.0
+                        ? "PARTIAL VERSION MATCH"
+                        : "LIKELY VERSION MISMATCH";
+
+            report.InsertRange(
+                Math.Min(
+                    5,
+                    report.Count),
+                new[]
+                {
+                    $"Compatibility: {compatibility}",
+                    $"Archive-backed match rate: {imported}/{compared} ({matchPercent:0.0}%)",
+                    $"Archive-missing definitions: {archiveSkipped}",
+                    $"Imported partial/unsupported: {unsupported}",
+                    string.Empty
+                });
 
             File.WriteAllLines(
                 reportPath,
