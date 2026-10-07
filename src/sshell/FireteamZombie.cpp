@@ -199,17 +199,77 @@ void FireteamZombie::ApplyWallhackRenderStyle(
             ? m_Def.sBodyRenderStyle0
             : "RenderStyles/default.ltb");
 
+    // SetObjectFilenames replaces the model resource bundle, not just the
+    // RenderStyle slot. Re-submit the complete composition so toggling the
+    // wallhack cannot accidentally clear the body/animation/child models.
     ObjectCreateStruct bodyOCS;
     bodyOCS.Clear();
+
+    FT_CopyInfectedString(
+        bodyOCS.m_Filenames[0],
+        MAX_CS_FILENAME_LEN,
+        m_Def.sBodyModel);
+    FT_CopyInfectedString(
+        bodyOCS.m_SkinNames[0],
+        MAX_CS_FILENAME_LEN,
+        m_Def.sBodyTexture0);
+    FT_CopyInfectedString(
+        bodyOCS.m_SkinNames[1],
+        MAX_CS_FILENAME_LEN,
+        m_Def.sBodyTexture1);
+
+    if(m_Def.sAnimationModel[0])
+    {
+        FT_CopyInfectedString(
+            bodyOCS.m_Filenames[1],
+            MAX_CS_FILENAME_LEN,
+            m_Def.sAnimationModel);
+    }
+
+    if(_stricmp(
+           m_Def.sFaceMode,
+           "child_model") == 0 &&
+       m_Def.sFaceModel[0])
+    {
+        FT_CopyInfectedString(
+            bodyOCS.m_Filenames[2],
+            MAX_CS_FILENAME_LEN,
+            m_Def.sFaceModel);
+        FT_CopyInfectedString(
+            bodyOCS.m_SkinNames[2],
+            MAX_CS_FILENAME_LEN,
+            m_Def.sFaceTexture);
+    }
+
+    if(m_Def.sHeadModel[0])
+    {
+        FT_CopyInfectedString(
+            bodyOCS.m_Filenames[3],
+            MAX_CS_FILENAME_LEN,
+            m_Def.sHeadModel);
+        FT_CopyInfectedString(
+            bodyOCS.m_SkinNames[3],
+            MAX_CS_FILENAME_LEN,
+            m_Def.sHeadTexture);
+    }
 
     FT_CopyInfectedString(
         bodyOCS.m_RenderStyleNames[0],
         MAX_CS_FILENAME_LEN,
         pBodyStyle);
 
-    g_pLTSCommon->SetObjectFilenames(
-        m_hObject,
-        &bodyOCS);
+    if(m_Def.sBodyRenderStyle1[0])
+    {
+        FT_CopyInfectedString(
+            bodyOCS.m_RenderStyleNames[1],
+            MAX_CS_FILENAME_LEN,
+            m_Def.sBodyRenderStyle1);
+    }
+
+    const LTRESULT nBodyResult =
+        g_pLTSCommon->SetObjectFilenames(
+            m_hObject,
+            &bodyOCS);
 
     if(m_hFace)
     {
@@ -224,14 +284,39 @@ void FireteamZombie::ApplyWallhackRenderStyle(
         faceOCS.Clear();
 
         FT_CopyInfectedString(
+            faceOCS.m_Filename,
+            MAX_CS_FILENAME_LEN,
+            m_Def.sFaceModel);
+        FT_CopyInfectedString(
+            faceOCS.m_SkinName,
+            MAX_CS_FILENAME_LEN,
+            m_Def.sFaceTexture);
+        FT_CopyInfectedString(
             faceOCS.m_RenderStyleNames[0],
             MAX_CS_FILENAME_LEN,
             pFaceStyle);
+
+        if(m_Def.sFaceRenderStyle1[0])
+        {
+            FT_CopyInfectedString(
+                faceOCS.m_RenderStyleNames[1],
+                MAX_CS_FILENAME_LEN,
+                m_Def.sFaceRenderStyle1);
+        }
 
         g_pLTSCommon->SetObjectFilenames(
             m_hFace,
             &faceOCS);
     }
+
+    g_pLTServer->CPrint(
+        "Fireteam powerup: zombie wallhack style %s (%s).",
+        bEnabled
+            ? "ON"
+            : "OFF",
+        nBodyResult == LT_OK
+            ? "OK"
+            : "FAILED");
 }
 
 static void FT_ApplyZombieWallhackToAll(
