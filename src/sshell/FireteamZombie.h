@@ -11,6 +11,9 @@ public:
     FireteamZombie();
     ~FireteamZombie();
 
+    void ApplyWallhackRenderStyle(
+        bool bEnabled);
+
 protected:
     uint32 EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData);
     uint32 ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg);
@@ -78,5 +81,13 @@ private:
     bool m_bDefLoaded;
     char m_sCurrentAnimation[64];
 };
+
+// Team/global zombie-only visibility powerup. The custom RenderStyle is
+// staged from assets-local/RS/ZombieThroughWall.ltb.
+float FT_ExtendZombieWallhack(
+    float fBaseSeconds);
+
+float FT_GetZombieWallhackRemaining();
+bool FT_IsZombieWallhackActive();
 
 #endif
