@@ -652,6 +652,18 @@ public sealed class WeaponStudioForm : Form
         var slot = _assignSlot.SelectedIndex + 1;
         var destination = $"weapon{slot}";
 
+        if(_selectedSection.StartsWith(
+            "catalog.",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            // An active slot must have its locally imported commercial assets
+            // staged even if the catalog entry was previously disabled.
+            _doc.SetValue(
+                _selectedSection,
+                "enabled",
+                "1");
+        }
+
         _doc.CopySection(_selectedSection, destination, RuntimeKeys);
 
         _status.Text = $"Copied {_doc.GetValue(_selectedSection, "name")} to active slot {slot}. Press SAVE to commit.";
