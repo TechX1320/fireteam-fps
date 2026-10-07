@@ -29,6 +29,7 @@
 #include "FireteamWeaponHud.h"
 #include "FireteamRoundHud.h"
 #include "FireteamCombatFeedback.h"
+#include "FireteamAmbientAudio.h"
 #include "FireteamLoadingScreen.h"
 // Client-side helper functions
 #include "clienthelper.h"
@@ -575,6 +576,9 @@ void CLTClientShell::OnEnterWorld()
 
     m_bInWorld = true;
 
+    // Low-volume Cabin Fever ambience loop supplied as a local mod asset.
+    FT_AmbientAudioEnterWorld();
+
     // NOLF2/Jupiter lighting diagnostics. Do not modify these values here;
     // record them so CA map parity can be fixed from evidence rather than a
     // blanket brightness multiplier.
@@ -616,6 +620,8 @@ void CLTClientShell::OnEnterWorld()
 //---------------------------------------------------------------------------
 void CLTClientShell::OnExitWorld()
 {
+    FT_AmbientAudioExitWorld();
+
 	if (m_pPlayer)
 	{
 		delete m_pPlayer;

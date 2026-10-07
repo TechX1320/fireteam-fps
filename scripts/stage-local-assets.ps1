@@ -101,7 +101,28 @@ Expand-OptionalZip "TEXTURES.zip" "Textures"
 Expand-OptionalZip "FX.zip" "FX"
 Expand-OptionalZip "SND.zip" "Snd"
 Expand-OptionalZip "RS.zip" "RenderStyles"
+Expand-OptionalZip "SHADERS.zip" "Shaders"
 Expand-OptionalZip "CLIENTFX.zip" "ClientFX"
+
+$zombieAmbience = Join-Path $assetRoot "ZombieAmbience.wav"
+if(Test-Path -LiteralPath $zombieAmbience) {
+    $ambientDir = Join-Path $rezRoot "Snd\Fireteam"
+    $ambientDest = Join-Path $ambientDir "ZombieAmbience.wav"
+    New-Item -ItemType Directory -Force -Path $ambientDir | Out-Null
+
+    if((-not (Test-Path -LiteralPath $ambientDest)) -or
+       ((Get-Item -LiteralPath $ambientDest).LastWriteTimeUtc -lt
+        (Get-Item -LiteralPath $zombieAmbience).LastWriteTimeUtc)) {
+        Copy-Item -LiteralPath $zombieAmbience -Destination $ambientDest -Force
+        Write-Host "[OK] ZombieAmbience.wav -> rez\Snd\Fireteam"
+    } else {
+        Write-Host "[OK] ZombieAmbience.wav unchanged"
+    }
+}
+elseif(Test-Path -LiteralPath (Join-Path $assetRoot "ZombieAmbience.mp3")) {
+    Write-Host "[INFO] ZombieAmbience.mp3 found, but Jupiter's normal sound path expects RIFF/WAV."
+    Write-Host "       Convert it to assets-local\ZombieAmbience.wav to enable the ambience loop."
+}
 
 
 
