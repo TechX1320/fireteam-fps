@@ -260,6 +260,43 @@ inline bool FT_LoadDifficultyDef(
     return bFound;
 }
 
+inline uint32 FT_GetActiveDifficultyLevel(
+    const char *pSessionFilename)
+{
+    char sDifficulty[32];
+
+    FT_ReadSessionDifficulty(
+        pSessionFilename,
+        sDifficulty,
+        sizeof(sDifficulty));
+
+    if(_stricmp(sDifficulty, "easy") == 0)
+        return 2;
+    if(_stricmp(sDifficulty, "normal") == 0)
+        return 4;
+    if(_stricmp(sDifficulty, "medium") == 0)
+        return 5;
+    if(_stricmp(sDifficulty, "hard") == 0)
+        return 6;
+    if(_stricmp(sDifficulty, "expert") == 0)
+        return 7;
+    if(_stricmp(sDifficulty, "extreme") == 0)
+        return 8;
+    if(_stricmp(sDifficulty, "nightmare") == 0)
+        return 10;
+
+    int nLevel =
+        atoi(
+            sDifficulty);
+
+    if(nLevel < 0)
+        nLevel = 0;
+    if(nLevel > 10)
+        nLevel = 10;
+
+    return (uint32)nLevel;
+}
+
 inline bool FT_LoadActiveDifficulty(
     const char *pDifficultyFilename,
     const char *pSessionFilename,
