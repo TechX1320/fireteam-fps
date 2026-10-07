@@ -1664,7 +1664,7 @@ public sealed partial class MainWindow : Window
                 App.Instance.Services.Game.Launch(
                     profile,
                     settings) +
-                " Weapon QA: mouse wheel cycles active + catalog entries; shots are visual/audio only.";
+                " Weapon QA: wheel cycles the full catalog, Q toggles launcher quarantine, and shots are visual/audio only.";
         }
         catch(Exception ex)
         {
