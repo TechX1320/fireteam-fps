@@ -621,11 +621,19 @@ public sealed partial class MainWindow
         PlayerGearView.HorizontalContentAlignment =
             HorizontalAlignment.Center;
 
+        // The window title already says FIRETEAM / PLAYER GEAR. Keep the
+        // page itself compact instead of repeating a second large header.
         var page =
-            NewPagePanel(
-                "PLAYER LOADOUT",
-                "Player Gear",
-                "A dedicated equipment layer for backpacks, armor and wearable Combat Arms attachments. This page is the launcher home for the player-side loadout instead of mixing gear into weapon slots.");
+            new StackPanel
+            {
+                Spacing = 16,
+                Margin =
+                    new Thickness(
+                        30, 20, 30, 30),
+                MaxWidth = 1120,
+                HorizontalAlignment =
+                    HorizontalAlignment.Center
+            };
 
         var grid =
             new Grid
@@ -699,28 +707,28 @@ public sealed partial class MainWindow
             GearCard(
                 "BACKPACK SLOT",
                 "Backpack",
-                "Visual inventory/utility slot sourced from the staged Combat Arms attachment catalog. Capacity bonuses can be layered on later.",
+                "Visual inventory/utility slot sourced from the Combat Arms attachment catalog.",
                 "NOT EQUIPPED");
 
         var armor =
             GearCard(
                 "ARMOR SLOT",
                 "Body Armor",
-                "Reserved for the planned blue Armor bar above HP. Armor will absorb damage first and create another useful pickup/reward type.",
+                "Reserved for the planned Armor layer that absorbs damage before HP.",
                 "NO ARMOR");
 
         var head =
             GearCard(
                 "HEAD SLOT",
                 "Headgear",
-                "Helmets and head attachments stay independent from backpack and armor so cosmetics do not need to change gameplay.",
+                "Helmets and head attachments stay separate from gameplay armor.",
                 "NOT EQUIPPED");
 
         var face =
             GearCard(
                 "FACE SLOT",
                 "Mask / Glasses",
-                "Face gear, glasses and masks from the attachment archive can live here without consuming a weapon slot.",
+                "Masks, glasses and goggles can remain cosmetic without consuming a weapon slot.",
                 "NOT EQUIPPED");
 
         Grid.SetRow(backpack, 0);
@@ -741,9 +749,9 @@ public sealed partial class MainWindow
 
         var source =
             CardHeading(
-                "CONTENT SOURCE",
-                "Combat Arms Attachments",
-                "ATTACHMENTS.zip contains the player attachment models/textures we inspected. The next importer pass will turn those filenames into a filterable gear catalog instead of hard-coding hundreds of assets.",
+                "ATTACHMENT CATALOG",
+                "Combat Arms Gear",
+                "Use Tools → Combat Arms Importer to extract ATTACH_M / ATTACH_T and rebuild config/attachments.cfg.",
                 AccentBrush);
 
         page.Children.Add(
@@ -764,11 +772,18 @@ public sealed partial class MainWindow
         WeaponModsView.HorizontalContentAlignment =
             HorizontalAlignment.Center;
 
+        // FIRETEAM / WEAPON MODS is already in the chrome.
         var page =
-            NewPagePanel(
-                "WEAPON LOADOUT",
-                "Weapon Mods",
-                "Dedicated weapon modification space for optics, muzzle devices, magazines and carried ammunition. These are separate from the base Weapon Catalog definition.");
+            new StackPanel
+            {
+                Spacing = 16,
+                Margin =
+                    new Thickness(
+                        30, 20, 30, 30),
+                MaxWidth = 1120,
+                HorizontalAlignment =
+                    HorizontalAlignment.Center
+            };
 
         var grid =
             new Grid
@@ -841,25 +856,25 @@ public sealed partial class MainWindow
             ModCard(
                 "OPTIC SLOT",
                 "Scope / Sight",
-                "Future optics can change FOV, overlay/crosshair presentation and zoom behavior without creating a duplicate base weapon.");
+                "Optics can change FOV, scope presentation and zoom behavior without duplicating the base gun.");
 
         var muzzle =
             ModCard(
                 "MUZZLE SLOT",
                 "Suppressor / Muzzle",
-                "Suppressors are planned to reduce the sound radius used by zombie hearing once auditory aggro is added.");
+                "Suppressors will reduce the zombie hearing radius when sound-based aggro is added.");
 
         var magazine =
             ModCard(
                 "MAGAZINE SLOT",
                 "Magazine",
-                "Extended magazines can alter magazine capacity while preserving the weapon's core damage/fire-rate definition.");
+                "Extended magazines alter capacity while the base weapon keeps its damage and fire rate.");
 
         var ammo =
             ModCard(
                 "AMMO SLOT",
                 "Reserve / Ammo Stash",
-                "Extra carried ammunition can increase reserve capacity independently from magazine size and create useful backpack tradeoffs.");
+                "Extra carried ammunition increases reserve capacity independently from magazine size.");
 
         Grid.SetRow(optic, 0);
         Grid.SetColumn(optic, 0);
@@ -881,7 +896,7 @@ public sealed partial class MainWindow
             CardHeading(
                 "DATA MODEL",
                 "Base weapon + installed mods",
-                "The launcher now has a separate destination for weapon customization. Gameplay hooks and the attachment importer come next; the Weapon Editor remains the base-stat/content-authoring tool.",
+                "Weapon Catalog remains the authoring tool for the base gun; installed mods live here as loadout data.",
                 CyanBrush);
 
         page.Children.Add(
@@ -892,7 +907,6 @@ public sealed partial class MainWindow
         WeaponModsView.Content =
             page;
     }
-
 
     private void BuildHomeView()
     {
@@ -2155,90 +2169,327 @@ public sealed partial class MainWindow
 
     private void BuildCaImportView()
     {
-        CaImportView.Visibility = Visibility.Collapsed;
-        CaImportView.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
-        CaImportView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-        CaImportView.HorizontalContentAlignment = HorizontalAlignment.Center;
+        CaImportView.Visibility =
+            Visibility.Collapsed;
+        CaImportView.HorizontalScrollBarVisibility =
+            ScrollBarVisibility.Disabled;
+        CaImportView.VerticalScrollBarVisibility =
+            ScrollBarVisibility.Auto;
+        CaImportView.HorizontalContentAlignment =
+            HorizontalAlignment.Center;
 
-        var page = new StackPanel
+        var page =
+            new StackPanel
+            {
+                Spacing = 12,
+                Margin =
+                    new Thickness(
+                        20, 14, 20, 20),
+                MaxWidth = 1120,
+                HorizontalAlignment =
+                    HorizontalAlignment.Center
+            };
+
+        var sourcePanel =
+            CardHeading(
+                "CONTENT SOURCES",
+                "Combat Arms Import",
+                "Pick each archive once, then run the import you want. Weapon metadata and attachment assets remain separate.",
+                AccentBrush);
+
+        var sources =
+            new Grid
+            {
+                ColumnSpacing = 12,
+                Margin =
+                    new Thickness(
+                        0, 8, 0, 0)
+            };
+
+        for(var i = 0;
+            i < 3;
+            ++i)
         {
-            Spacing = 12,
-            Margin = new Thickness(20, 14, 20, 20),
-            MaxWidth = 1120,
-            HorizontalAlignment = HorizontalAlignment.Center
-        };
+            sources.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width =
+                        new GridLength(
+                            1,
+                            GridUnitType.Star)
+                });
+        }
 
-        var control = CardHeading(
-            "ARCHIVE-FIRST MIGRATION",
-            "Import Audit",
-            "WEAPONS.txt supplies metadata; Guns.zip is the content authority. A weapon is only imported when its declared first-person model and texture exist in the supplied archive.",
-            AccentBrush);
+        StackPanel SourcePicker(
+            string label,
+            string buttonText,
+            Button button,
+            TextBlock status,
+            RoutedEventHandler handler)
+        {
+            var panel =
+                new StackPanel
+                {
+                    Spacing = 6
+                };
 
-        CaImportRunButton.Content = "START IMPORT / AUDIT";
-        CaImportRunButton.Background = AccentBrush;
+            panel.Children.Add(
+                Eyebrow(
+                    label,
+                    CyanBrush));
+
+            button.Content =
+                buttonText;
+            button.Background =
+                PanelRaisedBrush;
+            button.Foreground =
+                PrimaryTextBrush;
+            button.BorderBrush =
+                DividerBrush;
+            button.BorderThickness =
+                new Thickness(1);
+            button.CornerRadius =
+                new CornerRadius(3);
+            button.Padding =
+                new Thickness(
+                    12, 8, 12, 8);
+            button.HorizontalAlignment =
+                HorizontalAlignment.Stretch;
+            button.Click +=
+                handler;
+
+            status.Text =
+                "Not selected";
+            status.Foreground =
+                SecondaryTextBrush;
+            status.TextWrapping =
+                TextWrapping.Wrap;
+            status.FontSize =
+                12;
+
+            panel.Children.Add(
+                button);
+            panel.Children.Add(
+                status);
+
+            return panel;
+        }
+
+        var weaponsPicker =
+            SourcePicker(
+                "ATTRIBUTES",
+                "SELECT WEAPONS.TXT",
+                new Button(),
+                CaWeaponsSourceText,
+                SelectCaWeaponsSourceButton_Click);
+
+        var gunsPicker =
+            SourcePicker(
+                "WEAPONS",
+                "SELECT GUNS.ZIP",
+                new Button(),
+                CaGunsSourceText,
+                SelectCaGunsSourceButton_Click);
+
+        var attachmentsPicker =
+            SourcePicker(
+                "PLAYER GEAR",
+                "SELECT ATTACHMENTS.ZIP",
+                new Button(),
+                CaAttachmentsSourceText,
+                SelectCaAttachmentsSourceButton_Click);
+
+        Grid.SetColumn(
+            weaponsPicker,
+            0);
+        Grid.SetColumn(
+            gunsPicker,
+            1);
+        Grid.SetColumn(
+            attachmentsPicker,
+            2);
+
+        sources.Children.Add(
+            weaponsPicker);
+        sources.Children.Add(
+            gunsPicker);
+        sources.Children.Add(
+            attachmentsPicker);
+
+        sourcePanel.Children.Add(
+            sources);
+
+        var importActions =
+            new StackPanel
+            {
+                Orientation =
+                    Orientation.Horizontal,
+                Spacing = 10,
+                Margin =
+                    new Thickness(
+                        0, 8, 0, 0)
+            };
+
+        CaImportRunButton.Content =
+            "START WEAPON IMPORT";
+        CaImportRunButton.Background =
+            AccentBrush;
         CaImportRunButton.Foreground =
-            new SolidColorBrush(Color.FromArgb(255, 24, 16, 0));
-        CaImportRunButton.BorderBrush = AccentBrush;
-        CaImportRunButton.Padding = new Thickness(18, 9, 18, 9);
-        CaImportRunButton.HorizontalAlignment = HorizontalAlignment.Left;
-        CaImportRunButton.Click += ImportCombatArmsButton_Click;
-        control.Children.Add(CaImportRunButton);
+            new SolidColorBrush(
+                Color.FromArgb(
+                    255, 24, 16, 0));
+        CaImportRunButton.BorderBrush =
+            AccentBrush;
+        CaImportRunButton.Padding =
+            new Thickness(
+                18, 9, 18, 9);
+        CaImportRunButton.IsEnabled =
+            false;
+        CaImportRunButton.Click +=
+            ImportCombatArmsButton_Click;
+
+        CaAttachmentImportButton.Content =
+            "IMPORT ATTACHMENTS";
+        CaAttachmentImportButton.Background =
+            CyanBrush;
+        CaAttachmentImportButton.Foreground =
+            new SolidColorBrush(
+                Color.FromArgb(
+                    255, 0, 20, 28));
+        CaAttachmentImportButton.BorderBrush =
+            CyanBrush;
+        CaAttachmentImportButton.Padding =
+            new Thickness(
+                18, 9, 18, 9);
+        CaAttachmentImportButton.IsEnabled =
+            false;
+        CaAttachmentImportButton.Click +=
+            ImportCombatArmsAttachmentsButton_Click;
+
+        importActions.Children.Add(
+            CaImportRunButton);
+        importActions.Children.Add(
+            CaAttachmentImportButton);
+
+        sourcePanel.Children.Add(
+            importActions);
 
         CaImportProgressBar.Minimum = 0;
         CaImportProgressBar.Maximum = 100;
         CaImportProgressBar.Value = 0;
         CaImportProgressBar.Height = 8;
-        CaImportProgressBar.HorizontalAlignment = HorizontalAlignment.Stretch;
-        control.Children.Add(CaImportProgressBar);
+        CaImportProgressBar.HorizontalAlignment =
+            HorizontalAlignment.Stretch;
+        sourcePanel.Children.Add(
+            CaImportProgressBar);
 
         CaImportStatusText.Text =
-            "Ready. Choose WEAPONS.txt and the matching Guns.zip to begin.";
-        CaImportStatusText.Foreground = SecondaryTextBrush;
-        CaImportStatusText.TextWrapping = TextWrapping.Wrap;
-        control.Children.Add(CaImportStatusText);
+            "Select the Combat Arms source files you want to work with.";
+        CaImportStatusText.Foreground =
+            SecondaryTextBrush;
+        CaImportStatusText.TextWrapping =
+            TextWrapping.Wrap;
+        sourcePanel.Children.Add(
+            CaImportStatusText);
 
-        page.Children.Add(Card(control, AccentBrush));
+        page.Children.Add(
+            Card(
+                sourcePanel,
+                AccentBrush));
 
-        var audit = CardHeading(
-            "LIVE AUDIT",
-            "Importer Log",
-            "The live log is sampled for responsiveness. assets-local/WeaponImports/last-import.txt contains the complete per-weapon report.",
-            CyanBrush);
+        var audit =
+            CardHeading(
+                "LIVE AUDIT",
+                "Importer Log",
+                "Weapon reports stay under assets-local/WeaponImports. Attachment imports stay under assets-local/AttachmentImports.",
+                CyanBrush);
 
-        CaImportLogBox.AcceptsReturn = true;
-        CaImportLogBox.IsReadOnly = true;
-        CaImportLogBox.TextWrapping = TextWrapping.Wrap;
-        CaImportLogBox.MinHeight = 390;
-        CaImportLogBox.FontFamily = new FontFamily("Consolas");
-        CaImportLogBox.FontSize = 12;
-        audit.Children.Add(CaImportLogBox);
+        CaImportLogBox.AcceptsReturn =
+            true;
+        CaImportLogBox.IsReadOnly =
+            true;
+        CaImportLogBox.TextWrapping =
+            TextWrapping.Wrap;
+        CaImportLogBox.MinHeight =
+            350;
+        CaImportLogBox.FontFamily =
+            new FontFamily(
+                "Consolas");
+        CaImportLogBox.FontSize =
+            12;
+        audit.Children.Add(
+            CaImportLogBox);
 
-        var actions = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 10
-        };
-
-        var openFolder = SecondaryButton("OPEN IMPORT FOLDER");
-        openFolder.Click += (sender, args) =>
-        {
-            var repo = LauncherPaths.FindRepositoryDirectory();
-            if(repo is not null)
+        var actions =
+            new StackPanel
             {
-                LauncherPaths.OpenFolder(
-                    Path.Combine(repo, "assets-local", "WeaponImports"));
-            }
-        };
+                Orientation =
+                    Orientation.Horizontal,
+                Spacing = 10
+            };
 
-        var back = SecondaryButton("BACK TO TOOLS");
-        back.Click += (sender, args) => NavigateTo("tools");
+        var openWeapons =
+            SecondaryButton(
+                "OPEN WEAPON IMPORTS");
+        openWeapons.Click +=
+            (sender, args) =>
+            {
+                var repo =
+                    LauncherPaths.FindRepositoryDirectory();
 
-        actions.Children.Add(openFolder);
-        actions.Children.Add(back);
-        audit.Children.Add(actions);
+                if(repo is not null)
+                {
+                    LauncherPaths.OpenFolder(
+                        Path.Combine(
+                            repo,
+                            "assets-local",
+                            "WeaponImports"));
+                }
+            };
 
-        page.Children.Add(Card(audit, CyanBrush));
-        CaImportView.Content = page;
+        var openAttachments =
+            SecondaryButton(
+                "OPEN ATTACHMENT IMPORTS");
+        openAttachments.Click +=
+            (sender, args) =>
+            {
+                var repo =
+                    LauncherPaths.FindRepositoryDirectory();
+
+                if(repo is not null)
+                {
+                    LauncherPaths.OpenFolder(
+                        Path.Combine(
+                            repo,
+                            "assets-local",
+                            "AttachmentImports"));
+                }
+            };
+
+        var back =
+            SecondaryButton(
+                "BACK TO TOOLS");
+        back.Click +=
+            (sender, args) =>
+                NavigateTo(
+                    "tools");
+
+        actions.Children.Add(
+            openWeapons);
+        actions.Children.Add(
+            openAttachments);
+        actions.Children.Add(
+            back);
+        audit.Children.Add(
+            actions);
+
+        page.Children.Add(
+            Card(
+                audit,
+                CyanBrush));
+
+        CaImportView.Content =
+            page;
     }
 
     private void BuildArsenalView()
