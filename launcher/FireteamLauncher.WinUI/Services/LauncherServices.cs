@@ -8,6 +8,7 @@ public sealed class LauncherServices
         Weapons = new WeaponCatalogService();
         Loadouts = new LoadoutPresetService(Weapons);
         WeaponImports = new WeaponImportService();
+        AttachmentImports = new AttachmentImportService();
         Game = new GameLaunchService(Settings);
     }
 
@@ -15,5 +16,6 @@ public sealed class LauncherServices
     public WeaponCatalogService Weapons { get; }
     public LoadoutPresetService Loadouts { get; }
     public WeaponImportService WeaponImports { get; }
+    public AttachmentImportService AttachmentImports { get; }
     public GameLaunchService Game { get; }
 }
