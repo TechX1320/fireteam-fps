@@ -24,7 +24,9 @@ public sealed class WeaponCatalogService
         "crosshair_recover",
         "view_x", "view_y", "view_z",
         "pv_model", "pv_anim", "pv_texture",
-        "hh_model", "hh_texture", "sound_dir"
+        "hh_model", "hh_texture", "sound_dir",
+        "anim_select", "anim_idle", "anim_fire",
+        "anim_alt_fire", "anim_reload"
     ];
 
     private static readonly string[] EditorKeys =
@@ -36,125 +38,435 @@ public sealed class WeaponCatalogService
             "ca_timing_verified"
         ]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
-    public IReadOnlyList<WeaponDefinition> Load()
+    private readonly object _cacheLock = new();
+    private List<WeaponDefinition>? _cache;
+    private string? _cachePath;
+    private DateTime _cacheWriteUtc;
+    private long _cacheLength;
+
+    public IReadOnlyList<WeaponDefinition> Load(
+        bool force = false)
     {
-        var path = LauncherPaths.FindEditableConfig("weapons.cfg")
-            ?? throw new FileNotFoundException("Could not locate config\\weapons.cfg.");
+        var path =
+            LauncherPaths.FindEditableConfig(
+                "weapons.cfg")
+            ?? throw new FileNotFoundException(
+                "Could not locate config\\weapons.cfg.");
 
-        var doc = FireteamConfigDocument.Load(path);
-        var result = new List<WeaponDefinition>();
+        var info =
+            new FileInfo(
+                path);
 
-        foreach(var section in doc.Sections)
+        lock(_cacheLock)
         {
-            var active = Regex.IsMatch(section, @"^weapon[1-5]$", RegexOptions.IgnoreCase);
-            var catalog = section.StartsWith("catalog.", StringComparison.OrdinalIgnoreCase);
-            if(!active && !catalog)
+            if(!force &&
+               _cache is not null &&
+               string.Equals(
+                   _cachePath,
+                   path,
+                   StringComparison.OrdinalIgnoreCase) &&
+               _cacheWriteUtc ==
+                   info.LastWriteTimeUtc &&
+               _cacheLength ==
+                   info.Length)
             {
-                continue;
+                return _cache;
             }
-
-            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach(var key in EditorKeys)
-            {
-                values[key] = doc.GetValue(section, key);
-            }
-
-            var id = doc.GetValue(section, "id", section);
-            var name = doc.GetValue(section, "name", id);
-            var type = doc.GetValue(section, "type", "hitscan");
-
-            result.Add(new WeaponDefinition
-            {
-                Section = section,
-                Id = id,
-                Name = name,
-                Type = type,
-                Enabled = active || doc.GetBool(section, "enabled"),
-                Supported = active || doc.GetBool(section, "supported", true),
-                IsActiveSlot = active,
-                Source = doc.GetValue(section, "source", active ? "ACTIVE LOADOUT" : "LOCAL / CUSTOM"),
-                Values = values
-            });
         }
 
-        return result;
+        var parsed =
+            ParseCatalog(
+                path);
+
+        lock(_cacheLock)
+        {
+            _cache = parsed;
+            _cachePath = path;
+            _cacheWriteUtc =
+                info.LastWriteTimeUtc;
+            _cacheLength =
+                info.Length;
+
+            return _cache;
+        }
     }
 
-    public IReadOnlyList<WeaponDefinition> GetArsenalChoices()
+    public IReadOnlyList<WeaponDefinition> GetArsenalChoices(
+        IReadOnlyList<WeaponDefinition>? all = null)
     {
-        var all = Load();
-        var result = new List<WeaponDefinition>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        all ??=
+            Load();
+
+        var result =
+            new List<WeaponDefinition>();
+
+        var seen =
+            new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase);
 
         foreach(var weapon in all
             .Where(w =>
                 w.IsActiveSlot ||
                 (w.Supported && w.Enabled))
-            .OrderByDescending(w => w.IsActiveSlot)
-            .ThenBy(w => w.Name))
+            .OrderByDescending(w =>
+                w.IsActiveSlot)
+            .ThenBy(w =>
+                w.Name))
         {
-            var key = string.IsNullOrWhiteSpace(weapon.Id) ? weapon.Name : weapon.Id;
+            var key =
+                string.IsNullOrWhiteSpace(
+                    weapon.Id)
+                ? weapon.Name
+                : weapon.Id;
+
             if(seen.Add(key))
             {
-                result.Add(weapon);
+                result.Add(
+                    weapon);
             }
         }
 
         return result;
     }
 
-    public void SaveDefinition(WeaponDefinition definition)
+    public void SetEnabled(
+        string section,
+        bool enabled)
     {
-        var paths = LauncherPaths.FindConfigPaths("weapons.cfg");
-        var sourcePath = paths.Source ?? paths.Runtime
-            ?? throw new FileNotFoundException("Could not locate config\\weapons.cfg.");
+        var paths =
+            ResolveWritableConfigPaths(
+                "weapon-library.cfg");
 
-        var doc = FireteamConfigDocument.Load(sourcePath);
-        foreach(var (key, value) in definition.Values)
+        var destination =
+            paths.Source ??
+            paths.Runtime
+            ?? throw new FileNotFoundException(
+                "Could not resolve config\\weapon-library.cfg.");
+
+        var doc =
+            FireteamConfigDocument.Load(
+                destination);
+
+        doc.SetValue(
+            section,
+            "enabled",
+            enabled
+                ? "1"
+                : "0");
+
+        SaveBoth(
+            doc,
+            paths);
+
+        lock(_cacheLock)
         {
-            doc.SetValue(definition.Section, key, value);
-        }
+            if(_cache is null)
+            {
+                return;
+            }
 
-        doc.SetValue(definition.Section, "enabled", definition.Enabled ? "1" : "0");
-        SaveBoth(doc, paths);
+            var index =
+                _cache.FindIndex(
+                    weapon =>
+                        weapon.Section.Equals(
+                            section,
+                            StringComparison.OrdinalIgnoreCase));
+
+            if(index < 0)
+            {
+                return;
+            }
+
+            var old =
+                _cache[index];
+
+            _cache[index] =
+                CloneWithEnabled(
+                    old,
+                    old.IsActiveSlot ||
+                    enabled);
+        }
     }
 
-    public void SaveLoadout(IReadOnlyList<WeaponDefinition> selections)
+    public void SaveDefinition(
+        WeaponDefinition definition)
+    {
+        var paths =
+            LauncherPaths.FindConfigPaths(
+                "weapons.cfg");
+
+        var sourcePath =
+            paths.Source ??
+            paths.Runtime
+            ?? throw new FileNotFoundException(
+                "Could not locate config\\weapons.cfg.");
+
+        var doc =
+            FireteamConfigDocument.Load(
+                sourcePath);
+
+        foreach(var (key, value) in definition.Values)
+        {
+            doc.SetValue(
+                definition.Section,
+                key,
+                value);
+        }
+
+        SaveBoth(
+            doc,
+            paths);
+
+        SetEnabled(
+            definition.Section,
+            definition.Enabled);
+
+        Invalidate();
+    }
+
+    public void SaveLoadout(
+        IReadOnlyList<WeaponDefinition> selections)
     {
         if(selections.Count != 5)
         {
-            throw new ArgumentException("FIRETEAM currently requires exactly five active loadout slots.");
+            throw new ArgumentException(
+                "FIRETEAM currently requires exactly five active loadout slots.");
         }
 
-        var paths = LauncherPaths.FindConfigPaths("weapons.cfg");
-        var sourcePath = paths.Source ?? paths.Runtime
-            ?? throw new FileNotFoundException("Could not locate config\\weapons.cfg.");
+        var paths =
+            LauncherPaths.FindConfigPaths(
+                "weapons.cfg");
 
-        var doc = FireteamConfigDocument.Load(sourcePath);
+        var sourcePath =
+            paths.Source ??
+            paths.Runtime
+            ?? throw new FileNotFoundException(
+                "Could not locate config\\weapons.cfg.");
 
-        for(var slot = 0; slot < 5; ++slot)
+        var doc =
+            FireteamConfigDocument.Load(
+                sourcePath);
+
+        for(var slot = 0;
+            slot < 5;
+            ++slot)
         {
-            var weapon = selections[slot];
-            var destination = $"weapon{slot + 1}";
+            var weapon =
+                selections[slot];
+
+            var destination =
+                $"weapon{slot + 1}";
 
             foreach(var key in RuntimeKeys)
             {
-                weapon.Values.TryGetValue(key, out var value);
-                doc.SetValue(destination, key, value ?? string.Empty);
+                weapon.Values.TryGetValue(
+                    key,
+                    out var value);
+
+                doc.SetValue(
+                    destination,
+                    key,
+                    value ??
+                    string.Empty);
             }
 
             doc.SetValue(
                 destination,
                 "category",
                 weapon.LoadoutCategory);
-
-            if(weapon.Section.StartsWith("catalog.", StringComparison.OrdinalIgnoreCase))
-            {
-                doc.SetValue(weapon.Section, "enabled", "1");
-            }
         }
 
-        SaveBoth(doc, paths);
+        SaveBoth(
+            doc,
+            paths);
+
+        Invalidate();
+    }
+
+    public void Invalidate()
+    {
+        lock(_cacheLock)
+        {
+            _cache = null;
+            _cachePath = null;
+            _cacheWriteUtc =
+                default;
+            _cacheLength = 0;
+        }
+    }
+
+    private static List<WeaponDefinition> ParseCatalog(
+        string path)
+    {
+        var doc =
+            FireteamConfigDocument.Load(
+                path);
+
+        var enabledOverrides =
+            LoadEnabledOverrides();
+
+        var result =
+            new List<WeaponDefinition>();
+
+        foreach(var section in doc.Sections)
+        {
+            var active =
+                Regex.IsMatch(
+                    section,
+                    @"^weapon[1-5]$",
+                    RegexOptions.IgnoreCase);
+
+            var catalog =
+                section.StartsWith(
+                    "catalog.",
+                    StringComparison.OrdinalIgnoreCase);
+
+            if(!active &&
+               !catalog)
+            {
+                continue;
+            }
+
+            var values =
+                new Dictionary<string, string>(
+                    StringComparer.OrdinalIgnoreCase);
+
+            foreach(var key in EditorKeys)
+            {
+                values[key] =
+                    doc.GetValue(
+                        section,
+                        key);
+            }
+
+            var id =
+                doc.GetValue(
+                    section,
+                    "id",
+                    section);
+
+            var name =
+                doc.GetValue(
+                    section,
+                    "name",
+                    id);
+
+            var type =
+                doc.GetValue(
+                    section,
+                    "type",
+                    "hitscan");
+
+            var enabled =
+                active ||
+                (enabledOverrides.TryGetValue(
+                     section,
+                     out var overrideEnabled)
+                    ? overrideEnabled
+                    : doc.GetBool(
+                        section,
+                        "enabled"));
+
+            result.Add(
+                new WeaponDefinition
+                {
+                    Section = section,
+                    Id = id,
+                    Name = name,
+                    Type = type,
+                    Enabled = enabled,
+                    Supported =
+                        active ||
+                        doc.GetBool(
+                            section,
+                            "supported",
+                            true),
+                    IsActiveSlot = active,
+                    Source =
+                        doc.GetValue(
+                            section,
+                            "source",
+                            active
+                                ? "ACTIVE LOADOUT"
+                                : "LOCAL / CUSTOM"),
+                    Values = values
+                });
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, bool> LoadEnabledOverrides()
+    {
+        var path =
+            LauncherPaths.FindEditableConfig(
+                "weapon-library.cfg");
+
+        var result =
+            new Dictionary<string, bool>(
+                StringComparer.OrdinalIgnoreCase);
+
+        if(path is null ||
+           !File.Exists(path))
+        {
+            return result;
+        }
+
+        var doc =
+            FireteamConfigDocument.Load(
+                path);
+
+        foreach(var section in doc.Sections)
+        {
+            result[section] =
+                doc.GetBool(
+                    section,
+                    "enabled");
+        }
+
+        return result;
+    }
+
+    private static WeaponDefinition CloneWithEnabled(
+        WeaponDefinition source,
+        bool enabled) =>
+        new()
+        {
+            Section = source.Section,
+            Id = source.Id,
+            Name = source.Name,
+            Type = source.Type,
+            Enabled = enabled,
+            Supported = source.Supported,
+            IsActiveSlot = source.IsActiveSlot,
+            Source = source.Source,
+            Values = source.Values
+        };
+
+    private static (
+        string? Source,
+        string? Runtime) ResolveWritableConfigPaths(
+        string fileName)
+    {
+        var repo =
+            LauncherPaths.FindRepositoryDirectory();
+
+        var game =
+            LauncherPaths.FindGameDirectory();
+
+        return (
+            repo is null
+                ? null
+                : Path.Combine(
+                    repo,
+                    "config",
+                    fileName),
+            game is null
+                ? null
+                : Path.Combine(
+                    game,
+                    "config",
+                    fileName));
     }
 
     private static void SaveBoth(
@@ -163,13 +475,39 @@ public sealed class WeaponCatalogService
     {
         if(paths.Source is not null)
         {
-            doc.Save(paths.Source);
+            doc.Save(
+                paths.Source);
+
+            if(paths.Runtime is not null &&
+               !string.Equals(
+                   paths.Runtime,
+                   paths.Source,
+                   StringComparison.OrdinalIgnoreCase))
+            {
+                var parent =
+                    Path.GetDirectoryName(
+                        paths.Runtime);
+
+                if(!string.IsNullOrWhiteSpace(
+                    parent))
+                {
+                    Directory.CreateDirectory(
+                        parent);
+                }
+
+                File.Copy(
+                    paths.Source,
+                    paths.Runtime,
+                    true);
+            }
+
+            return;
         }
 
-        if(paths.Runtime is not null &&
-           !string.Equals(paths.Runtime, paths.Source, StringComparison.OrdinalIgnoreCase))
+        if(paths.Runtime is not null)
         {
-            doc.Save(paths.Runtime);
+            doc.Save(
+                paths.Runtime);
         }
     }
 }

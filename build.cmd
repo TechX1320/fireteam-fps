@@ -162,6 +162,8 @@ copy /y "config\powerups.cfg" "%BUILT_DIR%\config\powerups.cfg" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\loadouts.cfg" "%BUILT_DIR%\config\loadouts.cfg" >nul
 if errorlevel 1 goto :copyfail
+copy /y "config\weapon-library.cfg" "%BUILT_DIR%\config\weapon-library.cfg" >nul
+if errorlevel 1 goto :copyfail
 
 echo.
 echo [4/6] Installing freshly built modules...
