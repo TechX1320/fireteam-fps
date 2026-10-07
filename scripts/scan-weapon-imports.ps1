@@ -104,23 +104,34 @@ foreach($sectionName in $sections.Keys | Sort-Object) {
     $enabled =
         $section['enabled'] -match '^(1|true|yes|on)$'
 
-    Write-Host ""
-    Write-Host "[WEAPON] $name enabled=$enabled supported=$($section['supported'])"
+    $supported =
+        $section['supported'] -match '^(1|true|yes|on)$'
 
-    Test-Asset $name "PV model" $section['pv_model'] $true $enabled
-    Test-Asset $name "PV texture" $section['pv_texture'] $true $enabled
+    Write-Host ""
+    Write-Host "[WEAPON] $name enabled=$enabled supported=$supported"
+
+    # Unsupported imports stay in the catalog for future implementation.
+    # Supported definitions must have their required local assets; enabled
+    # definitions additionally must be staged into the BUILT runtime.
+    Test-Asset $name "PV model" $section['pv_model'] $supported $enabled
+    Test-Asset $name "PV texture" $section['pv_texture'] $supported $enabled
     Test-Asset $name "PV animation" $section['pv_anim'] $false $enabled
     Test-Asset $name "HH model" $section['hh_model'] $false $enabled
     Test-Asset $name "HH texture" $section['hh_texture'] $false $enabled
 
     $soundDir = $section['sound_dir']
     if($soundDir) {
-        Test-Asset $name "fire sound" ($soundDir.TrimEnd('/','\') + '\FIRE.WAV') $true $enabled
+        Test-Asset $name "fire sound" ($soundDir.TrimEnd('/','\') + '\FIRE.WAV') $supported $enabled
         Test-Asset $name "select sound" ($soundDir.TrimEnd('/','\') + '\SELECT.WAV') $false $enabled
         Test-Asset $name "reload sound" ($soundDir.TrimEnd('/','\') + '\RELOAD.WAV') $false $enabled
-    } else {
-        Write-Host "[WARN] $name has no sound_dir."
+    } elseif($enabled) {
+        Write-Host "[MISSING] $name is enabled but has no sound_dir."
+        $failures++
+    } elseif($supported) {
+        Write-Host "[WARN] $name is supported but has no sound_dir."
         $warnings++
+    } else {
+        Write-Host "[INFO] $name has no sound_dir; entry is unsupported/disabled."
     }
 
     if($section['ca_timing_verified'] -ne '1') {
