@@ -18,6 +18,8 @@ static uint16 s_nPrimaryReserve = 90;
 static float s_fCrosshairKick = 0.0f;
 static float s_fLastCrosshairTime = 0.0f;
 static uint8 s_nCrosshairSlot = 0;
+static uint32 s_nQaCurrent = 0;
+static uint32 s_nQaTotal = 0;
 
 static void FT_SetupQuad(
     LT_POLYF4 &poly,
@@ -135,6 +137,29 @@ void FT_SetPrimaryAmmo(uint16 nClip, uint16 nReserve)
 {
     s_nPrimaryClip = nClip;
     s_nPrimaryReserve = nReserve;
+}
+
+void FT_WeaponHudSetWeaponDefinition(
+    uint8 nWeaponSlot,
+    const FTWeaponDef *pDef)
+{
+    if(!pDef ||
+       nWeaponSlot < 1 ||
+       nWeaponSlot > 5)
+    {
+        return;
+    }
+
+    s_WeaponDefs[nWeaponSlot] =
+        *pDef;
+}
+
+void FT_WeaponHudSetQaProgress(
+    uint32 nCurrent,
+    uint32 nTotal)
+{
+    s_nQaCurrent = nCurrent;
+    s_nQaTotal = nTotal;
 }
 
 void FT_WeaponHudOnShot(uint8 nWeaponSlot)
@@ -323,7 +348,29 @@ void FT_RenderWeaponHud(
 
     if(s_pWeaponName && pDef)
     {
-        s_pWeaponName->SetText(pDef->sName);
+        char szWeaponLabel[128];
+
+        if(s_nQaTotal > 0)
+        {
+            sprintf(
+                szWeaponLabel,
+                "QA %u/%u  %s",
+                s_nQaCurrent,
+                s_nQaTotal,
+                pDef->sName);
+        }
+        else
+        {
+            strncpy(
+                szWeaponLabel,
+                pDef->sName,
+                sizeof(szWeaponLabel) - 1);
+            szWeaponLabel[
+                sizeof(szWeaponLabel) - 1] =
+                '\0';
+        }
+
+        s_pWeaponName->SetText(szWeaponLabel);
         s_pWeaponName->SetPosition(
             (float)nScreenW - 210.0f,
             (float)nScreenH - 102.0f);
