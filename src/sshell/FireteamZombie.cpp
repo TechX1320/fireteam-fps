@@ -577,6 +577,42 @@ void FireteamZombie::RebuildPath(const LTVector &vTarget)
         m_nPathLane,
         m_aPath))
     {
+        // If the authored volume graph has a gap, do not immediately repeat
+        // the same straight-line wall collision. Build a short alternating
+        // dog-leg recovery waypoint, then try the target again. This mirrors
+        // the practical intent of NOLF2's obstacle/path recovery without
+        // importing its entire CAIHuman stack.
+        LTVector vForward =
+            vTarget - vPos;
+        vForward.y = 0.0f;
+
+        if(vForward.MagSqr() > 0.001f)
+        {
+            vForward.Normalize();
+
+            LTVector vRight(
+                -vForward.z,
+                0.0f,
+                vForward.x);
+
+            const float fSide =
+                fAgentHalfWidth + 42.0f;
+
+            const float fSign =
+                (m_nPathLane & 1)
+                ? 1.0f
+                : -1.0f;
+
+            LTVector vRecovery =
+                vPos +
+                (vForward * 64.0f) +
+                (vRight *
+                 (fSide * fSign));
+
+            m_aPath.push_back(
+                vRecovery);
+        }
+
         m_aPath.push_back(vTarget);
     }
 
