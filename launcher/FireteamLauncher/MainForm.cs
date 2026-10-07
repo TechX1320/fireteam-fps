@@ -25,7 +25,7 @@ public sealed class MainForm : Form
     private static readonly Color BackColorMain = Color.FromArgb(20, 22, 25);
     private static readonly Color BackColorPanel = Color.FromArgb(31, 34, 38);
     private static readonly Color ForeColorMain = Color.FromArgb(235, 238, 241);
-    private static readonly Color AccentColor = Color.FromArgb(227, 151, 27);
+    private static readonly Color AccentColor = Color.FromArgb(38, 216, 88);
 
     public MainForm()
     {
