@@ -43,6 +43,8 @@ public sealed class WeaponCatalogService
     private string? _cachePath;
     private DateTime _cacheWriteUtc;
     private long _cacheLength;
+    private long _cacheQuarantineWriteTicks;
+    private long _cacheQuarantineLength;
 
     public IReadOnlyList<WeaponDefinition> Load(
         bool force = false)
@@ -57,6 +59,9 @@ public sealed class WeaponCatalogService
             new FileInfo(
                 path);
 
+        var quarantineSignature =
+            GetQaQuarantineSignature();
+
         lock(_cacheLock)
         {
             if(!force &&
@@ -68,7 +73,11 @@ public sealed class WeaponCatalogService
                _cacheWriteUtc ==
                    info.LastWriteTimeUtc &&
                _cacheLength ==
-                   info.Length)
+                   info.Length &&
+               _cacheQuarantineWriteTicks ==
+                   quarantineSignature.WriteTicks &&
+               _cacheQuarantineLength ==
+                   quarantineSignature.Length)
             {
                 return _cache;
             }
@@ -86,6 +95,10 @@ public sealed class WeaponCatalogService
                 info.LastWriteTimeUtc;
             _cacheLength =
                 info.Length;
+            _cacheQuarantineWriteTicks =
+                quarantineSignature.WriteTicks;
+            _cacheQuarantineLength =
+                quarantineSignature.Length;
 
             return _cache;
         }
@@ -398,6 +411,8 @@ public sealed class WeaponCatalogService
             _cacheWriteUtc =
                 default;
             _cacheLength = 0;
+            _cacheQuarantineWriteTicks = 0;
+            _cacheQuarantineLength = 0;
         }
     }
 
@@ -410,6 +425,9 @@ public sealed class WeaponCatalogService
 
         var enabledOverrides =
             LoadEnabledOverrides();
+
+        var quarantined =
+            LoadQaQuarantinedSections();
 
         var result =
             new List<WeaponDefinition>();
@@ -429,6 +447,13 @@ public sealed class WeaponCatalogService
 
             if(!active &&
                !catalog)
+            {
+                continue;
+            }
+
+            if(catalog &&
+               quarantined.Contains(
+                   section))
             {
                 continue;
             }
@@ -500,6 +525,99 @@ public sealed class WeaponCatalogService
         }
 
         return result;
+    }
+
+    private static HashSet<string> LoadQaQuarantinedSections()
+    {
+        var result =
+            new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase);
+
+        var paths =
+            LauncherPaths.FindConfigPaths(
+                "weapon-quarantine.txt");
+
+        var candidates =
+            new[]
+            {
+                paths.Source,
+                paths.Runtime
+            }
+            .Where(path =>
+                !string.IsNullOrWhiteSpace(
+                    path))
+            .Distinct(
+                StringComparer.OrdinalIgnoreCase);
+
+        foreach(var path in candidates)
+        {
+            if(path is null ||
+               !File.Exists(path))
+            {
+                continue;
+            }
+
+            foreach(var raw in File.ReadLines(path))
+            {
+                var line =
+                    raw.Trim();
+
+                if(line.Length == 0 ||
+                   line.StartsWith("#") ||
+                   line.StartsWith(";"))
+                {
+                    continue;
+                }
+
+                result.Add(
+                    line);
+            }
+        }
+
+        return result;
+    }
+
+    private static (
+        long WriteTicks,
+        long Length) GetQaQuarantineSignature()
+    {
+        var paths =
+            LauncherPaths.FindConfigPaths(
+                "weapon-quarantine.txt");
+
+        long ticks = 0;
+        long length = 0;
+
+        foreach(var path in new[]
+        {
+            paths.Source,
+            paths.Runtime
+        }
+        .Where(path =>
+            !string.IsNullOrWhiteSpace(
+                path))
+        .Distinct(
+            StringComparer.OrdinalIgnoreCase))
+        {
+            if(path is null ||
+               !File.Exists(path))
+            {
+                continue;
+            }
+
+            var info =
+                new FileInfo(
+                    path);
+
+            ticks ^=
+                info.LastWriteTimeUtc.Ticks;
+            length +=
+                info.Length;
+        }
+
+        return (
+            ticks,
+            length);
     }
 
     private static Dictionary<string, bool> LoadEnabledOverrides()
