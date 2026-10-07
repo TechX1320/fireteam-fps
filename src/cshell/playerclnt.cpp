@@ -232,7 +232,8 @@ static void FT_WriteMissingWeaponViewKeys(
     const FTWeaponDef *pDef,
     bool &bWroteX,
     bool &bWroteY,
-    bool &bWroteZ)
+    bool &bWroteZ,
+    bool &bWroteScale)
 {
     if(!pOutput || !pDef)
     {
@@ -264,6 +265,15 @@ static void FT_WriteMissingWeaponViewKeys(
             "view_z=%.3f\n",
             pDef->fViewZ);
         bWroteZ = true;
+    }
+
+    if(!bWroteScale)
+    {
+        fprintf(
+            pOutput,
+            "view_scale=%.3f\n",
+            pDef->fViewScale);
+        bWroteScale = true;
     }
 }
 
@@ -318,6 +328,7 @@ static bool FT_SaveWeaponViewToConfig(
     bool bWroteX = false;
     bool bWroteY = false;
     bool bWroteZ = false;
+    bool bWroteScale = false;
 
     while(fgets(
         sRaw,
@@ -346,7 +357,8 @@ static bool FT_SaveWeaponViewToConfig(
                     pDef,
                     bWroteX,
                     bWroteY,
-                    bWroteZ);
+                    bWroteZ,
+                    bWroteScale);
             }
 
             bInTarget =
@@ -416,6 +428,18 @@ static bool FT_SaveWeaponViewToConfig(
                     bWroteZ = true;
                     continue;
                 }
+
+                if(_stricmp(
+                       pKey,
+                       "view_scale") == 0)
+                {
+                    fprintf(
+                        pOutput,
+                        "view_scale=%.3f\n",
+                        pDef->fViewScale);
+                    bWroteScale = true;
+                    continue;
+                }
             }
         }
 
@@ -431,7 +455,8 @@ static bool FT_SaveWeaponViewToConfig(
             pDef,
             bWroteX,
             bWroteY,
-            bWroteZ);
+            bWroteZ,
+            bWroteScale);
     }
 
     fclose(
@@ -1401,6 +1426,58 @@ void CPlayerClnt::AdjustDevWeaponView(
         def.fViewZ);
 }
 
+void CPlayerClnt::AdjustDevWeaponScale(
+    float fDelta)
+{
+    if(!m_bDevWeaponQa ||
+       !m_pDevWeaponDefs ||
+       m_nDevWeaponCount == 0)
+    {
+        return;
+    }
+
+    FTWeaponDef &def =
+        m_pDevWeaponDefs[
+            m_nDevWeaponIndex];
+
+    def.fViewScale +=
+        fDelta;
+
+    if(def.fViewScale < 0.05f)
+    {
+        def.fViewScale =
+            0.05f;
+    }
+    else if(def.fViewScale > 4.0f)
+    {
+        def.fViewScale =
+            4.0f;
+    }
+
+    if(m_hViewWeaponObject)
+    {
+        LTVector vScale(
+            def.fViewScale,
+            def.fViewScale,
+            def.fViewScale);
+
+        g_pLTClient->SetObjectScale(
+            m_hViewWeaponObject,
+            &vScale);
+    }
+
+    FT_WeaponHudSetWeaponDefinition(
+        1,
+        &def);
+
+    g_pLTClient->CPrint(
+        "Fireteam weapon QA scale: %s %.2f",
+        def.sName,
+        def.fViewScale);
+}
+
+
+//----------------------------------------------------------------------------
 bool CPlayerClnt::SaveDevWeaponView()
 {
     if(!m_bDevWeaponQa ||
@@ -1439,11 +1516,12 @@ bool CPlayerClnt::SaveDevWeaponView()
     }
 
     g_pLTClient->CPrint(
-        "Fireteam weapon QA SAVE: %s X=%.2f Y=%.2f Z=%.2f runtime=%s source=%s",
+        "Fireteam weapon QA SAVE: %s X=%.2f Y=%.2f Z=%.2f SCALE=%.2f runtime=%s source=%s",
         def.sName,
         def.fViewX,
         def.fViewY,
         def.fViewZ,
+        def.fViewScale,
         bRuntimeSaved
             ? "OK"
             : "FAILED",
@@ -1876,6 +1954,15 @@ void CPlayerClnt::CreateViewWeapon()
             pDef->sPVModel);
         return;
     }
+
+    LTVector vWeaponScale(
+        pDef->fViewScale,
+        pDef->fViewScale,
+        pDef->fViewScale);
+
+    g_pLTClient->SetObjectScale(
+        m_hViewWeaponObject,
+        &vWeaponScale);
 
     HMODELANIM hSelect = INVALID_MODEL_ANIM;
 

@@ -1810,6 +1810,20 @@ void CLTClientShell::OnKeyDown(int key, int rep)
            }
            else if(m_pPlayer->IsDevWeaponQa() &&
                    m_bQaMenuOpen &&
+                   VK_OEM_4 == key)
+           {
+               m_pPlayer->AdjustDevWeaponScale(
+                   -0.05f);
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaMenuOpen &&
+                   VK_OEM_6 == key)
+           {
+               m_pPlayer->AdjustDevWeaponScale(
+                   0.05f);
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaMenuOpen &&
                    m_bQaControlDown &&
                    'S' == key &&
                    rep == 0)

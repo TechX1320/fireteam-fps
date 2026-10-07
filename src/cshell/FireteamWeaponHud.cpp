@@ -424,7 +424,7 @@ void FT_RenderWeaponHud(
         {
             sprintf(
                 szWeaponLabel,
-                "QA %u/%u  %s%s  [X %.2f Y %.2f Z %.2f]  [INSERT/F10: TOOLS]",
+                "QA %u/%u  %s%s  [X %.2f Y %.2f Z %.2f S %.2f]  [INSERT/F10: TOOLS]",
                 s_nQaCurrent,
                 s_nQaTotal,
                 s_bQaQuarantined
@@ -433,7 +433,8 @@ void FT_RenderWeaponHud(
                 pDef->sName,
                 pDef->fViewX,
                 pDef->fViewY,
-                pDef->fViewZ);
+                pDef->fViewZ,
+                pDef->fViewScale);
         }
         else
         {
@@ -472,7 +473,7 @@ void FT_RenderWeaponHud(
         const float fPanelX = 18.0f;
         const float fPanelY = 58.0f;
         const float fPanelW = 540.0f;
-        const float fPanelH = 306.0f;
+        const float fPanelH = 330.0f;
 
         LT_POLYF4 qaPanel[4];
 
@@ -535,14 +536,15 @@ void FT_RenderWeaponHud(
                 szQaMenu,
                 "FIRETEAM QA TOOLS  /  WEAPON POSITION\n"
                 "%s%s   QA %u/%u\n"
-                "X %.2f   Y %.2f   Z %.2f   STEP %.2f\n"
+                "X %.2f   Y %.2f   Z %.2f   SCALE %.2f   STEP %.2f\n"
                 "ZOMBIES: %s\n"
                 "\n"
                 "LEFT / RIGHT       move X\n"
                 "UP / DOWN          move Y\n"
                 "CTRL + UP / DOWN   move Z\n"
-                "+ / -              change increment\n"
-                "CTRL + S           save weapon position\n"
+                "[ / ]              shrink / grow model (0.05)\n"
+                "+ / -              change move increment\n"
+                "CTRL + S           save position + scale\n"
                 "Q                  enable / disable weapon\n"
                 "Z                  toggle zombies\n"
                 "MOUSE WHEEL        previous / next weapon\n"
@@ -556,6 +558,7 @@ void FT_RenderWeaponHud(
                 pDef->fViewX,
                 pDef->fViewY,
                 pDef->fViewZ,
+                pDef->fViewScale,
                 s_fQaMoveStep,
                 s_bQaZombiesEnabled
                     ? "YES"

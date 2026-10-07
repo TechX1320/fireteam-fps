@@ -70,6 +70,7 @@ struct FTWeaponDef
     float fViewX;
     float fViewY;
     float fViewZ;
+    float fViewScale;
 
     char sPVModel[128];
     char sPVAnim[128];
@@ -141,6 +142,7 @@ inline void FT_InitWeaponDef(FTWeaponDef &def, uint8 nSlot)
     memset(&def, 0, sizeof(FTWeaponDef));
     def.nSlot = nSlot;
     def.fProjectileScale = 1.0f;
+    def.fViewScale = 1.0f;
     def.fPenetrationDamageMult = 1.0f;
     def.fPenetrationRangeMult = 1.0f;
 }
@@ -199,6 +201,17 @@ inline void FT_AssignWeaponField(
     else if(_stricmp(pKey, "view_x") == 0) def.fViewX = (float)atof(pValue);
     else if(_stricmp(pKey, "view_y") == 0) def.fViewY = (float)atof(pValue);
     else if(_stricmp(pKey, "view_z") == 0) def.fViewZ = (float)atof(pValue);
+    else if(_stricmp(pKey, "view_scale") == 0)
+    {
+        const float fScale =
+            (float)atof(pValue);
+
+        if(fScale > 0.0f)
+        {
+            def.fViewScale =
+                fScale;
+        }
+    }
     else if(_stricmp(pKey, "pv_model") == 0) FT_CopyWeaponString(def.sPVModel, sizeof(def.sPVModel), pValue);
     else if(_stricmp(pKey, "pv_anim") == 0) FT_CopyWeaponString(def.sPVAnim, sizeof(def.sPVAnim), pValue);
     else if(_stricmp(pKey, "pv_texture") == 0) FT_CopyWeaponString(def.sPVTexture, sizeof(def.sPVTexture), pValue);

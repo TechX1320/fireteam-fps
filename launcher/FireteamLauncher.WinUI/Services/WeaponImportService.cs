@@ -2474,6 +2474,11 @@ public sealed class WeaponImportService
                 section,
                 "view_z",
                 "0");
+            Set(
+                doc,
+                section,
+                "view_scale",
+                "1");
             return;
         }
 
@@ -2492,6 +2497,11 @@ public sealed class WeaponImportService
             section,
             "view_z",
             parts[2]);
+        Set(
+            doc,
+            section,
+            "view_scale",
+            "1");
     }
 
     private static int ParseInt(

@@ -22,7 +22,7 @@ public sealed class WeaponCatalogService
         "crosshair_base_gap", "crosshair_shot_kick",
         "crosshair_move_kick", "crosshair_max_gap",
         "crosshair_recover",
-        "view_x", "view_y", "view_z",
+        "view_x", "view_y", "view_z", "view_scale",
         "pv_model", "pv_anim", "pv_texture",
         "hh_model", "hh_texture", "sound_dir",
         "anim_select", "anim_idle", "anim_fire",
