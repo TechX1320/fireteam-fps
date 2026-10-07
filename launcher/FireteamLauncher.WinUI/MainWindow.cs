@@ -1627,6 +1627,53 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void LaunchWeaponQa()
+    {
+        try
+        {
+            var customCommands =
+                CommandsBox.Text ??
+                string.Empty;
+
+            if(!string.IsNullOrWhiteSpace(
+                   customCommands))
+            {
+                customCommands +=
+                    " ";
+            }
+
+            customCommands +=
+                "+devweaponqa 1";
+
+            var profile =
+                new LauncherProfile(
+                    string.IsNullOrWhiteSpace(
+                        PlayerNameBox.Text)
+                        ? "Player"
+                        : PlayerNameBox.Text.Trim(),
+                    "Single Player",
+                    DifficultyCombo.SelectedItem?.ToString()
+                        ?? "Normal",
+                    "127.0.0.1",
+                    customCommands);
+
+            var settings =
+                App.Instance.Services.Settings.LoadSettings();
+
+            RunStatusText.Text =
+                App.Instance.Services.Game.Launch(
+                    profile,
+                    settings) +
+                " Weapon QA: mouse wheel cycles active + catalog entries; shots are visual/audio only.";
+        }
+        catch(Exception ex)
+        {
+            RunStatusText.Text =
+                "Weapon QA launch failed: " +
+                ex.Message;
+        }
+    }
+
     private void PlayButton_Click(object sender, RoutedEventArgs e)
     {
         try
