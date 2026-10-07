@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <string>
+#include <vector>
 
 static std::wstring GetRootDirectory()
 {
@@ -49,6 +50,12 @@ int WINAPI wWinMain(
     std::wstring command =
         L"\"" + target + L"\"";
 
+    std::vector<wchar_t> commandLine(
+        command.begin(),
+        command.end());
+
+    commandLine.push_back(L'\0');
+
     STARTUPINFOW si = {};
     si.cb = sizeof(si);
 
@@ -56,7 +63,7 @@ int WINAPI wWinMain(
 
     if(!CreateProcessW(
         target.c_str(),
-        command.data(),
+        commandLine.data(),
         NULL,
         NULL,
         FALSE,
