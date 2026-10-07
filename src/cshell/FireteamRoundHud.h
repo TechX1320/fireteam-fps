@@ -11,6 +11,9 @@ void FT_RoundHudHandleMessage(ILTMessage_Read *pMessage);
 void FT_RoundHudShowAnnouncement(
     const char *pText,
     float fSeconds);
+void FT_RoundHudSetTimedPowerups(
+    float fBottomlessSeconds,
+    float fOneHitSeconds);
 void FT_RenderRoundHud();
 
 #endif

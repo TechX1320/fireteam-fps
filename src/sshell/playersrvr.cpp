@@ -846,6 +846,57 @@ void CPlayerSrvr::NotifyPowerup(
     pMsg->DecRef();
 }
 
+void CPlayerSrvr::SendPowerupState()
+{
+    if(!m_hClient)
+    {
+        return;
+    }
+
+    const float fNow =
+        g_pLTServer->GetTime();
+
+    float fBottomless =
+        m_bBottomlessWasActive
+        ? (m_fBottomlessUntil - fNow)
+        : 0.0f;
+
+    float fOneHit =
+        m_bOneHitWasActive
+        ? (m_fOneHitUntil - fNow)
+        : 0.0f;
+
+    if(fBottomless < 0.0f)
+        fBottomless = 0.0f;
+
+    if(fOneHit < 0.0f)
+        fOneHit = 0.0f;
+
+    ILTMessage_Write *pMsg = LTNULL;
+
+    if(g_pLTSCommon->CreateMessage(
+        pMsg) != LT_OK ||
+       !pMsg)
+    {
+        return;
+    }
+
+    pMsg->IncRef();
+    pMsg->Writeuint8(
+        MSG_SC_POWERUP_STATE);
+    pMsg->Writefloat(
+        fBottomless);
+    pMsg->Writefloat(
+        fOneHit);
+
+    g_pLTServer->SendToClient(
+        pMsg->Read(),
+        m_hClient,
+        MESSAGE_GUARANTEED);
+
+    pMsg->DecRef();
+}
+
 void CPlayerSrvr::GrantAmmoMagazines(
     uint32 nMagazines)
 {
@@ -956,6 +1007,8 @@ void CPlayerSrvr::GrantBottomless(
 
     m_bBottomlessWasActive =
         true;
+
+    SendPowerupState();
 }
 
 void CPlayerSrvr::GrantOneHit(
@@ -979,6 +1032,8 @@ void CPlayerSrvr::GrantOneHit(
 
     m_bOneHitWasActive =
         true;
+
+    SendPowerupState();
 }
 
 void CPlayerSrvr::UpdatePowerups()
@@ -986,15 +1041,14 @@ void CPlayerSrvr::UpdatePowerups()
     const float fNow =
         g_pLTServer->GetTime();
 
+    bool bChanged = false;
+
     if(m_bBottomlessWasActive &&
        fNow >= m_fBottomlessUntil)
     {
         m_bBottomlessWasActive =
             false;
-
-        NotifyPowerup(
-            "BOTTOMLESS MAG ENDED",
-            2.0f);
+        bChanged = true;
     }
 
     if(m_bOneHitWasActive &&
@@ -1002,10 +1056,15 @@ void CPlayerSrvr::UpdatePowerups()
     {
         m_bOneHitWasActive =
             false;
+        bChanged = true;
+    }
 
-        NotifyPowerup(
-            "ONE HIT KILL ENDED",
-            2.0f);
+    // Do not queue a delayed center-screen "ENDED" announcement. The
+    // persistent HUD timer disappears from this authoritative state instead,
+    // which also behaves correctly after alt-tab / renderer reactivation.
+    if(bChanged)
+    {
+        SendPowerupState();
     }
 }
 

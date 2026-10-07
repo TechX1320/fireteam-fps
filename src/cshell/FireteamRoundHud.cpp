@@ -7,14 +7,19 @@
 #include <stdio.h>
 
 static CUIFont *s_pRoundFont = LTNULL;
+static CUIFont *s_pBuffFont = LTNULL;
 static CUIFormattedPolyString *s_pAnnouncement = LTNULL;
 static CUIFormattedPolyString *s_pRoundStatus = LTNULL;
+static CUIFormattedPolyString *s_pBottomlessStatus = LTNULL;
+static CUIFormattedPolyString *s_pOneHitStatus = LTNULL;
 
 static uint16 s_nRound = 0;
 static uint16 s_nTarget = 0;
 static uint16 s_nKilled = 0;
 static uint16 s_nAlive = 0;
 static float s_fAnnouncementUntil = 0.0f;
+static float s_fBottomlessUntil = 0.0f;
+static float s_fOneHitUntil = 0.0f;
 
 void FT_RoundHudInit()
 {
@@ -38,6 +43,19 @@ void FT_RoundHudInit()
     s_pRoundFont->SetDefCharWidth(7);
     s_pRoundFont->SetDefColor(0xFFFFFFFF);
 
+    s_pBuffFont = g_pLTCFontManager->CreateFont(
+        "fonts/SQR721B.TTF",
+        "Square721 BT",
+        18,
+        30,
+        255);
+
+    if(s_pBuffFont)
+    {
+        s_pBuffFont->SetDefCharWidth(6);
+        s_pBuffFont->SetDefColor(0xFFFFFFFF);
+    }
+
     s_pAnnouncement =
         g_pLTCFontManager->CreateFormattedPolyString(
             s_pRoundFont,
@@ -48,11 +66,30 @@ void FT_RoundHudInit()
             s_pRoundFont,
             "");
 
+    if(s_pBuffFont)
+    {
+        s_pBottomlessStatus =
+            g_pLTCFontManager->CreateFormattedPolyString(
+                s_pBuffFont,
+                "");
+
+        s_pOneHitStatus =
+            g_pLTCFontManager->CreateFormattedPolyString(
+                s_pBuffFont,
+                "");
+    }
+
     if(s_pAnnouncement)
         s_pAnnouncement->SetColor(0xFFFFB000);
 
     if(s_pRoundStatus)
         s_pRoundStatus->SetColor(0xFFFFFFFF);
+
+    if(s_pBottomlessStatus)
+        s_pBottomlessStatus->SetColor(0xFF30BDE7);
+
+    if(s_pOneHitStatus)
+        s_pOneHitStatus->SetColor(0xFFFFB000);
 }
 
 void FT_RoundHudTerm()
@@ -71,6 +108,27 @@ void FT_RoundHudTerm()
         s_pRoundStatus = LTNULL;
     }
 
+    if(s_pBottomlessStatus)
+    {
+        g_pLTCFontManager->DestroyPolyString(
+            s_pBottomlessStatus);
+        s_pBottomlessStatus = LTNULL;
+    }
+
+    if(s_pOneHitStatus)
+    {
+        g_pLTCFontManager->DestroyPolyString(
+            s_pOneHitStatus);
+        s_pOneHitStatus = LTNULL;
+    }
+
+    if(s_pBuffFont)
+    {
+        g_pLTCFontManager->DestroyFont(
+            s_pBuffFont);
+        s_pBuffFont = LTNULL;
+    }
+
     if(s_pRoundFont)
     {
         g_pLTCFontManager->DestroyFont(
@@ -83,6 +141,8 @@ void FT_RoundHudTerm()
     s_nKilled = 0;
     s_nAlive = 0;
     s_fAnnouncementUntil = 0.0f;
+    s_fBottomlessUntil = 0.0f;
+    s_fOneHitUntil = 0.0f;
 }
 
 void FT_RoundHudHandleMessage(
@@ -162,6 +222,29 @@ void FT_RoundHudShowAnnouncement(
             : 3.0f);
 }
 
+void FT_RoundHudSetTimedPowerups(
+    float fBottomlessSeconds,
+    float fOneHitSeconds)
+{
+    if(!s_pRoundFont)
+    {
+        FT_RoundHudInit();
+    }
+
+    const float fNow =
+        g_pLTClient->GetTime();
+
+    s_fBottomlessUntil =
+        fBottomlessSeconds > 0.0f
+        ? fNow + fBottomlessSeconds
+        : 0.0f;
+
+    s_fOneHitUntil =
+        fOneHitSeconds > 0.0f
+        ? fNow + fOneHitSeconds
+        : 0.0f;
+}
+
 void FT_RenderRoundHud()
 {
     if(!s_pRoundFont || s_nRound == 0)
@@ -199,8 +282,63 @@ void FT_RenderRoundHud()
         s_pRoundStatus->Render();
     }
 
+    const float fNow =
+        g_pLTClient->GetTime();
+
+    float fBuffY =
+        (float)nScreenH - 136.0f;
+
+    if(s_pBottomlessStatus &&
+       fNow < s_fBottomlessUntil)
+    {
+        const float fRemaining =
+            s_fBottomlessUntil - fNow;
+
+        char szBuff[64];
+        sprintf(
+            szBuff,
+            "BOTTOMLESS MAG  %us",
+            (uint32)(fRemaining + 0.999f));
+
+        s_pBottomlessStatus->SetText(
+            szBuff);
+
+        s_pBottomlessStatus->SetPosition(
+            (float)nScreenW -
+                s_pBottomlessStatus->GetWidth() -
+                34.0f,
+            fBuffY);
+
+        s_pBottomlessStatus->Render();
+        fBuffY -= 28.0f;
+    }
+
+    if(s_pOneHitStatus &&
+       fNow < s_fOneHitUntil)
+    {
+        const float fRemaining =
+            s_fOneHitUntil - fNow;
+
+        char szBuff[64];
+        sprintf(
+            szBuff,
+            "ONE HIT KILL  %us",
+            (uint32)(fRemaining + 0.999f));
+
+        s_pOneHitStatus->SetText(
+            szBuff);
+
+        s_pOneHitStatus->SetPosition(
+            (float)nScreenW -
+                s_pOneHitStatus->GetWidth() -
+                34.0f,
+            fBuffY);
+
+        s_pOneHitStatus->Render();
+    }
+
     if(s_pAnnouncement &&
-       g_pLTClient->GetTime() <
+       fNow <
             s_fAnnouncementUntil)
     {
         const float fWidth =

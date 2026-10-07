@@ -695,6 +695,18 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
                 fSeconds);
         }
         break;
+    case MSG_SC_POWERUP_STATE:
+        {
+            const float fBottomlessSeconds =
+                pMessage->Readfloat();
+            const float fOneHitSeconds =
+                pMessage->Readfloat();
+
+            FT_RoundHudSetTimedPowerups(
+                fBottomlessSeconds,
+                fOneHitSeconds);
+        }
+        break;
     case MSG_SC_AMMO:
         {
             uint16 nClip = pMessage->Readuint16();

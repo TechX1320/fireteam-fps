@@ -76,7 +76,7 @@ public:
     char*   			GetPlayerName();
 
     void    			PlayAnimation(const char* sAnimName, uint8 nTracker, bool bLooping);
-    void                SetClient(HCLIENT hClient){ m_hClient = hClient; SendHealth(); SendPrimaryAmmo(); }
+    void                SetClient(HCLIENT hClient){ m_hClient = hClient; SendHealth(); SendPrimaryAmmo(); SendPowerupState(); }
     void    			SetClubID();
     void                SetWeaponSlot(uint8 nSlot);
     void                FirePrimary(const LTVector &vFrom, const LTVector &vDirection);
@@ -121,6 +121,7 @@ private:
     void                Respawn();
     void                UpdateHazards();
     void                UpdatePowerups();
+    void                SendPowerupState();
 
 private:
 
