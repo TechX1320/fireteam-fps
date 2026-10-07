@@ -5,6 +5,21 @@ using FireteamLauncher.Infrastructure;
 
 namespace FireteamLauncher.Services;
 
+public sealed record WeaponImportProgress(
+    int Processed,
+    int Total,
+    string Stage,
+    string Detail)
+{
+    public double Percent =>
+        Total <= 0
+            ? 0.0
+            : Math.Clamp(
+                Processed * 100.0 / Total,
+                0.0,
+                100.0);
+}
+
 public sealed record WeaponImportResult(
     int Imported,
     int ExistingSkipped,
@@ -98,7 +113,9 @@ public sealed class WeaponImportService
 
     public WeaponImportResult Import(
         string weaponsTxtPath,
-        string gunsZipPath)
+        string gunsZipPath,
+        IProgress<WeaponImportProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         if(!File.Exists(weaponsTxtPath))
         {
@@ -143,6 +160,13 @@ public sealed class WeaponImportService
                     !string.IsNullOrWhiteSpace(
                         section.Get("Name")))
                 .ToList();
+
+        progress?.Report(
+            new WeaponImportProgress(
+                0,
+                weapons.Count,
+                "ATTRIBUTES",
+                $"Parsed {weapons.Count} weapon definitions from WEAPONS.txt."));
 
         var ammoByName =
             sections
@@ -274,25 +298,28 @@ public sealed class WeaponImportService
                         hhZip);
             }
 
-            // Keep the commercial archive contents local/ignored, but extract
-            // the complete weapon asset trees so every model/texture/sound
-            // present in the source archives is available to FIRETEAM. The
-            // catalog matcher below decides which definitions are usable.
+            // WEAPONS.txt can be newer than the user's Guns archives.
+            // Index the archives first and copy only assets belonging to
+            // definitions that can be proven to exist in this exact archive.
             var gunsFiles =
-                ExtractArchiveAssets(
-                    guns,
-                    localImportRoot,
-                    runtimeRezRoot);
+                guns.Entries.Count;
 
             var gunsHhFiles =
-                hh is null
-                ? 0
-                : ExtractArchiveAssets(
-                    hh,
-                    localImportRoot,
-                    runtimeRezRoot);
+                hh?.Entries.Count ??
+                0;
+
+            progress?.Report(
+                new WeaponImportProgress(
+                    0,
+                    weapons.Count,
+                    "ARCHIVE",
+                    $"Indexed {gunsFiles} Guns.zip files" +
+                    (hh is null
+                        ? "; GunsHH.zip not found."
+                        : $" and {gunsHhFiles} GunsHH.zip files.")));
 
             var imported = 0;
+            var processed = 0;
             var existingSkipped = 0;
             var unsupported = 0;
             var warnings = 0;
@@ -308,6 +335,9 @@ public sealed class WeaponImportService
 
             foreach(var weapon in weapons)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                ++processed;
+
                 var caName =
                     weapon.Get("Name");
 
@@ -375,11 +405,14 @@ public sealed class WeaponImportService
                 var warningList =
                     new List<string>();
 
+                var pvModelDeclared =
+                    weapon.Get(
+                        "PVModelNormal");
+
                 var pvModelEntry =
                     ResolveAsset(
                         guns,
-                        weapon.Get(
-                            "PVModelNormal"),
+                        pvModelDeclared,
                         tokens,
                         "GUNS_M_PV",
                         ".ltb",
@@ -389,6 +422,64 @@ public sealed class WeaponImportService
                                 "I_INFO",
                                 StringComparison.OrdinalIgnoreCase));
 
+                var pvTextureSource =
+                    FindSkinPath(
+                        weapon,
+                        "PVSkin",
+                        "GUNS_T_PV");
+
+                var pvTextureEntry =
+                    ResolveAsset(
+                        guns,
+                        pvTextureSource,
+                        tokens,
+                        "GUNS_T_PV",
+                        ".dtx",
+                        entry =>
+                            !entry.Name.Contains(
+                                "I_INFO",
+                                StringComparison.OrdinalIgnoreCase));
+
+                if(pvModelEntry is null ||
+                   pvTextureEntry is null)
+                {
+                    ++unsupported;
+
+                    if(existingCatalog.TryGetValue(
+                           identity,
+                           out var staleSection))
+                    {
+                        doc.RemoveSection(
+                            staleSection);
+                        existingCatalog.Remove(
+                            identity);
+                    }
+
+                    report.Add(
+                        $"[SKIP/NO-ARCHIVE] {FriendlyName(caName)} [{weapon.Section}]");
+                    report.Add(
+                        $"  PV model declared: {DisplayDeclaredPath(pvModelDeclared)}");
+                    report.Add(
+                        $"  PV model archive:  {DisplayArchiveMatch(pvModelEntry)}");
+                    report.Add(
+                        $"  PV skin declared:  {DisplayDeclaredPath(pvTextureSource)}");
+                    report.Add(
+                        $"  PV skin archive:   {DisplayArchiveMatch(pvTextureEntry)}");
+                    report.Add(
+                        "  Result: not imported; WEAPONS.txt entry is not backed by this Guns.zip.");
+                    report.Add(
+                        string.Empty);
+
+                    ReportImportProgress(
+                        progress,
+                        processed,
+                        weapons.Count,
+                        "MATCHING",
+                        $"Skipped {FriendlyName(caName)}: required PV asset missing from supplied archive.");
+
+                    continue;
+                }
+
                 var pvModel =
                     StageAsset(
                         pvModelEntry,
@@ -396,39 +487,12 @@ public sealed class WeaponImportService
                         runtimeRezRoot,
                         null);
 
-                if(!pvModel.Found)
-                {
-                    warningList.Add(
-                        "PV model missing");
-                }
-
-                var pvTextureSource =
-                    FindSkinPath(
-                        weapon,
-                        "PVSkin",
-                        "GUNS_T_PV");
-
                 var pvTexture =
                     StageAsset(
-                        ResolveAsset(
-                            guns,
-                            pvTextureSource,
-                            tokens,
-                            "GUNS_T_PV",
-                            ".dtx",
-                            entry =>
-                                !entry.Name.Contains(
-                                    "I_INFO",
-                                    StringComparison.OrdinalIgnoreCase)),
+                        pvTextureEntry,
                         localImportRoot,
                         runtimeRezRoot,
                         null);
-
-                if(!pvTexture.Found)
-                {
-                    warningList.Add(
-                        "PV texture missing");
-                }
 
                 StageAdditionalSkins(
                     weapon,
@@ -438,7 +502,6 @@ public sealed class WeaponImportService
                     tokens,
                     localImportRoot,
                     runtimeRezRoot);
-
                 var hhSource =
                     hh ?? guns;
 
@@ -933,16 +996,37 @@ public sealed class WeaponImportService
                     warningList.Count;
 
                 report.Add(
-                    $"{friendlyName} [{weapon.Section}] -> [{section}] | " +
-                    $"type={fireteamType} supported={(supported ? 1 : 0)} | " +
+                    $"[{(supported ? "READY" : "PARTIAL")}] {friendlyName} [{weapon.Section}] -> [{section}]");
+                report.Add(
+                    $"  PV model: {DisplayDeclaredPath(pvModelDeclared)} => {DisplayArchiveMatch(pvModelEntry)}");
+                report.Add(
+                    $"  PV skin:  {DisplayDeclaredPath(pvTextureSource)} => {DisplayArchiveMatch(pvTextureEntry)}");
+                report.Add(
+                    $"  Result: type={fireteamType}, supported={(supported ? 1 : 0)} | " +
                     (warningList.Count == 0
                         ? "OK"
                         : string.Join(
                             ", ",
                             warningList)));
+                report.Add(
+                    string.Empty);
 
                 ++imported;
+
+                ReportImportProgress(
+                    progress,
+                    processed,
+                    weapons.Count,
+                    "MATCHING",
+                    $"Matched {friendlyName} to exact archive filenames.");
             }
+
+            progress?.Report(
+                new WeaponImportProgress(
+                    weapons.Count,
+                    weapons.Count,
+                    "SAVING",
+                    $"Saving {imported} archive-backed definitions..."));
 
             SaveConfigCopies(
                 doc,
@@ -956,6 +1040,13 @@ public sealed class WeaponImportService
             File.WriteAllLines(
                 reportPath,
                 report);
+
+            progress?.Report(
+                new WeaponImportProgress(
+                    weapons.Count,
+                    weapons.Count,
+                    "COMPLETE",
+                    $"Imported {imported}; full audit written to {reportPath}."));
 
             return new WeaponImportResult(
                 imported,
@@ -1097,6 +1188,45 @@ public sealed class WeaponImportService
         }
     }
 
+    private static void ReportImportProgress(
+        IProgress<WeaponImportProgress>? progress,
+        int processed,
+        int total,
+        string stage,
+        string detail)
+    {
+        if(progress is null)
+        {
+            return;
+        }
+
+        if(processed == 1 ||
+           processed == total ||
+           processed % 10 == 0)
+        {
+            progress.Report(
+                new WeaponImportProgress(
+                    processed,
+                    total,
+                    stage,
+                    detail));
+        }
+    }
+
+    private static string DisplayDeclaredPath(
+        string value) =>
+        string.IsNullOrWhiteSpace(
+            value)
+            ? "(not declared)"
+            : NormalizeArchivePath(
+                value);
+
+    private static string DisplayArchiveMatch(
+        ZipArchiveEntry? entry) =>
+        entry is null
+            ? "MISSING"
+            : NormalizeArchivePath(
+                entry.FullName);
     private static string? FindGunsHH(
         string gunsZipPath)
     {
@@ -1157,12 +1287,7 @@ public sealed class WeaponImportService
                 extraFilter);
         }
 
-        return ResolveByTokens(
-            archive,
-            tokens,
-            pathToken,
-            extension,
-            extraFilter);
+        return null;
     }
 
     private static ZipArchiveEntry? ResolveDeclaredAsset(
@@ -1319,15 +1444,7 @@ public sealed class WeaponImportService
                         StringComparison.OrdinalIgnoreCase));
         }
 
-        return ResolveByTokens(
-            archive,
-            tokens,
-            "GUNS_SND",
-            ".wav",
-            entry =>
-                entry.Name.StartsWith(
-                    stem,
-                    StringComparison.OrdinalIgnoreCase));
+        return null;
     }
 
     private static ZipArchiveEntry? FindAnimation(

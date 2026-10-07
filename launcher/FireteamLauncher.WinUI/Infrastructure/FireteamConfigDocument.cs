@@ -117,6 +117,18 @@ public sealed class FireteamConfigDocument
         _lines.Insert(end, $"{key}={value ?? string.Empty}");
     }
 
+    public bool RemoveSection(string section)
+    {
+        var (start, end) = FindSection(section);
+        if(start < 0)
+        {
+            return false;
+        }
+
+        _lines.RemoveRange(start, end - start);
+        return true;
+    }
+
     public void Save(string path)
     {
         var parent = Path.GetDirectoryName(path);
