@@ -67,29 +67,30 @@ echo [INFO] Player-facing executable will be:
 echo        BUILT\FireteamLauncher.exe
 
 if exist "%SHORT_BUILD%" rmdir /s /q "%SHORT_BUILD%"
-mkdir "%SHORT_BUILD%\obj" >nul 2>nul
 mkdir "%SHORT_OUTPUT%" >nul 2>nul
 
+rem WinUI/XAML must keep its normal project-local obj tree. Redirecting
+rem BaseIntermediateOutputPath/MSBuildProjectExtensionsPath caused the markup
+rem compiler to emit App.g.i.cs and MainWindow.g.i.cs twice.
+if exist "%CD%\launcher\FireteamLauncher.WinUI\obj" rmdir /s /q "%CD%\launcher\FireteamLauncher.WinUI\obj"
+if exist "%CD%\launcher\FireteamLauncher.WinUI\bin" rmdir /s /q "%CD%\launcher\FireteamLauncher.WinUI\bin"
+
 echo.
-echo [LAUNCHER 1/4] Restoring with short WinUI intermediate paths...
-dotnet restore "%PROJECT%" -r win-x64 -p:Platform=x64 ^
-  "-p:BaseIntermediateOutputPath=%SHORT_BUILD%\obj/" ^
-  "-p:MSBuildProjectExtensionsPath=%SHORT_BUILD%\obj/"
+echo [LAUNCHER 1/4] Restoring WinUI launcher...
+dotnet restore "%PROJECT%" -r win-x64 -p:Platform=x64
 if errorlevel 1 (
   echo [ERROR] Launcher dependency restore failed.
   goto :fail
 )
 
 echo.
-echo [LAUNCHER 2/4] Building Release x64...
-dotnet build "%PROJECT%" ^
+echo [LAUNCHER 2/4] Publishing Release x64...
+dotnet publish "%PROJECT%" ^
   -c Release ^
   -r win-x64 ^
   -p:Platform=x64 ^
   -p:SelfContained=true ^
   -p:WindowsAppSDKSelfContained=true ^
-  "-p:BaseIntermediateOutputPath=%SHORT_BUILD%\obj/" ^
-  "-p:MSBuildProjectExtensionsPath=%SHORT_BUILD%\obj/" ^
   --no-restore ^
   -o "%SHORT_OUTPUT%"
 if errorlevel 1 (
