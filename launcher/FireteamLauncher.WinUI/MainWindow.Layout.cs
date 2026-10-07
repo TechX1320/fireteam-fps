@@ -268,6 +268,11 @@ public sealed partial class MainWindow
                     "weapon-editor")));
         toolsMenu.Items.Add(
             MenuItem(
+                "Combat Arms Importer",
+                () => NavigateTo(
+                    "ca-importer")));
+        toolsMenu.Items.Add(
+            MenuItem(
                 "Open Mod Library",
                 () => LauncherPaths.OpenFolder(
                     LauncherPaths.ModsDirectory)));
