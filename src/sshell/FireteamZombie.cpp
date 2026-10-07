@@ -73,6 +73,22 @@ FireteamZombie::FireteamZombie() :
         m_Def.fRunSpeed *=
             s_ZombieDifficulty.fSpeedMultiplier;
 
+        if(m_Def.fWalkSpeed <= 0.0f)
+        {
+            m_Def.fWalkSpeed =
+                m_Def.fRunSpeed * 0.52f;
+        }
+        else
+        {
+            m_Def.fWalkSpeed *=
+                s_ZombieDifficulty.fSpeedMultiplier;
+        }
+
+        if(m_Def.fAlertDistance <= 0.0f)
+        {
+            m_Def.fAlertDistance = 300.0f;
+        }
+
         float fDamage =
             (float)m_Def.nAttackDamage *
             s_ZombieDifficulty.fDamageMultiplier;
@@ -701,9 +717,6 @@ void FireteamZombie::UpdateZombie()
         ? m_Def.fUpdateSeconds
         : 0.10f;
 
-    const float kMoveSpeed =
-        m_Def.fRunSpeed;
-
     const float kAttackRange =
         m_Def.fAttackRange;
 
@@ -824,13 +837,26 @@ void FireteamZombie::UpdateZombie()
             vPos,
             vTarget);
 
-    const bool bDirectPursuit =
-        m_fForcePathTime <= 0.0f &&
-        bSameVolume &&
+    const bool bClearRouteToPlayer =
         HasDirectPathToTarget(
             hTarget,
             vPos,
             vTarget);
+
+    const bool bRunning =
+        bClearRouteToPlayer ||
+        fPlayerDistance <=
+            m_Def.fAlertDistance;
+
+    const float fMoveSpeed =
+        bRunning
+        ? m_Def.fRunSpeed
+        : m_Def.fWalkSpeed;
+
+    const bool bDirectPursuit =
+        m_fForcePathTime <= 0.0f &&
+        bSameVolume &&
+        bClearRouteToPlayer;
 
     if(bDirectPursuit)
     {
@@ -909,7 +935,7 @@ void FireteamZombie::UpdateZombie()
         vMove.Normalize();
 
         const float fStepDistance =
-            kMoveSpeed *
+            fMoveSpeed *
             kUpdate;
 
         // NOLF2-style dynamic character avoidance.  Other infected close to
@@ -1081,9 +1107,13 @@ void FireteamZombie::UpdateZombie()
                 &rLook);
 
             SetZombieAnimation(
-                m_Def.sRunAnim[0]
-                    ? m_Def.sRunAnim
-                    : m_Def.sWalkAnim,
+                bRunning
+                    ? (m_Def.sRunAnim[0]
+                        ? m_Def.sRunAnim
+                        : m_Def.sWalkAnim)
+                    : (m_Def.sWalkAnim[0]
+                        ? m_Def.sWalkAnim
+                        : m_Def.sRunAnim),
                 true);
 
             LTVector vDesired =
