@@ -154,7 +154,7 @@
                     <StackPanel MaxWidth="1000" HorizontalAlignment="Center" Margin="34,28,34,44" Spacing="18">
                         <StackPanel Spacing="5">
                             <TextBlock Text="FIRETEAM / LOADOUT" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
-                            <TextBlock Text="Build your deployment kit" FontFamily="Bahnschrift SemiCondensed" FontSize="40" FontWeight="Bold" CharacterSpacing="20" Foreground="{StaticResource LauncherPrimaryTextBrush}" FontSize="36" />
+                            <TextBlock Text="Build your deployment kit" FontFamily="Bahnschrift SemiCondensed" FontSize="36" FontWeight="Bold" CharacterSpacing="20" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
                             <TextBlock Text="This replaces the old fixed slot display with an actual launcher-side loadout editor."
                                        Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                         </StackPanel>
@@ -303,7 +303,7 @@
                     <StackPanel MaxWidth="1000" HorizontalAlignment="Center" Margin="34,28,34,44" Spacing="18">
                         <StackPanel Spacing="5">
                             <TextBlock Text="FIRETEAM / MODDING" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
-                            <TextBlock Text="Mods &amp; Content Tools" FontFamily="Bahnschrift SemiCondensed" FontSize="40" FontWeight="Bold" CharacterSpacing="20" Foreground="{StaticResource LauncherPrimaryTextBrush}" FontSize="36" />
+                            <TextBlock Text="Mods &amp; Content Tools" FontFamily="Bahnschrift SemiCondensed" FontSize="36" FontWeight="Bold" CharacterSpacing="20" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
                             <TextBlock Text="The launcher is the front door for both players and creators."
                                        Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                         </StackPanel>
@@ -357,7 +357,7 @@
                     <StackPanel MaxWidth="900" HorizontalAlignment="Center" Margin="34,28,34,44" Spacing="18">
                         <StackPanel Spacing="5">
                             <TextBlock Text="FIRETEAM / SETTINGS" FontFamily="Bahnschrift SemiCondensed" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80" Foreground="{StaticResource LauncherGreenBrush}" />
-                            <TextBlock Text="Game settings" FontFamily="Bahnschrift SemiCondensed" FontSize="40" FontWeight="Bold" CharacterSpacing="20" Foreground="{StaticResource LauncherPrimaryTextBrush}" FontSize="36" />
+                            <TextBlock Text="Game settings" FontFamily="Bahnschrift SemiCondensed" FontSize="36" FontWeight="Bold" CharacterSpacing="20" Foreground="{StaticResource LauncherPrimaryTextBrush}" />
                             <TextBlock Text="The launcher writes the same FIRETEAM settings file used by the in-game menu."
                                        Foreground="{StaticResource LauncherSecondaryTextBrush}" />
                         </StackPanel>
