@@ -277,6 +277,12 @@ void CPlayerClnt::Update()
     // Send our information to the server
     g_pCShell->SendVelPosAndRot(vVel, vPos, rRot);
 
+    // Input flags are accumulated by event callbacks during the frame.
+    // Always clear them after movement is consumed. This must happen before
+    // any optional weapon/club early-return or a missing hand-held object can
+    // leave W/A/S/D latched forever.
+    m_dwInputFlags = 0;
+
     // update club position
     if(!m_hClubObject)
     {
@@ -299,8 +305,6 @@ void CPlayerClnt::Update()
 
     g_pLTClient->SetObjectPos(m_hClubObject, &tSocketTransform.m_Pos);
     g_pLTClient->SetObjectRotation(m_hClubObject, &tSocketTransform.m_Rot);
-
-	m_dwInputFlags = 0;
 }
 
 
