@@ -188,7 +188,8 @@ echo.
 echo [6/6] BUILD COMPLETE
 echo Output: %BUILT_DIR%
 echo Existing extra files in BUILT were preserved.
-echo Launcher: BUILT\Launcher\FireteamLauncher.exe
+echo Launcher: BUILT\FireteamLauncher.exe
+echo Launcher runtime: BUILT\Launcher\App\
 echo Stock test: BUILT\run-normal.cmd
 echo Cabin Fever test: BUILT\run-cabinfever.cmd
 echo.
