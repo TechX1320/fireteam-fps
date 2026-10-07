@@ -8,7 +8,10 @@
 #include <string.h>
 
 static HANDLE s_hStopEvent = NULL;
+static HANDLE s_hThreadReadyEvent = NULL;
 static HANDLE s_hThread = NULL;
+static DWORD s_nLoadingStartTick = 0;
+static const DWORD kMinimumLoadingVisibleMS = 350;
 static CUIFont *s_pLoadingFont = LTNULL;
 static CUIFormattedPolyString *s_pLoadingText = LTNULL;
 static char s_szLoadingText[256];
@@ -56,6 +59,11 @@ static void FT_RenderLoadingFrame()
 
 static DWORD WINAPI FT_LoadingThread(void *)
 {
+    if(s_hThreadReadyEvent)
+    {
+        SetEvent(s_hThreadReadyEvent);
+    }
+
     while(s_hStopEvent &&
           WaitForSingleObject(
               s_hStopEvent,
@@ -76,6 +84,16 @@ void FT_LoadingScreenInit()
     if(!s_hStopEvent)
     {
         s_hStopEvent =
+            CreateEvent(
+                NULL,
+                TRUE,
+                FALSE,
+                NULL);
+    }
+
+    if(!s_hThreadReadyEvent)
+    {
+        s_hThreadReadyEvent =
             CreateEvent(
                 NULL,
                 TRUE,
@@ -133,6 +151,13 @@ void FT_LoadingScreenTerm()
         CloseHandle(s_hStopEvent);
         s_hStopEvent = NULL;
     }
+
+    if(s_hThreadReadyEvent)
+    {
+        CloseHandle(
+            s_hThreadReadyEvent);
+        s_hThreadReadyEvent = NULL;
+    }
 }
 
 bool FT_LoadingScreenStart(
@@ -173,6 +198,9 @@ bool FT_LoadingScreenStart(
         s_szLoadingText);
 
     ResetEvent(s_hStopEvent);
+    ResetEvent(s_hThreadReadyEvent);
+    s_nLoadingStartTick =
+        GetTickCount();
 
     // Put something on screen immediately before the synchronous load begins.
     FT_RenderLoadingFrame();
@@ -187,7 +215,22 @@ bool FT_LoadingScreenStart(
             0,
             &nThreadID);
 
-    return s_hThread != NULL;
+    if(!s_hThread)
+    {
+        return false;
+    }
+
+    // NOLF2 waits for its loading thread to enter the render loop before
+    // returning to the blocking world load. Without this handshake a quick
+    // scheduler race can make FIRETEAM appear to skip the loading screen.
+    if(s_hThreadReadyEvent)
+    {
+        WaitForSingleObject(
+            s_hThreadReadyEvent,
+            1000);
+    }
+
+    return true;
 }
 
 void FT_LoadingScreenStop()
@@ -195,6 +238,18 @@ void FT_LoadingScreenStop()
     if(!s_hThread)
     {
         return;
+    }
+
+    const DWORD nElapsed =
+        GetTickCount() -
+        s_nLoadingStartTick;
+
+    if(nElapsed <
+       kMinimumLoadingVisibleMS)
+    {
+        Sleep(
+            kMinimumLoadingVisibleMS -
+            nElapsed);
     }
 
     if(s_hStopEvent)
