@@ -13,7 +13,9 @@ struct FTInfectedDef
     char sName[64];
 
     uint16 nHealth;
+    float fWalkSpeed;
     float fRunSpeed;
+    float fAlertDistance;
     uint8 nAttackDamage;
     float fAttackRange;
     float fAttackCooldown;
@@ -116,8 +118,12 @@ inline void FT_ApplyInfectedValue(
         FT_CopyInfectedString(def.sName, sizeof(def.sName), pValue);
     else if(_stricmp(pKey, "health") == 0)
         def.nHealth = (uint16)atoi(pValue);
+    else if(_stricmp(pKey, "walk_speed") == 0)
+        def.fWalkSpeed = (float)atof(pValue);
     else if(_stricmp(pKey, "run_speed") == 0)
         def.fRunSpeed = (float)atof(pValue);
+    else if(_stricmp(pKey, "alert_distance") == 0)
+        def.fAlertDistance = (float)atof(pValue);
     else if(_stricmp(pKey, "attack_damage") == 0)
         def.nAttackDamage = (uint8)atoi(pValue);
     else if(_stricmp(pKey, "attack_range") == 0)
