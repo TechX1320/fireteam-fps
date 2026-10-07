@@ -42,7 +42,11 @@ public:
           m_nWeaponSlot(1),
           m_bReloading(false),
           m_nReloadSlot(0),
-          m_fReloadComplete(0.0f)
+          m_fReloadComplete(0.0f),
+          m_fBottomlessUntil(0.0f),
+          m_fOneHitUntil(0.0f),
+          m_bBottomlessWasActive(false),
+          m_bOneHitWasActive(false)
     {
         FT_LoadWeaponDefs("config/weapons.cfg", m_WeaponDefs);
 
@@ -91,6 +95,13 @@ public:
     void                ApplyDamage(uint8 nDamage);
     bool                IsAlive() const { return m_bAlive; }
 
+    // Fireteam Mutation Box rewards.
+    void                GrantAmmoMagazines(uint32 nMagazines);
+    void                GrantHealth(uint32 nAmount);
+    void                GrantBottomless(float fSeconds);
+    void                GrantOneHit(float fSeconds);
+    void                NotifyPowerup(const char *pText, float fSeconds);
+
 private:
 
 	uint32				PreCreate(void *pData, float fData);
@@ -109,6 +120,7 @@ private:
                             const LTVector &vDirection);
     void                Respawn();
     void                UpdateHazards();
+    void                UpdatePowerups();
 
 private:
 
@@ -133,6 +145,11 @@ private:
     bool                m_bReloading;
     uint8               m_nReloadSlot;
     float               m_fReloadComplete;
+
+    float               m_fBottomlessUntil;
+    float               m_fOneHitUntil;
+    bool                m_bBottomlessWasActive;
+    bool                m_bOneHitWasActive;
 
     HCLIENT             m_hClient;
 
