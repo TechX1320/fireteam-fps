@@ -11,6 +11,7 @@
 #include <iltphysics.h>
 #include <ltobjectcreate.h>
 #include <float.h>
+#include <math.h>
 #include <string.h>
 #include <stdio.h>
 
