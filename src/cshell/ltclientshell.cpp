@@ -640,6 +640,10 @@ void CLTClientShell::OnExitWorld()
     m_bQaMenuOpen = false;
     m_bQaMenuKeyHeld = false;
     m_bQaZombieSettingSent = false;
+    m_bControllerWasConnected = false;
+    m_bControllerMenuDown = false;
+    m_bControllerMenuHoldActivated = false;
+    FT_ControllerReset();
 
     FT_WeaponHudSetQaMenu(
         false,
