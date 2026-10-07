@@ -1004,6 +1004,7 @@ void CLTClientShell::OnEvent(uint32 dwEventID, uint32 dwParam)
     {
     case LTEVENT_LOSTFOCUS:
         m_bRender = false;
+        m_bQaControlDown = false;
         break;
 
     case LTEVENT_RENDERTERM:
