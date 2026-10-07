@@ -1217,7 +1217,8 @@ LTRESULT CLTClientShell::PollInput()
 
         if(m_pPlayer->Attack() &&
            pWeaponDef &&
-           pWeaponDef->eType != FT_WEAPON_MELEE)
+           pWeaponDef->eType != FT_WEAPON_MELEE &&
+           !m_pPlayer->IsDevWeaponQa())
         {
             HLOCALOBJ hFireCamera = m_pCamera->GetCamera();
             LTVector vFirePos;
