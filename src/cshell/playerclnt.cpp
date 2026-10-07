@@ -235,6 +235,21 @@ void CPlayerClnt::Update()
     {
         m_bReloading = false;
         m_fReloadComplete = 0.0f;
+
+        // The server owns the actual ammo transfer. Ask it to reconcile the
+        // HUD at the exact end of the local reload instead of waiting for the
+        // next shot/input to expose the completed magazine.
+        ILTMessage_Write *pAmmoSync = LTNULL;
+        if(g_pLTCCommon->CreateMessage(pAmmoSync) == LT_OK &&
+           pAmmoSync)
+        {
+            pAmmoSync->IncRef();
+            pAmmoSync->Writeuint8(MSG_CS_AMMO_SYNC);
+            g_pLTClient->SendToServer(
+                pAmmoSync->Read(),
+                MESSAGE_GUARANTEED);
+            pAmmoSync->DecRef();
+        }
     }
 
     LTVector vZero(0.0f, 0.0f, 0.0f);
