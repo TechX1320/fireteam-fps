@@ -43,6 +43,10 @@ bool FT_BuildNavigationPath(
     uint32 nLane,
     std::vector<LTVector> &aWaypoints);
 
+bool FT_ArePositionsInSameNavigationVolume(
+    const LTVector &vA,
+    const LTVector &vB);
+
 uint32 FT_GetNavigationVolumeCount();
 
 #endif
