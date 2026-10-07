@@ -24,12 +24,16 @@ struct FTPowerupDef
     uint32 nHealthWeight;
     uint32 nBottomlessWeight;
     uint32 nOneHitWeight;
+    uint32 nGodWeight;
+    uint32 nWallhackWeight;
 
     uint32 nAmmoMagazines;
     uint32 nHealthAmount;
 
     float fBottomlessSeconds;
     float fOneHitSeconds;
+    float fGodSeconds;
+    float fWallhackSeconds;
     float fLifetimeSeconds;
 };
 
@@ -95,12 +99,16 @@ inline void FT_InitPowerupDef(
     def.nHealthWeight = 25;
     def.nBottomlessWeight = 15;
     def.nOneHitWeight = 15;
+    def.nGodWeight = 2;
+    def.nWallhackWeight = 3;
 
     def.nAmmoMagazines = 2;
     def.nHealthAmount = 35;
 
-    def.fBottomlessSeconds = 60.0f;
+    def.fBottomlessSeconds = 30.0f;
     def.fOneHitSeconds = 30.0f;
+    def.fGodSeconds = 10.0f;
+    def.fWallhackSeconds = 20.0f;
     def.fLifetimeSeconds = 25.0f;
 
     FT_CopyPowerupString(
@@ -215,6 +223,10 @@ inline bool FT_LoadPowerupDef(
             def.nBottomlessWeight = (uint32)atoi(pValue);
         else if(_stricmp(pKey, "one_hit_weight") == 0)
             def.nOneHitWeight = (uint32)atoi(pValue);
+        else if(_stricmp(pKey, "god_weight") == 0)
+            def.nGodWeight = (uint32)atoi(pValue);
+        else if(_stricmp(pKey, "wallhack_weight") == 0)
+            def.nWallhackWeight = (uint32)atoi(pValue);
         else if(_stricmp(pKey, "ammo_magazines") == 0)
             def.nAmmoMagazines = (uint32)atoi(pValue);
         else if(_stricmp(pKey, "health_amount") == 0)
@@ -223,6 +235,10 @@ inline bool FT_LoadPowerupDef(
             def.fBottomlessSeconds = (float)atof(pValue);
         else if(_stricmp(pKey, "one_hit_seconds") == 0)
             def.fOneHitSeconds = (float)atof(pValue);
+        else if(_stricmp(pKey, "god_seconds") == 0)
+            def.fGodSeconds = (float)atof(pValue);
+        else if(_stricmp(pKey, "wallhack_seconds") == 0)
+            def.fWallhackSeconds = (float)atof(pValue);
         else if(_stricmp(pKey, "lifetime_seconds") == 0)
             def.fLifetimeSeconds = (float)atof(pValue);
     }
