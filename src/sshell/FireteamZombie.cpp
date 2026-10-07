@@ -216,8 +216,16 @@ void FireteamZombie::CreateInfectedFace()
                 rOffset = tAlign.m_Rot.Conjugate();
                 LTVector vInverseAlignPos =
                     tAlign.m_Pos * -1.0f;
-                vOffset +=
-                    rOffset * vInverseAlignPos;
+
+                // Jupiter's LTRotation only overloads rotation*rotation.
+                // Rotate the local offset explicitly through the inverse
+                // rotation basis instead.
+                LTVector vRotatedInverse =
+                    (rOffset.Right() * vInverseAlignPos.x) +
+                    (rOffset.Up() * vInverseAlignPos.y) +
+                    (rOffset.Forward() * vInverseAlignPos.z);
+
+                vOffset += vRotatedInverse;
 
                 g_pLTServer->CPrint(
                     "Fireteam infected: face auto-align node %s local %.1f %.1f %.1f.",
