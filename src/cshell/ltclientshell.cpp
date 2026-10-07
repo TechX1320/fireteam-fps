@@ -28,6 +28,7 @@
 #include "FireteamHealthHud.h"
 #include "FireteamWeaponHud.h"
 #include "FireteamRoundHud.h"
+#include "FireteamCombatFeedback.h"
 #include "FireteamLoadingScreen.h"
 // Client-side helper functions
 #include "clienthelper.h"
@@ -256,6 +257,7 @@ LTRESULT CLTClientShell::OnEngineInitialized(RMode *pMode, LTGUID *pAppGuid)
     FT_SettingsInit();
     FT_WeaponHudInit();
     FT_RoundHudInit();
+    FT_CombatFeedbackInit();
     FT_LoadingScreenInit();
 
     HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");
@@ -741,6 +743,12 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
                 fOneHitSeconds);
         }
         break;
+    case MSG_SC_COMBAT_FEEDBACK:
+        {
+            FT_CombatFeedbackHandleMessage(
+                pMessage);
+        }
+        break;
     case MSG_SC_AMMO:
         {
             uint16 nClip = pMessage->Readuint16();
@@ -968,6 +976,7 @@ LTRESULT CLTClientShell::Render()
         }
         FT_RenderHealthHud();
         FT_RenderRoundHud();
+        FT_RenderCombatFeedback();
 
         if(m_pPlayer &&
            m_pCamera &&
@@ -2139,6 +2148,7 @@ void CLTClientShell::OnEngineTerm()
     // Dispose of the Chat gui
     assert(m_pChatGui);
     FT_LoadingScreenTerm();
+    FT_CombatFeedbackTerm();
     FT_RoundHudTerm();
     FT_WeaponHudTerm();
     FT_SettingsTerm();

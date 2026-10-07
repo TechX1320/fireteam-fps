@@ -50,8 +50,24 @@ enum EMessageID
         MSG_SC_ROUND,               // server->client
         MSG_SC_POWERUP,             // server->client announcement
         MSG_SC_POWERUP_STATE,       // server->client timed buff state
+        MSG_SC_COMBAT_FEEDBACK,     // server->client shooter-only hit/kill feedback
 		MSG_LAST_MESSAGE			//last message marker, do not handle
 		
+};
+
+
+//-----------------------------------------------------------------------------
+// Shooter-only presentation events sent by the authoritative server.
+enum EFireteamCombatFeedback
+{
+    FT_COMBAT_FEEDBACK_HEADSHOT = 1,
+    FT_COMBAT_FEEDBACK_NUTSHOT,
+    FT_COMBAT_FEEDBACK_FIRSTKILL,
+    FT_COMBAT_FEEDBACK_DOUBLEKILL,
+    FT_COMBAT_FEEDBACK_MULTIKILL,
+    FT_COMBAT_FEEDBACK_ULTRAKILL,
+    FT_COMBAT_FEEDBACK_FANTASTIC,
+    FT_COMBAT_FEEDBACK_UNBELIEVABLE
 };
 
 

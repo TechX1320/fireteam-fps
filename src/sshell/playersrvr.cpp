@@ -387,6 +387,67 @@ uint32 CPlayerSrvr::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
                 //m_fMoney += 9.95f;
 				m_fMoney += pMsg->Readfloat();
 
+                if(messageID == OBJ_MID_KILLSCORE)
+                {
+                    const float fNow =
+                        g_pLTServer->GetTime();
+
+                    if(m_fLastKillFeedbackTime > 0.0f &&
+                       (fNow - m_fLastKillFeedbackTime) <= 4.0f)
+                    {
+                        if(m_nKillFeedbackChain < 255)
+                        {
+                            ++m_nKillFeedbackChain;
+                        }
+                    }
+                    else
+                    {
+                        m_nKillFeedbackChain = 1;
+                    }
+
+                    m_fLastKillFeedbackTime =
+                        fNow;
+
+                    uint8 nFeedback = 0;
+
+                    if(m_iScore == 1)
+                    {
+                        nFeedback =
+                            FT_COMBAT_FEEDBACK_FIRSTKILL;
+                    }
+                    else if(m_nKillFeedbackChain == 2)
+                    {
+                        nFeedback =
+                            FT_COMBAT_FEEDBACK_DOUBLEKILL;
+                    }
+                    else if(m_nKillFeedbackChain == 3)
+                    {
+                        nFeedback =
+                            FT_COMBAT_FEEDBACK_MULTIKILL;
+                    }
+                    else if(m_nKillFeedbackChain == 4)
+                    {
+                        nFeedback =
+                            FT_COMBAT_FEEDBACK_ULTRAKILL;
+                    }
+                    else if(m_nKillFeedbackChain == 5)
+                    {
+                        nFeedback =
+                            FT_COMBAT_FEEDBACK_FANTASTIC;
+                    }
+                    else if(m_nKillFeedbackChain >= 6)
+                    {
+                        nFeedback =
+                            FT_COMBAT_FEEDBACK_UNBELIEVABLE;
+                    }
+
+                    if(nFeedback)
+                    {
+                        SendCombatFeedback(
+                            nFeedback);
+                    }
+                }
+
                 //send score to client
             	ILTMessage_Write *pMessage;
 	            LTRESULT nResult = g_pLTSCommon->CreateMessage(pMessage);
@@ -856,6 +917,8 @@ void CPlayerSrvr::Respawn()
     m_fOneHitUntil = 0.0f;
     m_bBottomlessWasActive = false;
     m_bOneHitWasActive = false;
+    m_fLastKillFeedbackTime = 0.0f;
+    m_nKillFeedbackChain = 0;
 
     for(uint8 nSlot = 1; nSlot <= 5; ++nSlot)
     {
@@ -1494,6 +1557,19 @@ void CPlayerSrvr::FirePrimary(
                     0);
                 pDamage->DecRef();
 
+                if(eHitRegion ==
+                   FT_HITREGION_HEAD)
+                {
+                    SendCombatFeedback(
+                        FT_COMBAT_FEEDBACK_HEADSHOT);
+                }
+                else if(eHitRegion ==
+                        FT_HITREGION_GROIN)
+                {
+                    SendCombatFeedback(
+                        FT_COMBAT_FEEDBACK_NUTSHOT);
+                }
+
                 g_pLTServer->CPrint(
                     "Fireteam weapon: %s infected hit region=%s damage=%u distance=%.1f penetrations=%u",
                     pDef->sName,
@@ -1600,6 +1676,38 @@ void CPlayerSrvr::FirePrimary(
             pDef->sName,
             fThickness);
     }
+}
+
+
+void CPlayerSrvr::SendCombatFeedback(
+    uint8 nFeedback)
+{
+    if(!m_hClient ||
+       nFeedback == 0)
+    {
+        return;
+    }
+
+    ILTMessage_Write *pMsg = LTNULL;
+    if(g_pLTSCommon->CreateMessage(
+           pMsg) != LT_OK ||
+       !pMsg)
+    {
+        return;
+    }
+
+    pMsg->IncRef();
+    pMsg->Writeuint8(
+        MSG_SC_COMBAT_FEEDBACK);
+    pMsg->Writeuint8(
+        nFeedback);
+
+    g_pLTServer->SendToClient(
+        pMsg->Read(),
+        m_hClient,
+        MESSAGE_GUARANTEED);
+
+    pMsg->DecRef();
 }
 
 

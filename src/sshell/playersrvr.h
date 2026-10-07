@@ -46,7 +46,9 @@ public:
           m_fBottomlessUntil(0.0f),
           m_fOneHitUntil(0.0f),
           m_bBottomlessWasActive(false),
-          m_bOneHitWasActive(false)
+          m_bOneHitWasActive(false),
+          m_fLastKillFeedbackTime(0.0f),
+          m_nKillFeedbackChain(0)
     {
         FT_LoadWeaponDefs("config/weapons.cfg", m_WeaponDefs);
 
@@ -122,6 +124,7 @@ private:
     void                UpdateHazards();
     void                UpdatePowerups();
     void                SendPowerupState();
+    void                SendCombatFeedback(uint8 nFeedback);
 
 private:
 
@@ -158,6 +161,8 @@ private:
     uint32              m_iScore;
     float               m_fMoney;
     uint32              m_iClientID;
+    float               m_fLastKillFeedbackTime;
+    uint8               m_nKillFeedbackChain;
 
     // Stat send toggle and delay counter
     bool                m_bSendStats;
