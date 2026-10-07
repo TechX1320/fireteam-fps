@@ -138,7 +138,7 @@ public sealed partial class MainWindow : Window
         {
             Text = "FIRETEAM  /  CABIN FEVER",
             FontSize = 18,
-            FontWeight = Windows.UI.Text.FontWeights.SemiBold,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(18, 0, 0, 0)
         };
@@ -207,7 +207,7 @@ public sealed partial class MainWindow : Window
                 Text = title,
                 FontSize = 30,
                 FontWeight =
-                    Windows.UI.Text.FontWeights.SemiBold
+                    Microsoft.UI.Text.FontWeights.SemiBold
             });
 
         return panel;
@@ -335,7 +335,7 @@ public sealed partial class MainWindow : Window
             {
                 Text = "CURRENT LOADOUT",
                 FontWeight =
-                    Windows.UI.Text.FontWeights.SemiBold,
+                    Microsoft.UI.Text.FontWeights.SemiBold,
                 Margin = new Thickness(0, 12, 0, 0)
             });
 
