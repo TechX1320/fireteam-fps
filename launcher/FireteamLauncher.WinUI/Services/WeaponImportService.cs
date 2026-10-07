@@ -23,6 +23,7 @@ public sealed record WeaponImportProgress(
 public sealed record WeaponImportResult(
     int Imported,
     int ExistingSkipped,
+    int ArchiveSkipped,
     int Unsupported,
     int Warnings,
     int GunsFiles,
@@ -32,16 +33,17 @@ public sealed record WeaponImportResult(
     string ReportPath)
 {
     public string Summary =>
-        $"Imported {Imported} Combat Arms weapon definitions. " +
+        $"Imported {Imported} archive-backed Combat Arms weapon definitions. " +
+        $"Skipped {ArchiveSkipped} WEAPONS.txt entries whose required first-person " +
+        $"model/texture were not present in the supplied Guns.zip. " +
         $"{ExistingSkipped} existing FIRETEAM weapons were kept. " +
-        $"{Unsupported} entries are catalog-only/unsupported. " +
+        $"{Unsupported} imported entries are partial/unsupported. " +
         $"{Warnings} asset warnings. " +
-        $"Extracted {GunsFiles} files from Guns.zip" +
+        $"Indexed {GunsFiles} files in Guns.zip" +
         (FoundGunsHH
-            ? $" and {GunsHhFiles} files from GunsHH.zip. "
+            ? $" and {GunsHhFiles} files in GunsHH.zip. "
             : ". GunsHH.zip was not found beside Guns.zip. ") +
-        "New catalog weapons are disabled until you enable them in Definition. " +
-        $"Report: {ReportPath}";
+        $"Full audit: {ReportPath}";
 }
 
 public sealed class WeaponImportService
@@ -321,6 +323,7 @@ public sealed class WeaponImportService
             var imported = 0;
             var processed = 0;
             var existingSkipped = 0;
+            var archiveSkipped = 0;
             var unsupported = 0;
             var warnings = 0;
             var report =
@@ -443,7 +446,7 @@ public sealed class WeaponImportService
                 if(pvModelEntry is null ||
                    pvTextureEntry is null)
                 {
-                    ++unsupported;
+                    ++archiveSkipped;
 
                     if(existingCatalog.TryGetValue(
                            identity,
@@ -1051,6 +1054,7 @@ public sealed class WeaponImportService
             return new WeaponImportResult(
                 imported,
                 existingSkipped,
+                archiveSkipped,
                 unsupported,
                 warnings,
                 gunsFiles,
