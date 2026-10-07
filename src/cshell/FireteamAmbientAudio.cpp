@@ -36,7 +36,7 @@ void FT_AmbientAudioEnterWorld()
         PLAYSOUND_LOOP |
         PLAYSOUND_GETHANDLE |
         PLAYSOUND_CTRL_VOL;
-    info.m_nVolume = 30;
+    info.m_nVolume = 42;
 
     strncpy(
         info.m_szSoundName,
@@ -55,7 +55,12 @@ void FT_AmbientAudioEnterWorld()
         if(g_pLTClient)
         {
             g_pLTClient->CPrint(
-                "Fireteam ambience: ZombieAmbience.wav not staged; continuing without loop.");
+                "Fireteam ambience: ZombieAmbience.wav not staged/decodable; continuing without loop.");
         }
+    }
+    else if(g_pLTClient)
+    {
+        g_pLTClient->CPrint(
+            "Fireteam ambience: ZombieAmbience.wav loop started at volume 42.");
     }
 }
