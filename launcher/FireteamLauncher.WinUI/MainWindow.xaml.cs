@@ -32,29 +32,29 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
-        ModeCombo.ItemsSource =
-        [
+        ModeCombo.ItemsSource = new string[]
+        {
             "Single Player",
             "Host Multiplayer",
             "Join Multiplayer"
-        ];
+        };
 
-        DifficultyCombo.ItemsSource =
-        [
+        DifficultyCombo.ItemsSource = new string[]
+        {
             "Easy",
             "Normal",
             "Hard",
             "Extreme",
             "Nightmare"
-        ];
+        };
 
-        WeaponTypeCombo.ItemsSource =
-        [
+        WeaponTypeCombo.ItemsSource = new string[]
+        {
             "hitscan",
             "melee",
             "grenade",
             "rocket"
-        ];
+        };
 
         ResolutionCombo.ItemsSource = Resolutions;
 
