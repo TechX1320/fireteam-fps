@@ -113,6 +113,7 @@ m_pCamera(NULL),
 m_bRender(true),
 m_bFirstUpdate(true),
 m_bHavePlayerStartInfo(false),
+m_bQaControlDown(false),
 m_vPlayerStartPos(0.0f, 160.0f, 0.0f),
 m_pWorldPropsClnt(NULL),
 m_pPlayer(NULL),
@@ -1272,6 +1273,14 @@ LTRESULT CLTClientShell::PollInput()
         dwMoveFlags |= MOVE_CROUCH;
     }
 
+    if(m_pPlayer->IsDevWeaponQa() &&
+       m_bQaControlDown)
+    {
+        // Ctrl is reserved for QA editor shortcuts. Do not let Ctrl+S
+        // accidentally walk the player backward while saving a weapon.
+        dwMoveFlags = 0;
+    }
+
     if(g_pLTClient->IsCommandOn(COMMAND_SPRINT))
     {
         dwMoveFlags |= MOVE_SPRINT;
@@ -1566,6 +1575,11 @@ void CLTClientShell::OnUnLockRenderer()
 //-----------------------------------------------------------------------------
 void CLTClientShell::OnKeyDown(int key, int rep)
 {
+    if(VK_CONTROL == key)
+    {
+        m_bQaControlDown = true;
+    }
+
     // Fireteam settings key routing
     if(FT_SettingsIsOpen())
     {
@@ -1598,9 +1612,57 @@ void CLTClientShell::OnKeyDown(int key, int rep)
         else
         {
            if(m_pPlayer->IsDevWeaponQa() &&
-              'Q' == key)
+              'Q' == key &&
+              rep == 0)
            {
                m_pPlayer->ToggleDevWeaponQuarantine();
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaControlDown &&
+                   'S' == key &&
+                   rep == 0)
+           {
+               m_pPlayer->SaveDevWeaponView();
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   VK_LEFT == key)
+           {
+               m_pPlayer->AdjustDevWeaponView(
+                   -0.5f,
+                   0.0f,
+                   0.0f);
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   VK_RIGHT == key)
+           {
+               m_pPlayer->AdjustDevWeaponView(
+                   0.5f,
+                   0.0f,
+                   0.0f);
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   VK_UP == key)
+           {
+               m_pPlayer->AdjustDevWeaponView(
+                   0.0f,
+                   m_bQaControlDown
+                       ? 0.0f
+                       : 0.5f,
+                   m_bQaControlDown
+                       ? 0.5f
+                       : 0.0f);
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   VK_DOWN == key)
+           {
+               m_pPlayer->AdjustDevWeaponView(
+                   0.0f,
+                   m_bQaControlDown
+                       ? 0.0f
+                       : -0.5f,
+                   m_bQaControlDown
+                       ? -0.5f
+                       : 0.0f);
            }
            else if(key >= '1' && key <= '5')
            {
@@ -1631,6 +1693,11 @@ void CLTClientShell::OnKeyDown(int key, int rep)
 //-----------------------------------------------------------------------------
 void CLTClientShell::OnKeyUp(int key)
 {
+    if(VK_CONTROL == key)
+    {
+        m_bQaControlDown = false;
+    }
+
 	//g_pLTClient->CPrint("OnKeyUp(%d)", key);
         // If chat input is active, then let's give 
     if(m_pChatGui->IsChatInputActive())

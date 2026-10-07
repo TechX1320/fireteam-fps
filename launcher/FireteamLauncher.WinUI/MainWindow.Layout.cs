@@ -599,112 +599,17 @@ public sealed partial class MainWindow
         var page =
             new StackPanel
             {
-                Spacing = 18,
+                Spacing = 14,
                 Margin =
                     new Thickness(
                         30,
-                        20,
+                        14,
                         30,
-                        30),
+                        26),
                 MaxWidth = 1120,
                 HorizontalAlignment =
                     HorizontalAlignment.Center
             };
-
-        var header =
-            new Grid
-            {
-                ColumnSpacing = 24
-            };
-
-        header.ColumnDefinitions.Add(
-            new ColumnDefinition
-            {
-                Width =
-                    new GridLength(
-                        1,
-                        GridUnitType.Star)
-            });
-        header.ColumnDefinitions.Add(
-            new ColumnDefinition
-            {
-                Width =
-                    GridLength.Auto
-            });
-
-        var identity =
-            new StackPanel
-            {
-                Spacing = 4
-            };
-
-        identity.Children.Add(
-            Eyebrow(
-                "FIRETEAM / LOCAL ALPHA"));
-        identity.Children.Add(
-            SectionTitle(
-                "Ready Room",
-                32));
-        identity.Children.Add(
-            BodyText(
-                "Configure a run, review your loadout and deploy. Cabin Fever is the first supported FIRETEAM map, not the launcher identity."));
-
-        header.Children.Add(identity);
-
-        var launch =
-            new StackPanel
-            {
-                Spacing = 6,
-                HorizontalAlignment =
-                    HorizontalAlignment.Right,
-                VerticalAlignment =
-                    VerticalAlignment.Center,
-                MinWidth = 220
-            };
-
-        PlayButton.Content =
-            "LAUNCH GAME";
-        PlayButton.Background =
-            AccentBrush;
-        PlayButton.Foreground =
-            new SolidColorBrush(
-                Color.FromArgb(
-                    255, 24, 16, 0));
-        PlayButton.BorderBrush =
-            AccentBrush;
-        PlayButton.Padding =
-            new Thickness(
-                26,
-                11,
-                26,
-                11);
-        PlayButton.MinHeight = 46;
-        PlayButton.HorizontalAlignment =
-            HorizontalAlignment.Right;
-        PlayButton.Click +=
-            PlayButton_Click;
-
-        RunStatusText.TextWrapping =
-            TextWrapping.Wrap;
-        RunStatusText.TextAlignment =
-            TextAlignment.Right;
-        RunStatusText.Foreground =
-            SecondaryTextBrush;
-        RunStatusText.MaxWidth = 310;
-
-        launch.Children.Add(
-            PlayButton);
-        launch.Children.Add(
-            RunStatusText);
-
-        Grid.SetColumn(
-            launch,
-            1);
-        header.Children.Add(
-            launch);
-
-        page.Children.Add(
-            header);
 
         var dashboard =
             new Grid
@@ -867,6 +772,81 @@ public sealed partial class MainWindow
                 MutedTextBrush));
         quick.Children.Add(
             CommandsBox);
+
+        var runActions =
+            new Grid
+            {
+                ColumnSpacing = 14,
+                Margin =
+                    new Thickness(
+                        0,
+                        8,
+                        0,
+                        0)
+            };
+
+        runActions.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+        runActions.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    GridLength.Auto
+            });
+
+        RunStatusText.TextWrapping =
+            TextWrapping.Wrap;
+        RunStatusText.TextAlignment =
+            TextAlignment.Left;
+        RunStatusText.Foreground =
+            SecondaryTextBrush;
+        RunStatusText.VerticalAlignment =
+            VerticalAlignment.Center;
+
+        PlayButton.Content =
+            "LAUNCH GAME";
+        PlayButton.Background =
+            AccentBrush;
+        PlayButton.Foreground =
+            new SolidColorBrush(
+                Color.FromArgb(
+                    255,
+                    24,
+                    16,
+                    0));
+        PlayButton.BorderBrush =
+            AccentBrush;
+        PlayButton.Padding =
+            new Thickness(
+                24,
+                10,
+                24,
+                10);
+        PlayButton.MinHeight = 44;
+        PlayButton.HorizontalAlignment =
+            HorizontalAlignment.Right;
+        PlayButton.Click +=
+            PlayButton_Click;
+
+        Grid.SetColumn(
+            RunStatusText,
+            0);
+        Grid.SetColumn(
+            PlayButton,
+            1);
+        runActions.Children.Add(
+            RunStatusText);
+        runActions.Children.Add(
+            PlayButton);
+
+        quick.Children.Add(
+            runActions);
 
         left.Children.Add(
             Card(

@@ -108,6 +108,104 @@ static bool FTPenetrationGeometryFilter(
 
 
 
+enum FTFireteamHitRegion
+{
+    FT_HITREGION_BODY = 0,
+    FT_HITREGION_HEAD,
+    FT_HITREGION_GROIN
+};
+
+static FTFireteamHitRegion FT_GetZombieHitRegion(
+    HOBJECT hTarget,
+    const LTVector &vHitPoint)
+{
+    if(!hTarget)
+    {
+        return FT_HITREGION_BODY;
+    }
+
+    LTVector vTargetPos;
+    g_pLTServer->GetObjectPos(
+        hTarget,
+        &vTargetPos);
+
+    LTVector vDims(
+        18.0f,
+        42.0f,
+        18.0f);
+
+    LTVector vModelDims;
+    if(g_pLTSCommon->GetModelAnimUserDims(
+           hTarget,
+           &vModelDims,
+           g_pLTServer->GetModelAnimation(
+               hTarget)) == LT_OK &&
+       vModelDims.y > 10.0f &&
+       vModelDims.y < 200.0f)
+    {
+        vDims =
+            vModelDims;
+    }
+
+    const float fHeight =
+        vDims.y * 2.0f;
+
+    if(fHeight <= 1.0f)
+    {
+        return FT_HITREGION_BODY;
+    }
+
+    const float fBottom =
+        vTargetPos.y -
+        vDims.y;
+
+    float fNormalizedY =
+        (vHitPoint.y -
+         fBottom) /
+        fHeight;
+
+    if(fNormalizedY < 0.0f)
+    {
+        fNormalizedY = 0.0f;
+    }
+    else if(fNormalizedY > 1.0f)
+    {
+        fNormalizedY = 1.0f;
+    }
+
+    // Top ~28% of the collision/model height is the head/neck zone.
+    if(fNormalizedY >= 0.72f)
+    {
+        return FT_HITREGION_HEAD;
+    }
+
+    // Combat Arms-style "Nut Shot" region: narrow lower-torso/pelvis band.
+    if(fNormalizedY >= 0.42f &&
+       fNormalizedY <= 0.52f)
+    {
+        return FT_HITREGION_GROIN;
+    }
+
+    return FT_HITREGION_BODY;
+}
+
+static const char* FT_HitRegionName(
+    FTFireteamHitRegion eRegion)
+{
+    switch(eRegion)
+    {
+        case FT_HITREGION_HEAD:
+            return "HEADSHOT";
+
+        case FT_HITREGION_GROIN:
+            return "NUTSHOT";
+
+        default:
+            return "BODY";
+    }
+}
+
+
 //-----------------------------------------------------------------------------
 //	CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
 //
@@ -1328,6 +1426,30 @@ void CPlayerSrvr::FirePrimary(
                 fDamageMult *
                 fPenetrationDamageScale;
 
+            FTFireteamHitRegion eHitRegion =
+                FT_HITREGION_BODY;
+
+            if(bZombie)
+            {
+                eHitRegion =
+                    FT_GetZombieHitRegion(
+                        info.m_hObject,
+                        info.m_Point);
+
+                if(eHitRegion ==
+                   FT_HITREGION_HEAD)
+                {
+                    fDamage *=
+                        2.0f;
+                }
+                else if(eHitRegion ==
+                        FT_HITREGION_GROIN)
+                {
+                    fDamage *=
+                        1.5f;
+                }
+            }
+
             if(fDamage < 1.0f &&
                pDef->nDamage > 0)
             {
@@ -1367,8 +1489,10 @@ void CPlayerSrvr::FirePrimary(
                 pDamage->DecRef();
 
                 g_pLTServer->CPrint(
-                    "Fireteam weapon: %s infected hit damage=%u distance=%.1f penetrations=%u",
+                    "Fireteam weapon: %s infected hit region=%s damage=%u distance=%.1f penetrations=%u",
                     pDef->sName,
+                    FT_HitRegionName(
+                        eHitRegion),
                     (uint32)nDamage,
                     fTravelled,
                     nPass);

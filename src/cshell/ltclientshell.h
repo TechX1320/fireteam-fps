@@ -146,6 +146,7 @@ private:
 	bool					m_bRender;
 	bool					m_bFirstUpdate;
 	bool					m_bHavePlayerStartInfo;
+    bool                    m_bQaControlDown;
 
 	LTVector				m_vPlayerStartPos;
 	LTRotation				m_rPlayerStartRot;

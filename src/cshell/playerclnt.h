@@ -46,6 +46,8 @@ public:
     bool                ReloadWeapon();
     bool                IsDevWeaponQa() const { return m_bDevWeaponQa; }
     void                ToggleDevWeaponQuarantine();
+    void                AdjustDevWeaponView(float fDeltaX, float fDeltaY, float fDeltaZ);
+    bool                SaveDevWeaponView();
     void                ReleaseAttackTrigger() { m_bSemiAutoTriggerHeld = false; }
     bool                IsMoving();
     bool                IsCrouching() const { return m_bCrouching; }

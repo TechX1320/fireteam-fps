@@ -356,19 +356,22 @@ void FT_RenderWeaponHud(
 
     if(s_pWeaponName && pDef)
     {
-        char szWeaponLabel[128];
+        char szWeaponLabel[192];
 
         if(s_nQaTotal > 0)
         {
             sprintf(
                 szWeaponLabel,
-                "QA %u/%u  %s%s",
+                "QA %u/%u  %s%s  [X %.1f Y %.1f Z %.1f]",
                 s_nQaCurrent,
                 s_nQaTotal,
                 s_bQaQuarantined
                     ? "[DISABLED] "
                     : "",
-                pDef->sName);
+                pDef->sName,
+                pDef->fViewX,
+                pDef->fViewY,
+                pDef->fViewZ);
         }
         else
         {

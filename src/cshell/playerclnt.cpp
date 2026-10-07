@@ -227,6 +227,240 @@ static bool FT_SetWeaponQaQuarantined(
 
 
 
+static void FT_WriteMissingWeaponViewKeys(
+    FILE *pOutput,
+    const FTWeaponDef *pDef,
+    bool &bWroteX,
+    bool &bWroteY,
+    bool &bWroteZ)
+{
+    if(!pOutput || !pDef)
+    {
+        return;
+    }
+
+    if(!bWroteX)
+    {
+        fprintf(
+            pOutput,
+            "view_x=%.3f\n",
+            pDef->fViewX);
+        bWroteX = true;
+    }
+
+    if(!bWroteY)
+    {
+        fprintf(
+            pOutput,
+            "view_y=%.3f\n",
+            pDef->fViewY);
+        bWroteY = true;
+    }
+
+    if(!bWroteZ)
+    {
+        fprintf(
+            pOutput,
+            "view_z=%.3f\n",
+            pDef->fViewZ);
+        bWroteZ = true;
+    }
+}
+
+static bool FT_SaveWeaponViewToConfig(
+    const char *pFilename,
+    const FTWeaponDef *pDef)
+{
+    if(!pFilename ||
+       !pDef ||
+       !pDef->sSection[0])
+    {
+        return false;
+    }
+
+    FILE *pInput =
+        fopen(
+            pFilename,
+            "rt");
+
+    if(!pInput)
+    {
+        return false;
+    }
+
+    char sTempPath[512];
+    sprintf(
+        sTempPath,
+        "%s.qa.tmp",
+        pFilename);
+
+    FILE *pOutput =
+        fopen(
+            sTempPath,
+            "wt");
+
+    if(!pOutput)
+    {
+        fclose(
+            pInput);
+        return false;
+    }
+
+    char sTargetSection[160];
+    sprintf(
+        sTargetSection,
+        "[%s]",
+        pDef->sSection);
+
+    char sRaw[1024];
+    bool bInTarget = false;
+    bool bFoundTarget = false;
+    bool bWroteX = false;
+    bool bWroteY = false;
+    bool bWroteZ = false;
+
+    while(fgets(
+        sRaw,
+        sizeof(sRaw),
+        pInput))
+    {
+        char sParse[1024];
+        strncpy(
+            sParse,
+            sRaw,
+            sizeof(sParse) - 1);
+        sParse[
+            sizeof(sParse) - 1] =
+            '\0';
+
+        char *pLine =
+            FT_TrimWeaponLine(
+                sParse);
+
+        if(pLine[0] == '[')
+        {
+            if(bInTarget)
+            {
+                FT_WriteMissingWeaponViewKeys(
+                    pOutput,
+                    pDef,
+                    bWroteX,
+                    bWroteY,
+                    bWroteZ);
+            }
+
+            bInTarget =
+                _stricmp(
+                    pLine,
+                    sTargetSection) == 0;
+
+            if(bInTarget)
+            {
+                bFoundTarget = true;
+            }
+
+            fputs(
+                sRaw,
+                pOutput);
+            continue;
+        }
+
+        if(bInTarget)
+        {
+            char *pEquals =
+                strchr(
+                    pLine,
+                    '=');
+
+            if(pEquals)
+            {
+                *pEquals =
+                    '\0';
+
+                char *pKey =
+                    FT_TrimWeaponLine(
+                        pLine);
+
+                if(_stricmp(
+                       pKey,
+                       "view_x") == 0)
+                {
+                    fprintf(
+                        pOutput,
+                        "view_x=%.3f\n",
+                        pDef->fViewX);
+                    bWroteX = true;
+                    continue;
+                }
+
+                if(_stricmp(
+                       pKey,
+                       "view_y") == 0)
+                {
+                    fprintf(
+                        pOutput,
+                        "view_y=%.3f\n",
+                        pDef->fViewY);
+                    bWroteY = true;
+                    continue;
+                }
+
+                if(_stricmp(
+                       pKey,
+                       "view_z") == 0)
+                {
+                    fprintf(
+                        pOutput,
+                        "view_z=%.3f\n",
+                        pDef->fViewZ);
+                    bWroteZ = true;
+                    continue;
+                }
+            }
+        }
+
+        fputs(
+            sRaw,
+            pOutput);
+    }
+
+    if(bInTarget)
+    {
+        FT_WriteMissingWeaponViewKeys(
+            pOutput,
+            pDef,
+            bWroteX,
+            bWroteY,
+            bWroteZ);
+    }
+
+    fclose(
+        pInput);
+    fclose(
+        pOutput);
+
+    if(!bFoundTarget)
+    {
+        remove(
+            sTempPath);
+        return false;
+    }
+
+    remove(
+        pFilename);
+
+    if(rename(
+           sTempPath,
+           pFilename) != 0)
+    {
+        remove(
+            sTempPath);
+        return false;
+    }
+
+    return true;
+}
+
 //----------------------------------------------------------------------------
 // CPlayerClnt::CPlayerClnt()
 //
@@ -1117,6 +1351,109 @@ void CPlayerClnt::ToggleDevWeaponQuarantine()
             ? "DISABLED"
             : "ENABLED",
         pDef->sSection);
+}
+
+
+void CPlayerClnt::AdjustDevWeaponView(
+    float fDeltaX,
+    float fDeltaY,
+    float fDeltaZ)
+{
+    if(!m_bDevWeaponQa ||
+       !m_pDevWeaponDefs ||
+       m_nDevWeaponCount == 0)
+    {
+        return;
+    }
+
+    FTWeaponDef &def =
+        m_pDevWeaponDefs[
+            m_nDevWeaponIndex];
+
+    def.fViewX +=
+        fDeltaX;
+    def.fViewY +=
+        fDeltaY;
+    def.fViewZ +=
+        fDeltaZ;
+
+    if(m_hViewWeaponObject)
+    {
+        LTVector vViewPos(
+            def.fViewX,
+            def.fViewY,
+            def.fViewZ);
+
+        g_pLTClient->SetObjectPos(
+            m_hViewWeaponObject,
+            &vViewPos);
+    }
+
+    FT_WeaponHudSetWeaponDefinition(
+        1,
+        &def);
+
+    g_pLTClient->CPrint(
+        "Fireteam weapon QA position: %s X=%.2f Y=%.2f Z=%.2f",
+        def.sName,
+        def.fViewX,
+        def.fViewY,
+        def.fViewZ);
+}
+
+bool CPlayerClnt::SaveDevWeaponView()
+{
+    if(!m_bDevWeaponQa ||
+       !m_pDevWeaponDefs ||
+       m_nDevWeaponCount == 0)
+    {
+        return false;
+    }
+
+    FTWeaponDef &def =
+        m_pDevWeaponDefs[
+            m_nDevWeaponIndex];
+
+    const bool bRuntimeSaved =
+        FT_SaveWeaponViewToConfig(
+            "config/weapons.cfg",
+            &def);
+
+    bool bSourceSaved =
+        false;
+
+    FILE *pSourceProbe =
+        fopen(
+            "../config/weapons.cfg",
+            "rt");
+
+    if(pSourceProbe)
+    {
+        fclose(
+            pSourceProbe);
+
+        bSourceSaved =
+            FT_SaveWeaponViewToConfig(
+                "../config/weapons.cfg",
+                &def);
+    }
+
+    g_pLTClient->CPrint(
+        "Fireteam weapon QA SAVE: %s X=%.2f Y=%.2f Z=%.2f runtime=%s source=%s",
+        def.sName,
+        def.fViewX,
+        def.fViewY,
+        def.fViewZ,
+        bRuntimeSaved
+            ? "OK"
+            : "FAILED",
+        bSourceSaved
+            ? "OK"
+            : (pSourceProbe
+                ? "FAILED"
+                : "N/A"));
+
+    return bRuntimeSaved;
 }
 
 
