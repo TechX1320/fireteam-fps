@@ -24,6 +24,10 @@ static uint32 s_nZombieSerial = 0;
 static bool s_bDifficultyLoaded = false;
 static FTDifficultyDef s_ZombieDifficulty;
 
+static float s_fZombieWallhackUntil = 0.0f;
+static uint8 s_nZombieWallhackStacks = 0;
+static bool s_bZombieWallhackApplied = false;
+
 FireteamZombie::FireteamZombie() :
     m_nHealth(0),
     m_fAttackCooldown(0.0f),
@@ -136,6 +140,265 @@ static bool FT_ZombieAssetExists(const char *pPath)
 
     fclose(pFile);
     return true;
+}
+
+static float FT_ZombieWallhackStackSeconds(
+    float fBaseSeconds,
+    uint8 nStack)
+{
+    if(fBaseSeconds <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    const uint32 nDifficulty =
+        FT_GetActiveDifficultyLevel(
+            "config/session.cfg");
+
+    if(nDifficulty <= 4 ||
+       nStack <= 1)
+    {
+        return fBaseSeconds;
+    }
+
+    float fFactor = 1.0f;
+
+    if(nDifficulty <= 6)
+    {
+        if(nStack == 2) fFactor = 0.833333f;
+        else if(nStack == 3) fFactor = 0.50f;
+        else if(nStack == 4) fFactor = 0.333333f;
+        else fFactor = 0.20f;
+    }
+    else if(nDifficulty <= 8)
+    {
+        if(nStack == 2) fFactor = 0.75f;
+        else if(nStack == 3) fFactor = 0.40f;
+        else if(nStack == 4) fFactor = 0.25f;
+        else fFactor = 0.15f;
+    }
+    else
+    {
+        if(nStack == 2) fFactor = 0.50f;
+        else if(nStack == 3) fFactor = 0.25f;
+        else if(nStack == 4) fFactor = 0.15f;
+        else fFactor = 0.10f;
+    }
+
+    return fBaseSeconds *
+        fFactor;
+}
+
+void FireteamZombie::ApplyWallhackRenderStyle(
+    bool bEnabled)
+{
+    const char *pBodyStyle =
+        bEnabled
+        ? "RenderStyles/ZombieThroughWall.ltb"
+        : (m_Def.sBodyRenderStyle0[0]
+            ? m_Def.sBodyRenderStyle0
+            : "RenderStyles/default.ltb");
+
+    ObjectCreateStruct bodyOCS;
+    bodyOCS.Clear();
+
+    FT_CopyInfectedString(
+        bodyOCS.m_RenderStyleNames[0],
+        MAX_CS_FILENAME_LEN,
+        pBodyStyle);
+
+    g_pLTSCommon->SetObjectFilenames(
+        m_hObject,
+        &bodyOCS);
+
+    if(m_hFace)
+    {
+        const char *pFaceStyle =
+            bEnabled
+            ? "RenderStyles/ZombieThroughWall.ltb"
+            : (m_Def.sFaceRenderStyle0[0]
+                ? m_Def.sFaceRenderStyle0
+                : "RenderStyles/default.ltb");
+
+        ObjectCreateStruct faceOCS;
+        faceOCS.Clear();
+
+        FT_CopyInfectedString(
+            faceOCS.m_RenderStyleNames[0],
+            MAX_CS_FILENAME_LEN,
+            pFaceStyle);
+
+        g_pLTSCommon->SetObjectFilenames(
+            m_hFace,
+            &faceOCS);
+    }
+}
+
+static void FT_ApplyZombieWallhackToAll(
+    bool bEnabled)
+{
+    HCLASS hZombieClass =
+        g_pLTServer->GetClass(
+            "FireteamZombie");
+
+    if(!hZombieClass)
+    {
+        return;
+    }
+
+    for(HOBJECT hObject =
+            g_pLTServer->GetNextObject(
+                LTNULL);
+        hObject;
+        hObject =
+            g_pLTServer->GetNextObject(
+                hObject))
+    {
+        HCLASS hClass =
+            g_pLTServer->GetObjectClass(
+                hObject);
+
+        if(!hClass ||
+           !g_pLTServer->IsKindOf(
+                hClass,
+                hZombieClass))
+        {
+            continue;
+        }
+
+        FireteamZombie *pZombie =
+            (FireteamZombie*)
+            g_pLTServer->HandleToObject(
+                hObject);
+
+        if(pZombie)
+        {
+            pZombie->ApplyWallhackRenderStyle(
+                bEnabled);
+        }
+    }
+}
+
+static void FT_UpdateZombieWallhackState()
+{
+    if(!s_bZombieWallhackApplied)
+    {
+        return;
+    }
+
+    const float fNow =
+        g_pLTServer->GetTime();
+
+    if(fNow <
+       s_fZombieWallhackUntil)
+    {
+        return;
+    }
+
+    s_fZombieWallhackUntil =
+        0.0f;
+    s_nZombieWallhackStacks =
+        0;
+    s_bZombieWallhackApplied =
+        false;
+
+    FT_ApplyZombieWallhackToAll(
+        false);
+
+    g_pLTServer->CPrint(
+        "Fireteam powerup: ZOMBIE WALLHACK expired.");
+}
+
+float FT_ExtendZombieWallhack(
+    float fBaseSeconds)
+{
+    if(fBaseSeconds <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    if(!FT_ZombieAssetExists(
+           "rez/RenderStyles/ZombieThroughWall.ltb"))
+    {
+        g_pLTServer->CPrint(
+            "Fireteam powerup: ZombieThroughWall.ltb is not staged; wallhack reward skipped.");
+
+        return 0.0f;
+    }
+
+    FT_UpdateZombieWallhackState();
+
+    const float fNow =
+        g_pLTServer->GetTime();
+
+    if(s_fZombieWallhackUntil <=
+       fNow)
+    {
+        s_fZombieWallhackUntil =
+            fNow;
+        s_nZombieWallhackStacks =
+            0;
+    }
+
+    if(s_nZombieWallhackStacks <
+       255)
+    {
+        ++s_nZombieWallhackStacks;
+    }
+
+    const float fAdded =
+        FT_ZombieWallhackStackSeconds(
+            fBaseSeconds,
+            s_nZombieWallhackStacks);
+
+    s_fZombieWallhackUntil +=
+        fAdded;
+
+    if(!s_bZombieWallhackApplied)
+    {
+        s_bZombieWallhackApplied =
+            true;
+
+        FT_ApplyZombieWallhackToAll(
+            true);
+    }
+
+    const float fRemaining =
+        s_fZombieWallhackUntil -
+        fNow;
+
+    g_pLTServer->CPrint(
+        "Fireteam powerup: ZOMBIE WALLHACK stack %u +%.1fs, %.1fs total.",
+        (uint32)s_nZombieWallhackStacks,
+        fAdded,
+        fRemaining);
+
+    return fRemaining;
+}
+
+float FT_GetZombieWallhackRemaining()
+{
+    FT_UpdateZombieWallhackState();
+
+    if(!s_bZombieWallhackApplied)
+    {
+        return 0.0f;
+    }
+
+    const float fRemaining =
+        s_fZombieWallhackUntil -
+        g_pLTServer->GetTime();
+
+    return fRemaining > 0.0f
+        ? fRemaining
+        : 0.0f;
+}
+
+bool FT_IsZombieWallhackActive()
+{
+    return
+        FT_GetZombieWallhackRemaining() >
+        0.0f;
 }
 
 void FireteamZombie::PlayVoiceSound(
@@ -912,6 +1175,8 @@ void FireteamZombie::RebuildPath(const LTVector &vTarget)
 
 void FireteamZombie::UpdateZombie()
 {
+    FT_UpdateZombieWallhackState();
+
     const float kUpdate =
         (m_Def.fUpdateSeconds > 0.0f)
         ? m_Def.fUpdateSeconds
@@ -1642,7 +1907,7 @@ void FireteamZombie::UpdateZombie()
         m_fForcePathTime = 3.0f;
 
         g_pLTServer->CPrint(
-            "Fireteam infected: recovery %s reason=%s waypoint=%u/%u.",
+            "Fireteam infected: recovery %s reason=%s waypoint=%u/%u lane=%u zombie=%.1f %.1f %.1f target=%.1f %.1f %.1f dist=%.1f.",
             bEscaped
                 ? "local-steer"
                 : "repath",
@@ -1650,7 +1915,15 @@ void FireteamZombie::UpdateZombie()
                 ? "no-progress"
                 : "stationary",
             m_nWaypoint,
-            (uint32)m_aPath.size());
+            (uint32)m_aPath.size(),
+            m_nPathLane,
+            vNewPos.x,
+            vNewPos.y,
+            vNewPos.z,
+            vPursuitTarget.x,
+            vPursuitTarget.y,
+            vPursuitTarget.z,
+            fPlayerDistance);
 
         m_fStuckTime = 0.0f;
         m_fNoProgressTime = 0.0f;
@@ -1922,6 +2195,12 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                     true);
 
                 CreateInfectedFace();
+
+                if(FT_IsZombieWallhackActive())
+                {
+                    ApplyWallhackRenderStyle(
+                        true);
+                }
 
                 LTVector vHumanDims(
                     m_Def.fCollisionX,
