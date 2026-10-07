@@ -45,6 +45,7 @@ public:
     void                CycleWeapon(int nDirection);
     bool                ReloadWeapon();
     bool                IsDevWeaponQa() const { return m_bDevWeaponQa; }
+    void                ToggleDevWeaponQuarantine();
     void                ReleaseAttackTrigger() { m_bSemiAutoTriggerHeld = false; }
     bool                IsMoving();
     bool                IsCrouching() const { return m_bCrouching; }
