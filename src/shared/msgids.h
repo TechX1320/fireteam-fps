@@ -47,6 +47,7 @@ enum EMessageID
         MSG_SC_LIGHTGROUP,          // server->client
         MSG_SC_AMMO,                // server->client
         MSG_SC_ROUND,               // server->client
+        MSG_SC_POWERUP,             // server->client
 		MSG_LAST_MESSAGE			//last message marker, do not handle
 		
 };
