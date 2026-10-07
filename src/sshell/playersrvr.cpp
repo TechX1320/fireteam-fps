@@ -937,6 +937,23 @@ void CPlayerSrvr::GrantBottomless(
             fUntil;
     }
 
+    const FTWeaponDef *pDef =
+        FT_GetWeaponDef(
+            m_WeaponDefs,
+            m_nWeaponSlot);
+
+    if(pDef &&
+       pDef->eType !=
+           FT_WEAPON_MELEE &&
+       pDef->nClipSize > 0)
+    {
+        m_nWeaponAmmoInClip[
+            m_nWeaponSlot] =
+            pDef->nClipSize;
+
+        SendPrimaryAmmo();
+    }
+
     m_bBottomlessWasActive =
         true;
 }
