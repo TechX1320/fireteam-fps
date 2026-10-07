@@ -31,6 +31,9 @@ private:
         const LTVector &vPos,
         const LTVector &vDirection,
         float fDistance);
+    bool BuildLocalEscapeWaypoint(
+        const LTVector &vPos,
+        const LTVector &vGoal);
 
     uint16 m_nHealth;
     float m_fAttackCooldown;
