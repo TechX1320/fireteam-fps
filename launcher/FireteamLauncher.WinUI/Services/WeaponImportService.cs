@@ -855,6 +855,20 @@ public sealed class WeaponImportService
                 Set(
                     doc,
                     section,
+                    "min_perturb",
+                    weapon.Get(
+                        "MinPerturb",
+                        "0"));
+                Set(
+                    doc,
+                    section,
+                    "max_perturb",
+                    weapon.Get(
+                        "MaxPerturb",
+                        "0"));
+                Set(
+                    doc,
+                    section,
                     "automatic",
                     IsAutomatic(
                         weapon)
@@ -994,6 +1008,20 @@ public sealed class WeaponImportService
                     weapon.Get(
                         "VectorsPerRound",
                         "1"));
+                Set(
+                    doc,
+                    section,
+                    "ca_min_perturb",
+                    weapon.Get(
+                        "MinPerturb",
+                        "0"));
+                Set(
+                    doc,
+                    section,
+                    "ca_max_perturb",
+                    weapon.Get(
+                        "MaxPerturb",
+                        "0"));
                 Set(
                     doc,
                     section,
