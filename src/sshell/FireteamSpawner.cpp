@@ -2,6 +2,7 @@
 #include "serverinterfaces.h"
 #include "msgids.h"
 #include "FireteamDifficultyDefs.h"
+#include "FireteamMutationBox.h"
 
 #include <iltcommon.h>
 #include <iltmessage.h>
@@ -385,6 +386,8 @@ void FT_OnFireteamEnemyKilled()
                 s_Difficulty.fIntermissionSeconds);
 
             FT_BroadcastRoundState(2);
+
+            FT_SpawnRoundClearMutationBoxes();
         }
         else
         {
