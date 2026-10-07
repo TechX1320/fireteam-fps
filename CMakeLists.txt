@@ -134,7 +134,7 @@ endif()
 # Small dependency-free root launcher. The full WinUI runtime is kept under
 # BUILT/Launcher/App so the game root stays clean.
 add_executable(fireteam_launcher_bootstrap WIN32
-    "\${CMAKE_CURRENT_SOURCE_DIR}/launcher/bootstrap/FireteamLauncherBootstrap.cpp"
+    launcher/bootstrap/FireteamLauncherBootstrap.cpp
 )
 target_link_libraries(fireteam_launcher_bootstrap PRIVATE user32)
 set_target_properties(fireteam_launcher_bootstrap PROPERTIES
