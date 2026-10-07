@@ -82,12 +82,14 @@ public sealed partial class MainWindow
 
         BuildHomeView();
         BuildLoadoutView();
+        BuildCaImportView();
         BuildArsenalView();
         BuildModsView();
         BuildSettingsView();
 
         content.Children.Add(HomeView);
         content.Children.Add(LoadoutView);
+        content.Children.Add(CaImportView);
         content.Children.Add(ArsenalView);
         content.Children.Add(ModsView);
         content.Children.Add(SettingsView);
@@ -129,22 +131,43 @@ public sealed partial class MainWindow
             Background = AccentBrush
         };
 
-        var title = new TextBlock
+        var title = new StackPanel
         {
-            Text = "FIRETEAM",
-            FontFamily =
-                new FontFamily(
-                    "Bahnschrift SemiCondensed"),
-            FontSize = 19,
-            FontWeight =
-                Microsoft.UI.Text.FontWeights.Bold,
-            CharacterSpacing = 35,
-            Foreground = PrimaryTextBrush,
-            VerticalAlignment =
-                VerticalAlignment.Center,
-            Margin =
-                new Thickness(16, 0, 0, 0)
+            Orientation = Orientation.Horizontal,
+            Spacing = 10,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(16, 0, 0, 0)
         };
+
+        title.Children.Add(
+            new TextBlock
+            {
+                Text = "FIRETEAM",
+                FontFamily = new FontFamily("Bahnschrift SemiCondensed"),
+                FontSize = 19,
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                CharacterSpacing = 35,
+                Foreground = PrimaryTextBrush,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+        title.Children.Add(
+            new TextBlock
+            {
+                Text = "/",
+                FontSize = 16,
+                Foreground = MutedTextBrush,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+        AppSectionTitleText.Text = "READY ROOM";
+        AppSectionTitleText.FontFamily = new FontFamily("Bahnschrift SemiCondensed");
+        AppSectionTitleText.FontSize = 13;
+        AppSectionTitleText.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+        AppSectionTitleText.CharacterSpacing = 55;
+        AppSectionTitleText.Foreground = SecondaryTextBrush;
+        AppSectionTitleText.VerticalAlignment = VerticalAlignment.Center;
+        title.Children.Add(AppSectionTitleText);
 
         var build = new TextBlock
         {
@@ -1114,26 +1137,6 @@ public sealed partial class MainWindow
                     HorizontalAlignment.Center
             };
 
-        var header =
-            new StackPanel
-            {
-                Spacing = 4
-            };
-
-        header.Children.Add(
-            Eyebrow(
-                "FIRETEAM / LOADOUT"));
-        header.Children.Add(
-            SectionTitle(
-                "Armory",
-                30));
-        header.Children.Add(
-            BodyText(
-                "Three saved fighting loads, a Combat Arms-inspired inventory and FIRETEAM slot rules. No rarity or progression layer yet."));
-
-        page.Children.Add(
-            header);
-
         var workspace =
             new Grid
             {
@@ -1725,20 +1728,15 @@ public sealed partial class MainWindow
                 () => LauncherPaths.OpenFolder(
                     LauncherPaths.ModToolsDirectory));
 
-        var future =
-            CardHeading(
-                "NEXT TOOLING",
-                "Round / Powerup Tuner",
-                "Planned: data-driven difficulty, infected, round and powerup editing without recompiling FIRETEAM.",
-                MutedTextBrush);
-        future.Children.Add(
-            BodyText(
-                "This follows after the current gameplay configs stabilize."));
-
-        var futureCard =
-            Card(
-                future,
-                MutedTextBrush);
+        var importer =
+            ToolCard(
+                "MIGRATION TOOL",
+                "Combat Arms Importer",
+                "Audit WEAPONS.txt against the exact contents of Guns.zip, import only archive-backed weapons and write a full match/missing report.",
+                AccentBrush,
+                "OPEN IMPORTER",
+                () => NavigateTo(
+                    "ca-importer"));
 
         Grid.SetRow(weapon, 0);
         Grid.SetColumn(weapon, 0);
@@ -1746,13 +1744,13 @@ public sealed partial class MainWindow
         Grid.SetColumn(mods, 1);
         Grid.SetRow(content, 1);
         Grid.SetColumn(content, 0);
-        Grid.SetRow(futureCard, 1);
-        Grid.SetColumn(futureCard, 1);
+        Grid.SetRow(importer, 1);
+        Grid.SetColumn(importer, 1);
 
         tools.Children.Add(weapon);
         tools.Children.Add(mods);
         tools.Children.Add(content);
-        tools.Children.Add(futureCard);
+        tools.Children.Add(importer);
 
         page.Children.Add(tools);
 
@@ -1817,6 +1815,94 @@ public sealed partial class MainWindow
             accent);
     }
 
+    private void BuildCaImportView()
+    {
+        CaImportView.Visibility = Visibility.Collapsed;
+        CaImportView.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+        CaImportView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+        CaImportView.HorizontalContentAlignment = HorizontalAlignment.Center;
+
+        var page = new StackPanel
+        {
+            Spacing = 12,
+            Margin = new Thickness(20, 14, 20, 20),
+            MaxWidth = 1120,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+
+        var control = CardHeading(
+            "ARCHIVE-FIRST MIGRATION",
+            "Import Audit",
+            "WEAPONS.txt supplies metadata; Guns.zip is the content authority. A weapon is only imported when its declared first-person model and texture exist in the supplied archive.",
+            AccentBrush);
+
+        CaImportRunButton.Content = "START IMPORT / AUDIT";
+        CaImportRunButton.Background = AccentBrush;
+        CaImportRunButton.Foreground =
+            new SolidColorBrush(Color.FromArgb(255, 24, 16, 0));
+        CaImportRunButton.BorderBrush = AccentBrush;
+        CaImportRunButton.Padding = new Thickness(18, 9, 18, 9);
+        CaImportRunButton.HorizontalAlignment = HorizontalAlignment.Left;
+        CaImportRunButton.Click += ImportCombatArmsButton_Click;
+        control.Children.Add(CaImportRunButton);
+
+        CaImportProgressBar.Minimum = 0;
+        CaImportProgressBar.Maximum = 100;
+        CaImportProgressBar.Value = 0;
+        CaImportProgressBar.Height = 8;
+        CaImportProgressBar.HorizontalAlignment = HorizontalAlignment.Stretch;
+        control.Children.Add(CaImportProgressBar);
+
+        CaImportStatusText.Text =
+            "Ready. Choose WEAPONS.txt and the matching Guns.zip to begin.";
+        CaImportStatusText.Foreground = SecondaryTextBrush;
+        CaImportStatusText.TextWrapping = TextWrapping.Wrap;
+        control.Children.Add(CaImportStatusText);
+
+        page.Children.Add(Card(control, AccentBrush));
+
+        var audit = CardHeading(
+            "LIVE AUDIT",
+            "Importer Log",
+            "The live log is sampled for responsiveness. assets-local/WeaponImports/last-import.txt contains the complete per-weapon report.",
+            CyanBrush);
+
+        CaImportLogBox.AcceptsReturn = true;
+        CaImportLogBox.IsReadOnly = true;
+        CaImportLogBox.TextWrapping = TextWrapping.Wrap;
+        CaImportLogBox.MinHeight = 390;
+        CaImportLogBox.FontFamily = new FontFamily("Consolas");
+        CaImportLogBox.FontSize = 12;
+        audit.Children.Add(CaImportLogBox);
+
+        var actions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10
+        };
+
+        var openFolder = SecondaryButton("OPEN IMPORT FOLDER");
+        openFolder.Click += (sender, args) =>
+        {
+            var repo = LauncherPaths.FindRepositoryDirectory();
+            if(repo is not null)
+            {
+                LauncherPaths.OpenFolder(
+                    Path.Combine(repo, "assets-local", "WeaponImports"));
+            }
+        };
+
+        var back = SecondaryButton("BACK TO TOOLS");
+        back.Click += (sender, args) => NavigateTo("tools");
+
+        actions.Children.Add(openFolder);
+        actions.Children.Add(back);
+        audit.Children.Add(actions);
+
+        page.Children.Add(Card(audit, CyanBrush));
+        CaImportView.Content = page;
+    }
+
     private void BuildArsenalView()
     {
         ArsenalView.Visibility =
@@ -1864,28 +1950,6 @@ public sealed partial class MainWindow
                 Spacing = 12
             };
 
-        left.Children.Add(
-            Eyebrow(
-                "TOOLS / WEAPON EDITOR",
-                CyanBrush));
-        left.Children.Add(
-            SectionTitle(
-                "Weapon Catalog",
-                28));
-        left.Children.Add(
-            BodyText(
-                "Search or author FIRETEAM weapon definitions. The list renders a capped working set so the 1,300+ weapon CA catalog stays responsive."));
-
-        var import =
-            SecondaryButton(
-                "IMPORT COMBAT ARMS...");
-        import.Click +=
-            ImportCombatArmsButton_Click;
-        left.Children.Add(import);
-        left.Children.Add(
-            BodyText(
-                "Import runs on a worker thread. Commercial assets stay local; use stage-imported-weapons.cmd when you are ready to copy them into BUILT."));
-
         WeaponSearchBox.PlaceholderText =
             "Search name, ID or category...";
         WeaponSearchBox.TextChanged +=
@@ -1895,8 +1959,8 @@ public sealed partial class MainWindow
 
         WeaponList.DisplayMemberPath =
             "DisplayName";
-        WeaponList.MinHeight = 360;
-        WeaponList.MaxHeight = 470;
+        WeaponList.MinHeight = 430;
+        WeaponList.MaxHeight = 600;
         WeaponList.SelectionChanged +=
             WeaponList_SelectionChanged;
         left.Children.Add(
@@ -2447,7 +2511,14 @@ public sealed partial class MainWindow
         else if(tag ==
                 "weapon-editor")
         {
-            ReloadArsenal();
+            if(_arsenal.Count == 0)
+            {
+                ReloadArsenal();
+            }
+            else
+            {
+                ApplyArsenalFilter();
+            }
         }
         else if(tag == "tools")
         {

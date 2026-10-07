@@ -32,6 +32,7 @@ public sealed partial class MainWindow : Window
     private int _selectedLoadoutPresetIndex = 1;
 
     private readonly Grid AppTitleBar = new();
+    private readonly TextBlock AppSectionTitleText = new();
 
     private readonly ScrollViewer HomeView = new();
     private readonly TextBox PlayerNameBox = new();
@@ -65,6 +66,12 @@ public sealed partial class MainWindow : Window
     private readonly ComboBox LoadoutEquipSlotCombo = new();
     private readonly Button LoadoutEquipButton = new();
     private readonly TextBlock LoadoutStatusText = new();
+
+    private readonly ScrollViewer CaImportView = new();
+    private readonly ProgressBar CaImportProgressBar = new();
+    private readonly TextBlock CaImportStatusText = new();
+    private readonly TextBox CaImportLogBox = new();
+    private readonly Button CaImportRunButton = new();
 
     private readonly ScrollViewer ArsenalView = new();
     private readonly TextBox WeaponSearchBox = new();
@@ -165,7 +172,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            AppWindow.Resize(new SizeInt32(1360, 860));
+            AppWindow.Resize(new SizeInt32(1480, 900));
         }
         catch
         {
@@ -176,9 +183,20 @@ public sealed partial class MainWindow : Window
     {
         HomeView.Visibility = tag == "home" ? Visibility.Visible : Visibility.Collapsed;
         LoadoutView.Visibility = tag == "loadout" ? Visibility.Visible : Visibility.Collapsed;
+        CaImportView.Visibility = tag == "ca-importer" ? Visibility.Visible : Visibility.Collapsed;
         ArsenalView.Visibility = tag == "weapon-editor" ? Visibility.Visible : Visibility.Collapsed;
         ModsView.Visibility = tag == "tools" ? Visibility.Visible : Visibility.Collapsed;
         SettingsView.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
+
+        AppSectionTitleText.Text = tag switch
+        {
+            "loadout" => "ARMORY",
+            "weapon-editor" => "WEAPON CATALOG",
+            "ca-importer" => "COMBAT ARMS IMPORTER",
+            "tools" => "MODS & CONTENT TOOLS",
+            "settings" => "SETTINGS",
+            _ => "READY ROOM"
+        };
     }
 
     private void LoadProfile()
@@ -314,8 +332,17 @@ public sealed partial class MainWindow : Window
     private void ReloadArsenal(
         bool force = false)
     {
-        ReloadWeapons(
-            force);
+        try
+        {
+            var all = App.Instance.Services.Weapons.Load(force);
+            _arsenal = all;
+            _choices = App.Instance.Services.Weapons.GetArsenalChoices(all);
+            ApplyArsenalFilter();
+        }
+        catch(Exception ex)
+        {
+            ArsenalStatusText.Text = "Arsenal error: " + ex.Message;
+        }
     }
 
     private void RefreshHomeLoadoutSummary(
@@ -1017,7 +1044,7 @@ public sealed partial class MainWindow : Window
 
     private void ApplyArsenalFilter()
     {
-        const int RenderLimit = 250;
+        const int RenderLimit = 100;
 
         var query =
             WeaponSearchBox.Text?
@@ -1250,7 +1277,7 @@ public sealed partial class MainWindow : Window
                 ? $"Saved {updated.Name} definition."
                 : $"{updated.Name} loadout availability updated.";
 
-            ReloadWeapons(
+            ReloadArsenal(
                 definitionChanged);
         }
         catch(Exception ex)
@@ -1311,60 +1338,74 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            ArsenalStatusText.Text =
-                "Choose the decrypted Combat Arms WEAPONS.txt file...";
+            CaImportRunButton.IsEnabled = false;
+            CaImportProgressBar.Value = 0;
+            CaImportLogBox.Text = string.Empty;
+            CaImportStatusText.Text = "Choose decrypted Combat Arms WEAPONS.txt...";
 
-            var weaponsPath =
-                await PickLauncherFileAsync(
-                    ".txt");
-
+            var weaponsPath = await PickLauncherFileAsync(".txt");
             if(weaponsPath is null)
             {
-                ArsenalStatusText.Text =
-                    "Combat Arms import cancelled.";
+                CaImportStatusText.Text = "Import cancelled.";
                 return;
             }
 
-            ArsenalStatusText.Text =
-                "Choose Guns.zip. GunsHH.zip will be auto-detected beside it when available...";
+            AppendImportLog($"WEAPONS: {weaponsPath}");
+            CaImportStatusText.Text = "Choose the matching Guns.zip archive...";
 
-            var gunsPath =
-                await PickLauncherFileAsync(
-                    ".zip");
-
+            var gunsPath = await PickLauncherFileAsync(".zip");
             if(gunsPath is null)
             {
-                ArsenalStatusText.Text =
-                    "Combat Arms import cancelled.";
+                CaImportStatusText.Text = "Import cancelled.";
                 return;
             }
 
-            ArsenalStatusText.Text =
-                "Importing Combat Arms weapon attributes and assets...";
+            AppendImportLog($"GUNS: {gunsPath}");
+            AppendImportLog("Archive-first audit started. Attribute-only weapons will be skipped.");
 
-            var result =
-                await Task.Run(
-                    () =>
-                        App.Instance.Services.WeaponImports.Import(
-                            weaponsPath,
-                            gunsPath));
+            var progress = new Progress<WeaponImportProgress>(update =>
+            {
+                CaImportProgressBar.Value = update.Percent;
+                CaImportStatusText.Text = $"{update.Stage}  •  {update.Processed}/{update.Total}";
+                AppendImportLog($"[{update.Stage}] {update.Detail}");
+            });
+
+            var result = await Task.Run(() =>
+                App.Instance.Services.WeaponImports.Import(
+                    weaponsPath,
+                    gunsPath,
+                    progress));
 
             App.Instance.Services.Weapons.Invalidate();
-
-            ReloadWeapons(
-                true);
-
-            ArsenalStatusText.Text =
-                result.Summary;
+            ReloadWeapons(true);
+            CaImportProgressBar.Value = 100;
+            CaImportStatusText.Text = result.Summary;
+            AppendImportLog(result.Summary);
         }
         catch(Exception ex)
         {
-            ArsenalStatusText.Text =
-                "Combat Arms import failed: " +
-                ex.Message;
+            CaImportStatusText.Text = "Combat Arms import failed: " + ex.Message;
+            AppendImportLog("[ERROR] " + ex);
+        }
+        finally
+        {
+            CaImportRunButton.IsEnabled = true;
         }
     }
 
+    private void AppendImportLog(string line)
+    {
+        var current = CaImportLogBox.Text;
+        if(current.Length > 24000)
+        {
+            current = current[^16000..];
+        }
+
+        CaImportLogBox.Text = current.Length == 0
+            ? line
+            : current + Environment.NewLine + line;
+        CaImportLogBox.SelectionStart = CaImportLogBox.Text.Length;
+    }
     private async Task<string?> PickLauncherFileAsync(
         params string[] extensions)
     {
