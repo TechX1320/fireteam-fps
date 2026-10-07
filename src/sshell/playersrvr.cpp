@@ -133,6 +133,114 @@ static float FT_StackedPowerupUntil(
 
 
 
+static void FT_ApplyWeaponPerturb(
+    const FTWeaponDef &def,
+    HOBJECT hPlayer,
+    bool bZoomed,
+    LTVector &vDirection)
+{
+    if(def.nMaxPerturb == 0 ||
+       def.nMaxPerturb <
+           def.nMinPerturb)
+    {
+        return;
+    }
+
+    uint32 nPerturb =
+        def.nMinPerturb;
+
+    if(def.fZoomFovDegrees > 0.0f)
+    {
+        // Scoped rifles are deliberately inaccurate from the hip/no-scope.
+        // A real scoped shot receives the CA MinPerturb value.
+        nPerturb =
+            bZoomed
+            ? def.nMinPerturb
+            : def.nMaxPerturb;
+    }
+    else if(hPlayer)
+    {
+        // NOLF2/CA interpolate between MinPerturb and MaxPerturb using a
+        // dynamic perturb factor. FIRETEAM currently derives that factor from
+        // player movement until recoil/bloom state is added.
+        LTVector vVelocity;
+        g_pLTSPhysics->GetVelocity(
+            hPlayer,
+            &vVelocity);
+
+        vVelocity.y =
+            0.0f;
+
+        float fMove =
+            vVelocity.Mag() /
+            435.0f;
+
+        if(fMove < 0.0f)
+            fMove = 0.0f;
+        if(fMove > 1.0f)
+            fMove = 1.0f;
+
+        nPerturb =
+            def.nMinPerturb +
+            (uint32)(
+                ((float)(
+                    def.nMaxPerturb -
+                    def.nMinPerturb) *
+                 fMove) +
+                0.5f);
+    }
+
+    if(nPerturb == 0)
+    {
+        return;
+    }
+
+    LTVector vRight(
+        -vDirection.z,
+        0.0f,
+        vDirection.x);
+
+    if(vRight.MagSqr() <
+       0.0001f)
+    {
+        vRight.Init(
+            1.0f,
+            0.0f,
+            0.0f);
+    }
+    else
+    {
+        vRight.Normalize();
+    }
+
+    LTVector vUp(
+        0.0f,
+        1.0f,
+        0.0f);
+
+    const float fRightPerturb =
+        g_pLTServer->Random(
+            -(float)nPerturb,
+            (float)nPerturb) /
+        1000.0f;
+
+    const float fUpPerturb =
+        g_pLTServer->Random(
+            -(float)nPerturb,
+            (float)nPerturb) /
+        1000.0f;
+
+    vDirection +=
+        (vRight *
+         fRightPerturb);
+    vDirection +=
+        (vUp *
+         fUpPerturb);
+
+    vDirection.Normalize();
+}
+
+
 static bool FTPenetrationGeometryFilter(
     HOBJECT hObject,
     void *pUserData)
@@ -1465,7 +1573,8 @@ void CPlayerSrvr::SetWeaponSlot(uint8 nSlot)
 
 void CPlayerSrvr::FirePrimary(
     const LTVector &vFrom,
-    const LTVector &vDirection)
+    const LTVector &vDirection,
+    bool bZoomed)
 {
     if(!m_bAlive)
     {
@@ -1511,6 +1620,16 @@ void CPlayerSrvr::FirePrimary(
         return;
     }
     vDir.Normalize();
+
+    if(pDef->eType ==
+       FT_WEAPON_HITSCAN)
+    {
+        FT_ApplyWeaponPerturb(
+            *pDef,
+            m_hObject,
+            bZoomed,
+            vDir);
+    }
 
     LTVector vPlayerPos;
     g_pLTServer->GetObjectPos(
