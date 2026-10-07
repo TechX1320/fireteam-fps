@@ -45,8 +45,13 @@ public:
           m_fReloadComplete(0.0f),
           m_fBottomlessUntil(0.0f),
           m_fOneHitUntil(0.0f),
+          m_fGodUntil(0.0f),
+          m_nBottomlessStacks(0),
+          m_nOneHitStacks(0),
+          m_nGodStacks(0),
           m_bBottomlessWasActive(false),
           m_bOneHitWasActive(false),
+          m_bGodWasActive(false),
           m_fLastKillFeedbackTime(0.0f),
           m_nKillFeedbackChain(0)
     {
@@ -102,7 +107,9 @@ public:
     void                GrantHealth(uint32 nAmount);
     void                GrantBottomless(float fSeconds);
     void                GrantOneHit(float fSeconds);
+    void                GrantGodMode(float fSeconds);
     void                NotifyPowerup(const char *pText, float fSeconds);
+    void                SyncPowerupState(){ SendPowerupState(); }
 
 private:
 
@@ -152,8 +159,13 @@ private:
 
     float               m_fBottomlessUntil;
     float               m_fOneHitUntil;
+    float               m_fGodUntil;
+    uint8               m_nBottomlessStacks;
+    uint8               m_nOneHitStacks;
+    uint8               m_nGodStacks;
     bool                m_bBottomlessWasActive;
     bool                m_bOneHitWasActive;
+    bool                m_bGodWasActive;
 
     HCLIENT             m_hClient;
 
