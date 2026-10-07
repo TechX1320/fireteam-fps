@@ -20,6 +20,7 @@
 #include <iltmodel.h>
 #include <iltsoundmgr.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "clientinterfaces.h"
 #include "commandids.h"
