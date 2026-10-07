@@ -47,6 +47,87 @@ static float FTClamp(float v, float lo, float hi)
     return v;
 }
 
+static float FTChooseGateCoordinate(
+    float fReference,
+    float fLo,
+    float fHi,
+    float fAgentHalfWidth,
+    uint32 nLane)
+{
+    if(fLo >= fHi)
+    {
+        return (fLo + fHi) * 0.5f;
+    }
+
+    const float fGateWidth =
+        FTMax(
+            12.0f,
+            fAgentHalfWidth * 2.0f);
+    const float fSpan =
+        fHi - fLo;
+
+    uint32 nGateCount =
+        (uint32)(fSpan / fGateWidth) + 1;
+
+    if(nGateCount <= 1)
+    {
+        return (fLo + fHi) * 0.5f;
+    }
+
+    const float fSpacing =
+        fSpan /
+        (float)(nGateCount - 1);
+
+    const float fClampedReference =
+        FTClamp(
+            fReference,
+            fLo,
+            fHi);
+
+    int nNearest =
+        (int)(((fClampedReference - fLo) /
+               fSpacing) + 0.5f);
+
+    // NOLF2 divides volume connections into character-width gates and
+    // allocates a nearby gate. FIRETEAM does not keep shared occupancy yet,
+    // so use a stable per-infected lane and rotate it during stuck recovery.
+    const uint32 nPatternCount =
+        (nGateCount * 2) - 1;
+    const uint32 nPattern =
+        nLane % nPatternCount;
+
+    int nOffset = 0;
+    if(nPattern > 0)
+    {
+        const int nStep =
+            (int)((nPattern + 1) / 2);
+
+        nOffset =
+            (nPattern & 1)
+            ? nStep
+            : -nStep;
+    }
+
+    int nSelected =
+        nNearest + nOffset;
+
+    if(nSelected < 0 ||
+       nSelected >= (int)nGateCount)
+    {
+        nSelected =
+            nNearest - nOffset;
+    }
+
+    if(nSelected < 0 ||
+       nSelected >= (int)nGateCount)
+    {
+        nSelected = nNearest;
+    }
+
+    return fLo +
+        (fSpacing * (float)nSelected);
+}
+
 static uint32 FTCollectVolumes(FTNavVolume *pVolumes, uint32 nMax)
 {
     HCLASS hVolumeClass = g_pLTServer->GetClass("AIVolume");
@@ -81,7 +162,10 @@ static uint32 FTCollectVolumes(FTNavVolume *pVolumes, uint32 nMax)
     return nCount;
 }
 
-static int FTFindVolume(const FTNavVolume *pVolumes, uint32 nCount, const LTVector &vPos)
+static int FTFindContainingVolume(
+    const FTNavVolume *pVolumes,
+    uint32 nCount,
+    const LTVector &vPos)
 {
     int nBest = -1;
     float fBest = FLT_MAX;
@@ -91,13 +175,23 @@ static int FTFindVolume(const FTNavVolume *pVolumes, uint32 nCount, const LTVect
         const LTVector &c = pVolumes[i].vCenter;
         const LTVector &d = pVolumes[i].vDims;
 
-        float dx = (float)fabs(vPos.x - c.x) - d.x;
-        float dz = (float)fabs(vPos.z - c.z) - d.z;
-        float dy = (float)fabs(vPos.y - c.y) - (d.y + 96.0f);
+        const float dx =
+            (float)fabs(vPos.x - c.x) - d.x;
+        const float dz =
+            (float)fabs(vPos.z - c.z) - d.z;
+        const float dy =
+            (float)fabs(vPos.y - c.y) -
+            (d.y + 96.0f);
 
-        if(dx <= 6.0f && dz <= 6.0f && dy <= 0.0f)
+        if(dx <= 6.0f &&
+           dz <= 6.0f &&
+           dy <= 0.0f)
         {
-            float fArea = FTMax(1.0f, d.x * d.z);
+            const float fArea =
+                FTMax(
+                    1.0f,
+                    d.x * d.z);
+
             if(fArea < fBest)
             {
                 fBest = fArea;
@@ -106,21 +200,53 @@ static int FTFindVolume(const FTNavVolume *pVolumes, uint32 nCount, const LTVect
         }
     }
 
-    if(nBest >= 0)
+    return nBest;
+}
+
+static int FTFindVolume(
+    const FTNavVolume *pVolumes,
+    uint32 nCount,
+    const LTVector &vPos)
+{
+    const int nContaining =
+        FTFindContainingVolume(
+            pVolumes,
+            nCount,
+            vPos);
+
+    if(nContaining >= 0)
     {
-        return nBest;
+        return nContaining;
     }
 
-    fBest = FLT_MAX;
+    int nBest = -1;
+    float fBest = FLT_MAX;
+
     for(uint32 i = 0; i < nCount; ++i)
     {
         const LTVector &c = pVolumes[i].vCenter;
         const LTVector &d = pVolumes[i].vDims;
 
-        float dx = FTMax(0.0f, (float)fabs(vPos.x - c.x) - d.x);
-        float dz = FTMax(0.0f, (float)fabs(vPos.z - c.z) - d.z);
-        float dy = FTMax(0.0f, (float)fabs(vPos.y - c.y) - (d.y + 96.0f));
-        float fScore = (dx * dx) + (dz * dz) + (dy * dy * 0.25f);
+        const float dx =
+            FTMax(
+                0.0f,
+                (float)fabs(vPos.x - c.x) -
+                d.x);
+        const float dz =
+            FTMax(
+                0.0f,
+                (float)fabs(vPos.z - c.z) -
+                d.z);
+        const float dy =
+            FTMax(
+                0.0f,
+                (float)fabs(vPos.y - c.y) -
+                (d.y + 96.0f));
+
+        const float fScore =
+            (dx * dx) +
+            (dz * dz) +
+            (dy * dy * 0.25f);
 
         if(fScore < fBest)
         {
@@ -137,6 +263,7 @@ static bool FTGetConnection(
     const FTNavVolume &b,
     float fAgentHalfWidth,
     const LTVector &vReference,
+    uint32 nLane,
     LTVector *pOut)
 {
     const float kSlack = 18.0f;
@@ -202,7 +329,12 @@ static bool FTGetConnection(
         const float fLo = overlapZMin + fHalfWidth;
         const float fHi = overlapZMax - fHalfWidth;
         pOut->z = (fLo <= fHi)
-            ? FTClamp(vReference.z, fLo, fHi)
+            ? FTChooseGateCoordinate(
+                vReference.z,
+                fLo,
+                fHi,
+                fHalfWidth,
+                nLane)
             : (overlapZMin + overlapZMax) * 0.5f;
 
         pOut->y = (a.vCenter.y + b.vCenter.y) * 0.5f;
@@ -221,7 +353,12 @@ static bool FTGetConnection(
         const float fLo = overlapXMin + fHalfWidth;
         const float fHi = overlapXMax - fHalfWidth;
         pOut->x = (fLo <= fHi)
-            ? FTClamp(vReference.x, fLo, fHi)
+            ? FTChooseGateCoordinate(
+                vReference.x,
+                fLo,
+                fHi,
+                fHalfWidth,
+                nLane)
             : (overlapXMin + overlapXMax) * 0.5f;
 
         pOut->y = (a.vCenter.y + b.vCenter.y) * 0.5f;
@@ -241,17 +378,21 @@ static bool FTGetConnection(
         if(dxCenter >= dzCenter)
         {
             pOut->x = (overlapXMin + overlapXMax) * 0.5f;
-            pOut->z = FTClamp(
+            pOut->z = FTChooseGateCoordinate(
                 vReference.z,
                 overlapZMin + fHalfWidth,
-                overlapZMax - fHalfWidth);
+                overlapZMax - fHalfWidth,
+                fHalfWidth,
+                nLane);
         }
         else
         {
-            pOut->x = FTClamp(
+            pOut->x = FTChooseGateCoordinate(
                 vReference.x,
                 overlapXMin + fHalfWidth,
-                overlapXMax - fHalfWidth);
+                overlapXMax - fHalfWidth,
+                fHalfWidth,
+                nLane);
             pOut->z = (overlapZMin + overlapZMax) * 0.5f;
         }
 
@@ -278,12 +419,12 @@ bool FT_ArePositionsInSameNavigationVolume(
     }
 
     const int nA =
-        FTFindVolume(
+        FTFindContainingVolume(
             aVolumes,
             nCount,
             vA);
     const int nB =
-        FTFindVolume(
+        FTFindContainingVolume(
             aVolumes,
             nCount,
             vB);
@@ -291,6 +432,22 @@ bool FT_ArePositionsInSameNavigationVolume(
     return nA >= 0 &&
            nB >= 0 &&
            nA == nB;
+}
+
+bool FT_IsPositionInNavigationVolume(
+    const LTVector &vPos)
+{
+    FTNavVolume aVolumes[kMaxNavVolumes];
+    const uint32 nCount =
+        FTCollectVolumes(
+            aVolumes,
+            kMaxNavVolumes);
+
+    return nCount > 0 &&
+           FTFindContainingVolume(
+               aVolumes,
+               nCount,
+               vPos) >= 0;
 }
 
 uint32 FT_GetNavigationVolumeCount()
@@ -375,6 +532,7 @@ bool FT_BuildNavigationPath(
                 aVolumes[i],
                 fAgentHalfWidth,
                 aVolumes[nCurrent].vCenter,
+                0,
                 &vConnection))
             {
                 continue;
@@ -444,6 +602,7 @@ bool FT_BuildNavigationPath(
             to,
             fAgentHalfWidth,
             vGateReference,
+            nLane,
             &vConnection))
         {
             aWaypoints.push_back(vConnection);

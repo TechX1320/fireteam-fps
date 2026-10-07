@@ -29,6 +29,11 @@ FireteamZombie::FireteamZombie() :
     m_fRepathCooldown(0.0f),
     m_fStuckTime(0.0f),
     m_fForcePathTime(0.0f),
+    m_fNoProgressTime(0.0f),
+    m_fBestProgressDistance(FLT_MAX),
+    m_fTargetMemory(0.0f),
+    m_bHasLastKnownTarget(false),
+    m_eBehaviorState(kBehaviorSearch),
     m_bDying(false),
     m_fDeathTimeRemaining(0.0f),
     m_nPathLane((s_nZombieSerial++) % 5),
@@ -38,6 +43,8 @@ FireteamZombie::FireteamZombie() :
     m_bDefLoaded(false)
 {
     m_vLastPos.Init(0.0f, 0.0f, 0.0f);
+    m_vLastKnownTargetPos.Init(0.0f, 0.0f, 0.0f);
+    m_vProgressTarget.Init(0.0f, 0.0f, 0.0f);
     m_vCollisionDims.Init(24.0f, 53.0f, 24.0f);
     m_sCurrentAnimation[0] = '\0';
 
@@ -88,6 +95,11 @@ FireteamZombie::FireteamZombie() :
         if(m_Def.fAlertDistance <= 0.0f)
         {
             m_Def.fAlertDistance = 300.0f;
+        }
+
+        if(m_Def.fTargetMemorySeconds <= 0.0f)
+        {
+            m_Def.fTargetMemorySeconds = 3.5f;
         }
 
         float fDamage =
@@ -403,36 +415,74 @@ bool FireteamZombie::IsMovementStepClear(
 
     vDir.Normalize();
 
+    LTVector vRight(
+        -vDir.z,
+        0.0f,
+        vDir.x);
+
+    float fHalfWidth =
+        m_vCollisionDims.x;
+
+    if(m_vCollisionDims.z >
+       fHalfWidth)
+    {
+        fHalfWidth =
+            m_vCollisionDims.z;
+    }
+
+    if(fHalfWidth < 6.0f)
+    {
+        fHalfWidth = 6.0f;
+    }
+
     LTVector vProbeFrom = vPos;
     vProbeFrom.y +=
         m_vCollisionDims.y * 0.45f;
 
-    IntersectQuery query;
-    IntersectInfo info;
-
-    query.m_From = vProbeFrom;
-    query.m_To =
-        vProbeFrom +
-        (vDir *
-         (fDistance +
-          m_vCollisionDims.x));
-    query.m_Flags =
-        INTERSECT_OBJECTS |
-        IGNORE_NONSOLID |
-        INTERSECT_HPOLY;
+    const float aOffsets[3] =
+    {
+        0.0f,
+        -(fHalfWidth + 2.0f),
+        (fHalfWidth + 2.0f)
+    };
 
     FTZombieMovementFilterData filter;
     filter.hZombie = m_hObject;
-    query.m_FilterFn =
-        FTZombieMovementFilter;
-    query.m_pUserData =
-        &filter;
 
-    return !g_pLTServer->IntersectSegment(
-        &query,
-        &info);
+    for(uint32 i = 0; i < 3; ++i)
+    {
+        const LTVector vOffset =
+            vRight * aOffsets[i];
+
+        IntersectQuery query;
+        IntersectInfo info;
+
+        query.m_From =
+            vProbeFrom + vOffset;
+        query.m_To =
+            query.m_From +
+            (vDir *
+             (fDistance +
+              fHalfWidth));
+        query.m_Flags =
+            INTERSECT_OBJECTS |
+            IGNORE_NONSOLID |
+            INTERSECT_HPOLY;
+        query.m_FilterFn =
+            FTZombieMovementFilter;
+        query.m_pUserData =
+            &filter;
+
+        if(g_pLTServer->IntersectSegment(
+            &query,
+            &info))
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
-
 bool FireteamZombie::BuildLocalEscapeWaypoint(
     const LTVector &vPos,
     const LTVector &vGoal)
@@ -453,9 +503,6 @@ bool FireteamZombie::BuildLocalEscapeWaypoint(
         0.0f,
         vForward.x);
 
-    // Prefer shallow sidesteps that keep making progress.  Pure lateral
-    // movement is a fallback.  We intentionally do not reverse direction:
-    // NOLF2's dynamic avoidance similarly constrains steering to <= 90 deg.
     LTVector aDirections[4];
     aDirections[0] =
         vForward +
@@ -468,6 +515,14 @@ bool FireteamZombie::BuildLocalEscapeWaypoint(
 
     const uint32 nStart =
         (m_nPathLane & 1) ? 1 : 0;
+
+    const bool bConstrainToVolume =
+        FT_IsPositionInNavigationVolume(
+            vPos);
+
+    bool bFound = false;
+    LTVector vBest;
+    float fBestScore = FLT_MAX;
 
     for(uint32 nPass = 0;
         nPass < 4;
@@ -503,24 +558,49 @@ bool FireteamZombie::BuildLocalEscapeWaypoint(
             vPos +
             (vDir * 72.0f);
 
-        if(m_nWaypoint >
-           m_aPath.size())
+        if(bConstrainToVolume &&
+           !FT_ArePositionsInSameNavigationVolume(
+               vPos,
+               vEscape))
         {
-            m_nWaypoint =
-                (uint32)m_aPath.size();
+            continue;
         }
 
-        m_aPath.insert(
-            m_aPath.begin() +
-                m_nWaypoint,
-            vEscape);
+        LTVector vRemaining =
+            vGoal - vEscape;
+        vRemaining.y = 0.0f;
 
-        return true;
+        const float fScore =
+            vRemaining.MagSqr();
+
+        if(!bFound ||
+           fScore < fBestScore)
+        {
+            bFound = true;
+            vBest = vEscape;
+            fBestScore = fScore;
+        }
     }
 
-    return false;
-}
+    if(!bFound)
+    {
+        return false;
+    }
 
+    if(m_nWaypoint >
+       m_aPath.size())
+    {
+        m_nWaypoint =
+            (uint32)m_aPath.size();
+    }
+
+    m_aPath.insert(
+        m_aPath.begin() +
+            m_nWaypoint,
+        vBest);
+
+    return true;
+}
 HOBJECT FireteamZombie::FindNearestPlayer()
 {
     HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
@@ -585,6 +665,43 @@ static bool FTZombieSightFilter(
 
     return hObject != pData->hZombie &&
            hObject != pData->hTarget;
+}
+
+bool FireteamZombie::CanSeeTarget(
+    HOBJECT hTarget,
+    const LTVector &vFrom,
+    const LTVector &vTarget)
+{
+    IntersectQuery query;
+    IntersectInfo info;
+
+    query.m_From = vFrom;
+    query.m_To = vTarget;
+
+    const float fProbeHeight =
+        m_vCollisionDims.y > 20.0f
+        ? m_vCollisionDims.y * 0.45f
+        : 12.0f;
+
+    query.m_From.y += fProbeHeight;
+    query.m_To.y += fProbeHeight;
+    query.m_Flags =
+        INTERSECT_OBJECTS |
+        IGNORE_NONSOLID |
+        INTERSECT_HPOLY;
+
+    FTZombieSightFilterData filterData;
+    filterData.hZombie = m_hObject;
+    filterData.hTarget = hTarget;
+
+    query.m_FilterFn =
+        FTZombieSightFilter;
+    query.m_pUserData =
+        &filterData;
+
+    return !g_pLTServer->IntersectSegment(
+        &query,
+        &info);
 }
 
 bool FireteamZombie::HasDirectPathToTarget(
@@ -754,6 +871,14 @@ void FireteamZombie::UpdateZombie()
             m_Def.sIdleAnim,
             true);
 
+        m_fTargetMemory = 0.0f;
+        m_bHasLastKnownTarget = false;
+        m_eBehaviorState =
+            kBehaviorSearch;
+        m_fNoProgressTime = 0.0f;
+        m_fBestProgressDistance =
+            FLT_MAX;
+
         return;
     }
 
@@ -776,8 +901,60 @@ void FireteamZombie::UpdateZombie()
     const float fPlayerDistance =
         vToPlayer.Mag();
 
-    if(fPlayerDistance <= kAttackRange)
+    const bool bCanSeePlayer =
+        fPlayerDistance <=
+            m_Def.fAlertDistance &&
+        CanSeeTarget(
+            hTarget,
+            vPos,
+            vTarget);
+
+    if(bCanSeePlayer)
     {
+        m_vLastKnownTargetPos =
+            vTarget;
+        m_fTargetMemory =
+            m_Def.fTargetMemorySeconds;
+        m_bHasLastKnownTarget =
+            true;
+        m_eBehaviorState =
+            kBehaviorChase;
+    }
+    else if(m_bHasLastKnownTarget &&
+            m_fTargetMemory > 0.0f)
+    {
+        m_fTargetMemory -=
+            kUpdate;
+
+        if(m_fTargetMemory > 0.0f)
+        {
+            m_eBehaviorState =
+                kBehaviorLostTarget;
+        }
+        else
+        {
+            m_fTargetMemory = 0.0f;
+            m_bHasLastKnownTarget =
+                false;
+            m_eBehaviorState =
+                kBehaviorSearch;
+        }
+    }
+    else
+    {
+        m_fTargetMemory = 0.0f;
+        m_bHasLastKnownTarget =
+            false;
+        m_eBehaviorState =
+            kBehaviorSearch;
+    }
+
+    if(fPlayerDistance <= kAttackRange &&
+       bCanSeePlayer)
+    {
+        m_eBehaviorState =
+            kBehaviorAttack;
+
         LTVector vStop(
             0.0f,
             0.0f,
@@ -825,29 +1002,61 @@ void FireteamZombie::UpdateZombie()
         }
 
         m_fStuckTime = 0.0f;
+        m_fNoProgressTime = 0.0f;
+        m_fBestProgressDistance =
+            FLT_MAX;
         m_vLastPos = vPos;
         return;
     }
 
-    // NOLF2 only takes a simple direct movement route when source and
-    // destination share an authored navigation volume.  Crossing rooms,
-    // doorways or stairs stays on the AIVolume graph instead of repeatedly
-    // shortcutting through visible-but-unwalkable geometry.
+    LTVector vPursuitTarget =
+        vTarget;
+
+    if(m_eBehaviorState ==
+           kBehaviorLostTarget &&
+       m_bHasLastKnownTarget)
+    {
+        vPursuitTarget =
+            m_vLastKnownTargetPos;
+
+        LTVector vToLastKnown =
+            vPursuitTarget -
+            vPos;
+
+        vToLastKnown.y = 0.0f;
+
+        if(vToLastKnown.Mag() <=
+           (kWaypointRadius * 1.5f))
+        {
+            m_fTargetMemory = 0.0f;
+            m_bHasLastKnownTarget =
+                false;
+            m_eBehaviorState =
+                kBehaviorSearch;
+            vPursuitTarget =
+                vTarget;
+        }
+    }
+
+    // Direct pursuit is only allowed inside the same authored volume.
+    // Path construction may still recover from a slightly out-of-volume
+    // source position using its nearest-volume fallback.
     const bool bSameVolume =
         FT_ArePositionsInSameNavigationVolume(
             vPos,
-            vTarget);
+            vPursuitTarget);
 
-    const bool bClearRouteToPlayer =
+    const bool bClearRouteToTarget =
         HasDirectPathToTarget(
             hTarget,
             vPos,
-            vTarget);
+            vPursuitTarget);
 
     const bool bRunning =
-        bClearRouteToPlayer ||
-        fPlayerDistance <=
-            m_Def.fAlertDistance;
+        m_eBehaviorState ==
+            kBehaviorChase ||
+        m_eBehaviorState ==
+            kBehaviorLostTarget;
 
     const float fMoveSpeed =
         bRunning
@@ -857,7 +1066,7 @@ void FireteamZombie::UpdateZombie()
     const bool bDirectPursuit =
         m_fForcePathTime <= 0.0f &&
         bSameVolume &&
-        bClearRouteToPlayer;
+        bClearRouteToTarget;
 
     if(bDirectPursuit)
     {
@@ -873,7 +1082,7 @@ void FireteamZombie::UpdateZombie()
         {
             LTVector vTargetDelta =
                 m_aPath.back() -
-                vTarget;
+                vPursuitTarget;
 
             vTargetDelta.y = 0.0f;
 
@@ -888,7 +1097,7 @@ void FireteamZombie::UpdateZombie()
            (bTargetMoved &&
             m_fRepathCooldown <= 0.0f))
         {
-            RebuildPath(vTarget);
+            RebuildPath(vPursuitTarget);
         }
 
         while(m_nWaypoint <
@@ -913,13 +1122,13 @@ void FireteamZombie::UpdateZombie()
            m_aPath.size() &&
            m_fRepathCooldown <= 0.0f)
         {
-            RebuildPath(vTarget);
+            RebuildPath(vPursuitTarget);
         }
     }
 
     const LTVector vMoveTarget =
         bDirectPursuit
-        ? vTarget
+        ? vPursuitTarget
         : ((m_nWaypoint <
             m_aPath.size())
             ? m_aPath[m_nWaypoint]
@@ -1224,55 +1433,117 @@ void FireteamZombie::UpdateZombie()
 
     vMoved.y = 0.0f;
 
+    if(!bDirectPursuit &&
+       m_nWaypoint <
+           m_aPath.size())
+    {
+        LTVector vTargetChange =
+            vMoveTarget -
+            m_vProgressTarget;
+        vTargetChange.y = 0.0f;
+
+        LTVector vToWaypoint =
+            vMoveTarget -
+            vNewPos;
+        vToWaypoint.y = 0.0f;
+
+        const float fDistanceToWaypoint =
+            vToWaypoint.Mag();
+
+        if(m_fBestProgressDistance ==
+               FLT_MAX ||
+           vTargetChange.MagSqr() >
+               (12.0f * 12.0f))
+        {
+            m_vProgressTarget =
+                vMoveTarget;
+            m_fBestProgressDistance =
+                fDistanceToWaypoint;
+            m_fNoProgressTime =
+                0.0f;
+        }
+        else if(fDistanceToWaypoint +
+                    2.0f <
+                m_fBestProgressDistance)
+        {
+            m_fBestProgressDistance =
+                fDistanceToWaypoint;
+            m_fNoProgressTime =
+                0.0f;
+        }
+        else
+        {
+            m_fNoProgressTime +=
+                kUpdate;
+        }
+    }
+    else
+    {
+        m_fNoProgressTime = 0.0f;
+        m_fBestProgressDistance =
+            FLT_MAX;
+    }
+
     if(vMoved.Mag() < 0.75f &&
        fPlayerDistance >
            kAttackRange)
     {
         m_fStuckTime +=
             kUpdate;
-
-        if(m_fStuckTime >= 1.50f)
-        {
-            bool bEscaped = false;
-
-            // One local sidestep gets a chance to clear a jamb/stair edge.
-            // If that escape itself stalls, throw it away and rebuild the
-            // authored-volume route instead of inserting endless temporary
-            // waypoints (the old behavior could grow paths 1/8 -> 1/11 ->
-            // 1/14 while the infected stayed in the same spot).
-            if(m_fForcePathTime <= 0.0f)
-            {
-                bEscaped =
-                    BuildLocalEscapeWaypoint(
-                        vNewPos,
-                        vMoveTarget);
-            }
-
-            if(!bEscaped)
-            {
-                m_aPath.clear();
-                m_nWaypoint = 0;
-                m_fRepathCooldown = 0.0f;
-                RebuildPath(vTarget);
-            }
-
-            m_fForcePathTime = 3.0f;
-            ++m_nPathLane;
-
-            g_pLTServer->CPrint(
-                "Fireteam infected: recovery %s waypoint=%u/%u.",
-                bEscaped
-                    ? "local-steer"
-                    : "repath",
-                m_nWaypoint,
-                (uint32)m_aPath.size());
-
-            m_fStuckTime = 0.0f;
-        }
     }
     else
     {
         m_fStuckTime = 0.0f;
+    }
+
+    const bool bNoRouteProgress =
+        m_fNoProgressTime >= 1.25f;
+
+    if((m_fStuckTime >= 1.50f ||
+        bNoRouteProgress) &&
+       fPlayerDistance >
+           kAttackRange)
+    {
+        bool bEscaped = false;
+
+        // Rotate before rebuilding so this recovery really tries a different
+        // character-width volume gate.
+        ++m_nPathLane;
+
+        if(m_fForcePathTime <= 0.0f)
+        {
+            bEscaped =
+                BuildLocalEscapeWaypoint(
+                    vNewPos,
+                    vMoveTarget);
+        }
+
+        if(!bEscaped)
+        {
+            m_aPath.clear();
+            m_nWaypoint = 0;
+            m_fRepathCooldown = 0.0f;
+            RebuildPath(
+                vPursuitTarget);
+        }
+
+        m_fForcePathTime = 3.0f;
+
+        g_pLTServer->CPrint(
+            "Fireteam infected: recovery %s reason=%s waypoint=%u/%u.",
+            bEscaped
+                ? "local-steer"
+                : "repath",
+            bNoRouteProgress
+                ? "no-progress"
+                : "stationary",
+            m_nWaypoint,
+            (uint32)m_aPath.size());
+
+        m_fStuckTime = 0.0f;
+        m_fNoProgressTime = 0.0f;
+        m_fBestProgressDistance =
+            FLT_MAX;
     }
 
     m_vLastPos =

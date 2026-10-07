@@ -47,6 +47,9 @@ bool FT_ArePositionsInSameNavigationVolume(
     const LTVector &vA,
     const LTVector &vB);
 
+bool FT_IsPositionInNavigationVolume(
+    const LTVector &vPos);
+
 uint32 FT_GetNavigationVolumeCount();
 
 #endif

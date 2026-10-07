@@ -16,6 +16,7 @@ struct FTInfectedDef
     float fWalkSpeed;
     float fRunSpeed;
     float fAlertDistance;
+    float fTargetMemorySeconds;
     uint8 nAttackDamage;
     float fAttackRange;
     float fAttackCooldown;
@@ -124,6 +125,8 @@ inline void FT_ApplyInfectedValue(
         def.fRunSpeed = (float)atof(pValue);
     else if(_stricmp(pKey, "alert_distance") == 0)
         def.fAlertDistance = (float)atof(pValue);
+    else if(_stricmp(pKey, "target_memory_seconds") == 0)
+        def.fTargetMemorySeconds = (float)atof(pValue);
     else if(_stricmp(pKey, "attack_damage") == 0)
         def.nAttackDamage = (uint8)atoi(pValue);
     else if(_stricmp(pKey, "attack_range") == 0)
