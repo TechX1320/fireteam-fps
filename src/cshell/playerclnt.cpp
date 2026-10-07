@@ -64,7 +64,7 @@ static void FT_BuildWeaponQaQuarantineKey(
         sprintf(
             pKey,
             "section:%s",
-            sQaKey);
+            pDef->sSection);
     }
 }
 
