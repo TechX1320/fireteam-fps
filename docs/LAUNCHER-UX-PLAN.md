@@ -96,6 +96,8 @@ Weapon authoring is not a top-level player tab.
 - preserve current stable code-built WinUI startup path
 
 ### Phase 1.1 — weapon import workflow
+- full local extraction of Guns.zip / GunsHH.zip into ignored assets-local storage
+- one-click staging command for the complete imported asset tree into BUILT\rez
 - Weapon Editor Enabled/Disabled control
 - import decrypted Combat Arms WEAPONS.txt
 - import/stage Guns.zip and auto-detect adjacent GunsHH.zip assets

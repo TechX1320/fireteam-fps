@@ -10,6 +10,8 @@ public sealed record WeaponImportResult(
     int ExistingSkipped,
     int Unsupported,
     int Warnings,
+    int GunsFiles,
+    int GunsHhFiles,
     bool FoundGunsHH,
     string ConfigPath,
     string ReportPath)
@@ -19,9 +21,10 @@ public sealed record WeaponImportResult(
         $"{ExistingSkipped} existing FIRETEAM weapons were kept. " +
         $"{Unsupported} entries are catalog-only/unsupported. " +
         $"{Warnings} asset warnings. " +
+        $"Extracted {GunsFiles} files from Guns.zip" +
         (FoundGunsHH
-            ? "GunsHH.zip detected. "
-            : "GunsHH.zip was not found beside Guns.zip. ") +
+            ? $" and {GunsHhFiles} files from GunsHH.zip. "
+            : ". GunsHH.zip was not found beside Guns.zip. ") +
         "New catalog weapons are disabled until you enable them in Definition. " +
         $"Report: {ReportPath}";
 }
@@ -260,6 +263,24 @@ public sealed class WeaponImportService
                     new ArchiveIndex(
                         hhZip);
             }
+
+            // Keep the commercial archive contents local/ignored, but extract
+            // the complete weapon asset trees so every model/texture/sound
+            // present in the source archives is available to FIRETEAM. The
+            // catalog matcher below decides which definitions are usable.
+            var gunsFiles =
+                ExtractArchiveAssets(
+                    guns,
+                    localImportRoot,
+                    runtimeRezRoot);
+
+            var gunsHhFiles =
+                hh is null
+                ? 0
+                : ExtractArchiveAssets(
+                    hh,
+                    localImportRoot,
+                    runtimeRezRoot);
 
             var imported = 0;
             var existingSkipped = 0;
@@ -918,6 +939,8 @@ public sealed class WeaponImportService
                 existingSkipped,
                 unsupported,
                 warnings,
+                gunsFiles,
+                gunsHhFiles,
                 gunsHHPath is not null,
                 configPath,
                 reportPath);
@@ -1272,6 +1295,33 @@ public sealed class WeaponImportService
         entry.Name.StartsWith(
             "ANI_",
             StringComparison.OrdinalIgnoreCase);
+
+    private static int ExtractArchiveAssets(
+        ArchiveIndex archive,
+        string localRoot,
+        string? runtimeRezRoot)
+    {
+        var extracted = 0;
+
+        foreach(var entry in archive.Entries)
+        {
+            var relative =
+                "Weapons/ca/" +
+                entry.FullName
+                    .Replace('\\', '/')
+                    .TrimStart('/');
+
+            StageAsset(
+                entry,
+                localRoot,
+                runtimeRezRoot,
+                relative);
+
+            ++extracted;
+        }
+
+        return extracted;
+    }
 
     private static AssetResult StageAsset(
         ZipArchiveEntry? entry,
