@@ -439,19 +439,6 @@ public sealed class WeaponImportService
                     weapon.Get(
                         "PVModelNormal");
 
-                var pvModelEntry =
-                    ResolveAsset(
-                        guns,
-                        pvModelDeclared,
-                        tokens,
-                        "GUNS_M_PV",
-                        ".ltb",
-                        entry =>
-                            !IsAnimationEntry(entry) &&
-                            !entry.Name.Contains(
-                                "I_INFO",
-                                StringComparison.OrdinalIgnoreCase));
-
                 var pvTextureSource =
                     FindSkinPath(
                         weapon,
@@ -469,6 +456,13 @@ public sealed class WeaponImportService
                             !entry.Name.Contains(
                                 "I_INFO",
                                 StringComparison.OrdinalIgnoreCase));
+
+                var pvModelEntry =
+                    ResolvePlayerViewModel(
+                        guns,
+                        pvModelDeclared,
+                        pvTextureEntry,
+                        caName);
 
                 if(pvModelEntry is null ||
                    pvTextureEntry is null)
@@ -491,6 +485,8 @@ public sealed class WeaponImportService
                         $"  PV model declared: {DisplayDeclaredPath(pvModelDeclared)}");
                     report.Add(
                         $"  PV model archive:  {DisplayArchiveMatch(pvModelEntry)}");
+                    report.Add(
+                        $"  Model family key:  {BuildWeaponFamilyKey(pvModelDeclared)}");
                     report.Add(
                         $"  PV skin declared:  {DisplayDeclaredPath(pvTextureSource)}");
                     report.Add(
@@ -537,17 +533,12 @@ public sealed class WeaponImportService
 
                 var hhModel =
                     StageAsset(
-                        ResolveAsset(
+                        ResolveHeldModel(
                             hhSource,
                             weapon.Get(
                                 "HHModel"),
-                            tokens,
-                            "GUNS_M_HH",
-                            ".ltb",
-                            entry =>
-                                !entry.Name.Contains(
-                                    "I_INFO",
-                                    StringComparison.OrdinalIgnoreCase)),
+                            pvModelEntry,
+                            caName),
                         localImportRoot,
                         runtimeRezRoot,
                         null);
@@ -1030,6 +1021,8 @@ public sealed class WeaponImportService
                 report.Add(
                     $"  PV model: {DisplayDeclaredPath(pvModelDeclared)} => {DisplayArchiveMatch(pvModelEntry)}");
                 report.Add(
+                    $"  Model family: {BuildWeaponFamilyKey(pvModelDeclared)}");
+                report.Add(
                     $"  PV skin:  {DisplayDeclaredPath(pvTextureSource)} => {DisplayArchiveMatch(pvTextureEntry)}");
                 report.Add(
                     $"  Result: type={fireteamType}, supported={(supported ? 1 : 0)} | " +
@@ -1478,55 +1471,251 @@ public sealed class WeaponImportService
         return null;
     }
 
+    private static ZipArchiveEntry? ResolvePlayerViewModel(
+        ArchiveIndex archive,
+        string declaredModelPath,
+        ZipArchiveEntry? matchedTexture,
+        string weaponName)
+    {
+        var exact =
+            ResolveDeclaredAsset(
+                archive,
+                declaredModelPath,
+                "GUNS_M_PV",
+                ".ltb",
+                entry =>
+                    !IsAnimationEntry(
+                        entry) &&
+                    !entry.Name.Contains(
+                        "I_INFO",
+                        StringComparison.OrdinalIgnoreCase));
+
+        if(exact is not null)
+        {
+            return exact;
+        }
+
+        var keys =
+            BuildWeaponFamilyKeys(
+                declaredModelPath,
+                matchedTexture?.Name,
+                weaponName);
+
+        return ResolveFamilyModel(
+            archive,
+            keys,
+            "GUNS_M_PV",
+            entry =>
+                !IsAnimationEntry(
+                    entry) &&
+                !entry.Name.Contains(
+                    "I_INFO",
+                    StringComparison.OrdinalIgnoreCase),
+            playerView: true);
+    }
+
+    private static ZipArchiveEntry? ResolveHeldModel(
+        ArchiveIndex archive,
+        string declaredModelPath,
+        ZipArchiveEntry? pvModel,
+        string weaponName)
+    {
+        var exact =
+            ResolveDeclaredAsset(
+                archive,
+                declaredModelPath,
+                "GUNS_M_HH",
+                ".ltb",
+                entry =>
+                    !entry.Name.Contains(
+                        "I_INFO",
+                        StringComparison.OrdinalIgnoreCase));
+
+        if(exact is not null)
+        {
+            return exact;
+        }
+
+        var keys =
+            BuildWeaponFamilyKeys(
+                declaredModelPath,
+                pvModel?.Name,
+                weaponName);
+
+        return ResolveFamilyModel(
+            archive,
+            keys,
+            "GUNS_M_HH",
+            entry =>
+                !entry.Name.Contains(
+                    "I_INFO",
+                    StringComparison.OrdinalIgnoreCase),
+            playerView: false);
+    }
+
+    private static ZipArchiveEntry? ResolveFamilyModel(
+        ArchiveIndex archive,
+        IReadOnlyList<string> familyKeys,
+        string pathToken,
+        Func<ZipArchiveEntry, bool> extraFilter,
+        bool playerView)
+    {
+        if(familyKeys.Count == 0)
+        {
+            return null;
+        }
+
+        ZipArchiveEntry? best = null;
+        var bestScore = 0;
+        var tied = false;
+
+        foreach(var entry in archive.Entries)
+        {
+            if(!AssetMatches(
+                   entry,
+                   pathToken,
+                   ".ltb",
+                   extraFilter))
+            {
+                continue;
+            }
+
+            var candidateFamily =
+                BuildWeaponFamilyKey(
+                    entry.Name);
+
+            if(candidateFamily.Length < 3)
+            {
+                continue;
+            }
+
+            var score = 0;
+
+            foreach(var key in familyKeys)
+            {
+                if(key.Length < 3)
+                {
+                    continue;
+                }
+
+                if(candidateFamily.Equals(
+                       key,
+                       StringComparison.OrdinalIgnoreCase))
+                {
+                    score =
+                        Math.Max(
+                            score,
+                            1000 +
+                            key.Length);
+                }
+                else if(candidateFamily.Contains(
+                            key,
+                            StringComparison.OrdinalIgnoreCase) ||
+                        key.Contains(
+                            candidateFamily,
+                            StringComparison.OrdinalIgnoreCase))
+                {
+                    score =
+                        Math.Max(
+                            score,
+                            500 +
+                            Math.Min(
+                                key.Length,
+                                candidateFamily.Length));
+                }
+            }
+
+            if(score == 0)
+            {
+                continue;
+            }
+
+            var fileName =
+                entry.Name;
+
+            if(playerView)
+            {
+                if(fileName.StartsWith(
+                       "PVMLA",
+                       StringComparison.OrdinalIgnoreCase))
+                {
+                    score += 120;
+                }
+                else if(fileName.StartsWith(
+                            "PVML",
+                            StringComparison.OrdinalIgnoreCase))
+                {
+                    score += 110;
+                }
+                else if(fileName.StartsWith(
+                            "PV_",
+                            StringComparison.OrdinalIgnoreCase))
+                {
+                    score += 90;
+                }
+                else if(fileName.Contains(
+                            "HND",
+                            StringComparison.OrdinalIgnoreCase))
+                {
+                    // Some melee/player-view assets are hand-composite models.
+                    score += 45;
+                }
+            }
+            else if(fileName.StartsWith(
+                        "HH_",
+                        StringComparison.OrdinalIgnoreCase))
+            {
+                score += 100;
+            }
+
+            if(score > bestScore)
+            {
+                bestScore = score;
+                best = entry;
+                tied = false;
+            }
+            else if(score == bestScore)
+            {
+                tied = true;
+            }
+        }
+
+        // Do not silently choose between equally plausible families.
+        return !tied &&
+               bestScore >= 500
+            ? best
+            : null;
+    }
+
     private static ZipArchiveEntry? FindAnimation(
         ArchiveIndex archive,
         ZipArchiveEntry? pvModel,
         string declaredModelPath)
     {
-        var modelName =
-            pvModel?.Name;
+        var keys =
+            BuildWeaponFamilyKeys(
+                declaredModelPath,
+                pvModel?.Name);
 
-        if(string.IsNullOrWhiteSpace(
-            modelName))
-        {
-            var normalized =
-                NormalizeArchivePath(
-                    declaredModelPath);
-
-            modelName =
-                normalized
-                    .Split('\\')
-                    .LastOrDefault();
-        }
-
-        if(string.IsNullOrWhiteSpace(
-            modelName))
-        {
-            return null;
-        }
-
-        var modelTokens =
-            BuildModelTokens(
-                modelName);
-
-        if(modelTokens.Count == 0)
+        if(keys.Count == 0)
         {
             return null;
         }
 
         var pvFamily =
             pvModel is null
-            ? string.Empty
-            : NormalizeArchivePath(
-                pvModel.FullName);
+                ? string.Empty
+                : NormalizeArchivePath(
+                    pvModel.FullName);
 
         var familySlash =
-            pvFamily.LastIndexOf('\\');
+            pvFamily.LastIndexOf(
+                '\\');
 
-        var family =
+        var folder =
             familySlash > 0
-            ? pvFamily[..familySlash]
-            : string.Empty;
+                ? pvFamily[..familySlash]
+                : string.Empty;
 
         ZipArchiveEntry? best = null;
         var bestScore = 0;
@@ -1539,7 +1728,8 @@ public sealed class WeaponImportService
                !entry.Name.EndsWith(
                    ".ltb",
                    StringComparison.OrdinalIgnoreCase) ||
-               !IsAnimationEntry(entry))
+               !IsAnimationEntry(
+                   entry))
             {
                 continue;
             }
@@ -1548,28 +1738,50 @@ public sealed class WeaponImportService
                 NormalizeArchivePath(
                     entry.FullName);
 
-            if(family.Length > 0 &&
+            if(folder.Length > 0 &&
                !entryPath.StartsWith(
-                   family + "\\",
+                   folder + "\\",
                    StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var identity =
-                NormalizeIdentity(
+            var candidateFamily =
+                BuildWeaponFamilyKey(
                     entry.Name);
 
             var score =
-                modelTokens
-                    .Where(token =>
-                        identity.Contains(
-                            token,
+                keys
+                    .Where(key =>
+                        candidateFamily.Equals(
+                            key,
+                            StringComparison.OrdinalIgnoreCase) ||
+                        candidateFamily.Contains(
+                            key,
+                            StringComparison.OrdinalIgnoreCase) ||
+                        key.Contains(
+                            candidateFamily,
                             StringComparison.OrdinalIgnoreCase))
-                    .Select(token =>
-                        token.Length)
+                    .Select(key =>
+                        500 +
+                        Math.Min(
+                            key.Length,
+                            candidateFamily.Length))
                     .DefaultIfEmpty(0)
                     .Max();
+
+            if(entry.Name.Contains(
+                   "ANIBASE",
+                   StringComparison.OrdinalIgnoreCase))
+            {
+                score += 80;
+            }
+            else if(entry.Name.StartsWith(
+                        "ANI_",
+                        StringComparison.OrdinalIgnoreCase))
+            {
+                score += 40;
+            }
 
             if(score > bestScore)
             {
@@ -1578,39 +1790,78 @@ public sealed class WeaponImportService
             }
         }
 
-        return bestScore >= 4
+        return bestScore >= 500
             ? best
             : null;
     }
 
-    private static IReadOnlyList<string> BuildModelTokens(
-        string modelName)
+    private static IReadOnlyList<string> BuildWeaponFamilyKeys(
+        params string?[] values)
     {
+        var result =
+            new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase);
+
+        foreach(var value in values)
+        {
+            var key =
+                BuildWeaponFamilyKey(
+                    value);
+
+            if(key.Length >= 3)
+            {
+                result.Add(
+                    key);
+            }
+        }
+
+        return result
+            .OrderByDescending(key =>
+                key.Length)
+            .ToList();
+    }
+
+    private static string BuildWeaponFamilyKey(
+        string? value)
+    {
+        if(string.IsNullOrWhiteSpace(
+            value))
+        {
+            return string.Empty;
+        }
+
         var ignored =
             new HashSet<string>(
                 new[]
                 {
-                    "PV", "AR", "SR", "MG", "SMG", "SG", "PISTOL",
-                    "ML", "HND", "CM", "NM", "DF", "SH", "CH", "BC",
-                    "LTB", "ANI", "ANIBASE"
+                    "PV", "PVML", "PVMLA",
+                    "HH", "CM", "HND",
+                    "AR", "SR", "MG", "SMG", "SG",
+                    "PST", "PISTOL", "LCH", "LAUNCHER",
+                    "TH", "THROWING", "MELEE", "ML", "ETC",
+                    "NM", "DF", "SP",
+                    "SH", "CH", "BC", "HM", "KE",
+                    "ANI", "ANIBASE", "G",
+                    "LTB", "DTX"
                 },
                 StringComparer.OrdinalIgnoreCase);
 
-        return Regex.Split(
-                Path.GetFileNameWithoutExtension(
-                    modelName),
-                @"[^A-Za-z0-9]+")
-            .Select(
-                NormalizeIdentity)
-            .Where(token =>
-                token.Length >= 4 &&
-                !ignored.Contains(
-                    token))
-            .Distinct(
-                StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(token =>
-                token.Length)
-            .ToList();
+        return string.Concat(
+            Regex.Split(
+                    Path.GetFileNameWithoutExtension(
+                        value.Replace(
+                            '\\',
+                            Path.DirectorySeparatorChar)
+                             .Replace(
+                                 '/',
+                                 Path.DirectorySeparatorChar)),
+                    @"[^A-Za-z0-9]+")
+                .Where(part =>
+                    part.Length > 0 &&
+                    !ignored.Contains(
+                        part))
+                .Select(
+                    NormalizeIdentity));
     }
 
     private static bool IsAnimationEntry(
