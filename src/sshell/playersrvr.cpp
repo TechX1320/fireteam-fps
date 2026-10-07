@@ -914,9 +914,12 @@ void CPlayerSrvr::FirePrimary(
     LTVector vReportedOffset =
         vFrom - vPlayerPos;
 
-    if(vReportedOffset.MagSqr() <= (140.0f * 140.0f) &&
+    if(vReportedOffset.x >= -32.0f &&
+       vReportedOffset.x <= 32.0f &&
+       vReportedOffset.z >= -32.0f &&
+       vReportedOffset.z <= 32.0f &&
        vReportedOffset.y >= -20.0f &&
-       vReportedOffset.y <= 120.0f)
+       vReportedOffset.y <= 110.0f)
     {
         vServerFrom = vFrom;
     }
