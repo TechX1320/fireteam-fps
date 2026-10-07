@@ -8,6 +8,9 @@ class ILTMessage_Read;
 void FT_RoundHudInit();
 void FT_RoundHudTerm();
 void FT_RoundHudHandleMessage(ILTMessage_Read *pMessage);
+void FT_RoundHudShowAnnouncement(
+    const char *pText,
+    float fSeconds);
 void FT_RenderRoundHud();
 
 #endif
