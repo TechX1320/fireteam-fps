@@ -13,7 +13,9 @@ void FT_RoundHudShowAnnouncement(
     float fSeconds);
 void FT_RoundHudSetTimedPowerups(
     float fBottomlessSeconds,
-    float fOneHitSeconds);
+    float fOneHitSeconds,
+    float fGodSeconds,
+    float fWallhackSeconds);
 void FT_RenderRoundHud();
 
 #endif
