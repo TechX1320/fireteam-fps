@@ -95,6 +95,13 @@ Weapon authoring is not a top-level player tab.
 - fix loadout weapon enumeration/dropdowns
 - preserve current stable code-built WinUI startup path
 
+### Phase 1.1 — weapon import workflow
+- Weapon Editor Enabled/Disabled control
+- import decrypted Combat Arms WEAPONS.txt
+- import/stage Guns.zip and optional GunsHH.zip assets
+- generate disabled catalog entries for testing
+- one-off asset/config scanner before gameplay testing
+
 ### Phase 2 — player-facing polish
 - weapon cards / icons
 - richer loadout summaries
@@ -120,7 +127,7 @@ Weapon authoring is not a top-level player tab.
 - launcher starts with no startup.log exception
 - title says FIRETEAM only
 - navigation is across the top
-- Home fits comfortably at 1280x820 without giant empty space
+- Home keeps the primary LAUNCH GAME action visible in the Ready Room header without scrolling
 - News/Updates appears in a right-side column
 - Loadout dropdowns enumerate current weapon definitions
 - Weapon Editor is only reached through Tools / Loadout

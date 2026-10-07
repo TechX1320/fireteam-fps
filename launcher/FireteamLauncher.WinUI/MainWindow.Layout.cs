@@ -561,10 +561,114 @@ public sealed partial class MainWindow
             ScrollBarVisibility.Auto;
 
         var page =
-            NewPagePanel(
-                "FIRETEAM / LOCAL ALPHA",
+            new StackPanel
+            {
+                Spacing = 18,
+                Margin =
+                    new Thickness(
+                        30,
+                        20,
+                        30,
+                        30),
+                MaxWidth = 1220,
+                HorizontalAlignment =
+                    HorizontalAlignment.Stretch
+            };
+
+        var header =
+            new Grid
+            {
+                ColumnSpacing = 24
+            };
+
+        header.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+        header.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    GridLength.Auto
+            });
+
+        var identity =
+            new StackPanel
+            {
+                Spacing = 4
+            };
+
+        identity.Children.Add(
+            Eyebrow(
+                "FIRETEAM / LOCAL ALPHA"));
+        identity.Children.Add(
+            SectionTitle(
                 "Ready Room",
-                "Configure a run, review your loadout and deploy. Cabin Fever is the first supported FIRETEAM map, not the launcher identity.");
+                32));
+        identity.Children.Add(
+            BodyText(
+                "Configure a run, review your loadout and deploy. Cabin Fever is the first supported FIRETEAM map, not the launcher identity."));
+
+        header.Children.Add(identity);
+
+        var launch =
+            new StackPanel
+            {
+                Spacing = 6,
+                HorizontalAlignment =
+                    HorizontalAlignment.Right,
+                VerticalAlignment =
+                    VerticalAlignment.Center,
+                MinWidth = 220
+            };
+
+        PlayButton.Content =
+            "LAUNCH GAME";
+        PlayButton.Background =
+            AccentBrush;
+        PlayButton.Foreground =
+            new SolidColorBrush(
+                Color.FromArgb(
+                    255, 24, 16, 0));
+        PlayButton.BorderBrush =
+            AccentBrush;
+        PlayButton.Padding =
+            new Thickness(
+                26,
+                11,
+                26,
+                11);
+        PlayButton.MinHeight = 46;
+        PlayButton.HorizontalAlignment =
+            HorizontalAlignment.Right;
+        PlayButton.Click +=
+            PlayButton_Click;
+
+        RunStatusText.TextWrapping =
+            TextWrapping.Wrap;
+        RunStatusText.TextAlignment =
+            TextAlignment.Right;
+        RunStatusText.Foreground =
+            SecondaryTextBrush;
+        RunStatusText.MaxWidth = 310;
+
+        launch.Children.Add(
+            PlayButton);
+        launch.Children.Add(
+            RunStatusText);
+
+        Grid.SetColumn(
+            launch,
+            1);
+        header.Children.Add(
+            launch);
+
+        page.Children.Add(
+            header);
 
         var dashboard =
             new Grid
@@ -827,46 +931,6 @@ public sealed partial class MainWindow
                 loadout,
                 CyanBrush));
 
-        var deploy =
-            CardHeading(
-                "STATUS",
-                "Deploy",
-                "The launcher saves your profile and starts FIRETEAM with the selected mode, difficulty and display settings.");
-
-        RunStatusText.TextWrapping =
-            TextWrapping.Wrap;
-        RunStatusText.Foreground =
-            SecondaryTextBrush;
-        RunStatusText.Margin =
-            new Thickness(0, 8, 0, 8);
-        deploy.Children.Add(
-            RunStatusText);
-
-        PlayButton.Content =
-            "PLAY FIRETEAM";
-        PlayButton.Background =
-            AccentBrush;
-        PlayButton.Foreground =
-            new SolidColorBrush(
-                Color.FromArgb(
-                    255, 24, 16, 0));
-        PlayButton.BorderBrush =
-            AccentBrush;
-        PlayButton.Padding =
-            new Thickness(22, 11, 22, 11);
-        PlayButton.MinHeight = 48;
-        PlayButton.HorizontalAlignment =
-            HorizontalAlignment.Left;
-        PlayButton.Click +=
-            PlayButton_Click;
-        deploy.Children.Add(
-            PlayButton);
-
-        left.Children.Add(
-            Card(
-                deploy,
-                AccentRedBrush));
-
         var right =
             new StackPanel
             {
@@ -895,7 +959,7 @@ public sealed partial class MainWindow
         news.Children.Add(
             NewsItem(
                 "LAUNCHER",
-                "The launcher shell is being rebuilt around a compact top navigation and tool hubs."));
+                "The launcher shell now uses compact top navigation and dedicated tool hubs."));
 
         right.Children.Add(
             Card(
@@ -1512,6 +1576,24 @@ public sealed partial class MainWindow
             ReloadBox);
 
         editor.Children.Add(fields);
+
+        WeaponEnabledCheckBox.Content =
+            "Enabled for Loadout";
+        WeaponEnabledCheckBox.Foreground =
+            PrimaryTextBrush;
+        WeaponEnabledCheckBox.Margin =
+            new Thickness(0, 8, 0, 0);
+
+        var enabledHelp =
+            BodyText(
+                "Disabled catalog weapons stay in the Weapon Editor but are hidden from the player loadout picker. Active slot definitions are always enabled.");
+        enabledHelp.Margin =
+            new Thickness(26, -4, 0, 0);
+
+        editor.Children.Add(
+            WeaponEnabledCheckBox);
+        editor.Children.Add(
+            enabledHelp);
 
         var actions =
             new StackPanel

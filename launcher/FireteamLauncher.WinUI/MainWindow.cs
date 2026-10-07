@@ -62,6 +62,7 @@ public sealed partial class MainWindow : Window
     private readonly TextBox ReserveBox = new();
     private readonly TextBox FireIntervalBox = new();
     private readonly TextBox ReloadBox = new();
+    private readonly CheckBox WeaponEnabledCheckBox = new();
     private readonly TextBlock ArsenalStatusText = new();
 
     private readonly ScrollViewer ModsView = new();
@@ -142,7 +143,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            AppWindow.Resize(new SizeInt32(1280, 820));
+            AppWindow.Resize(new SizeInt32(1360, 860));
         }
         catch
         {
@@ -427,6 +428,10 @@ public sealed partial class MainWindow : Window
         SetWeaponField(ReserveBox, weapon, "reserve");
         SetWeaponField(FireIntervalBox, weapon, "fire_interval");
         SetWeaponField(ReloadBox, weapon, "reload");
+        WeaponEnabledCheckBox.IsChecked =
+            weapon.Enabled || weapon.IsActiveSlot;
+        WeaponEnabledCheckBox.IsEnabled =
+            !weapon.IsActiveSlot;
     }
 
     private void SaveWeaponButton_Click(object sender, RoutedEventArgs e)
@@ -459,7 +464,9 @@ public sealed partial class MainWindow : Window
                 Name = WeaponNameBox.Text.Trim(),
                 Type = WeaponTypeCombo.SelectedItem?.ToString()
                     ?? _selectedWeapon.Type,
-                Enabled = _selectedWeapon.Enabled,
+                Enabled =
+                    _selectedWeapon.IsActiveSlot ||
+                    WeaponEnabledCheckBox.IsChecked == true,
                 Supported = _selectedWeapon.Supported,
                 IsActiveSlot = _selectedWeapon.IsActiveSlot,
                 Source = _selectedWeapon.Source,

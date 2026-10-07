@@ -84,7 +84,9 @@ public sealed class WeaponCatalogService
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach(var weapon in all
-            .Where(w => w.IsActiveSlot || w.Supported)
+            .Where(w =>
+                w.IsActiveSlot ||
+                (w.Supported && w.Enabled))
             .OrderByDescending(w => w.IsActiveSlot)
             .ThenBy(w => w.Name))
         {
