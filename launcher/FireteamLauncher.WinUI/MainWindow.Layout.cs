@@ -241,6 +241,12 @@ public sealed partial class MainWindow
                 "Join Multiplayer",
                 () => SelectPlayMode(
                     "Join Multiplayer")));
+        playMenu.Items.Add(
+            new MenuFlyoutSeparator());
+        playMenu.Items.Add(
+            MenuItem(
+                "Weapon QA (Local)",
+                LaunchWeaponQa));
 
         playButton.Flyout =
             playMenu;
