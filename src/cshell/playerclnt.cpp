@@ -508,6 +508,9 @@ m_fNextPrimaryClientShot(0.0f),
 m_bSemiAutoTriggerHeld(false),
 m_bReloading(false),
 m_fReloadComplete(0.0f),
+m_nPrimaryAmmoInClip(0),
+m_nPrimaryAmmoReserve(0),
+m_bPrimaryAmmoKnown(false),
 m_pDevWeaponDefs(NULL),
 m_nDevWeaponCount(0),
 m_nDevWeaponIndex(0),
@@ -1058,6 +1061,20 @@ void CPlayerClnt::UpdateJump()
 
 
 //----------------------------------------------------------------------------
+// Server-authoritative ammo mirrored locally so the presentation cannot keep
+// dry-firing after the server reaches 0/0.
+//-----------------------------------------------------------------------------
+void CPlayerClnt::SetPrimaryAmmo(
+    uint16 nClip,
+    uint16 nReserve)
+{
+    m_nPrimaryAmmoInClip = nClip;
+    m_nPrimaryAmmoReserve = nReserve;
+    m_bPrimaryAmmoKnown = true;
+}
+
+
+//----------------------------------------------------------------------------
 // void CPlayerClnt::Attack()
 //
 //-----------------------------------------------------------------------------
@@ -1076,6 +1093,21 @@ bool CPlayerClnt::Attack()
 
     if(pDef->eType != FT_WEAPON_MELEE)
     {
+        // The server remains authoritative, but once its ammo state is known
+        // do not play a muzzle/fire animation or FIRE.WAV for a rejected shot.
+        if(!m_bDevWeaponQa &&
+           m_bPrimaryAmmoKnown &&
+           m_nPrimaryAmmoInClip == 0)
+        {
+            if(m_nPrimaryAmmoReserve > 0 &&
+               pDef->bAutoReload)
+            {
+                ReloadWeapon();
+            }
+
+            return false;
+        }
+
         const float fNow = g_pLTClient->GetTime();
         if(fNow < m_fNextPrimaryClientShot)
         {
@@ -1093,6 +1125,15 @@ bool CPlayerClnt::Attack()
         }
 
         m_fNextPrimaryClientShot = fNow + pDef->fFireInterval;
+
+        // Optimistically mirror the accepted local trigger pull. The reliable
+        // server ammo message reconciles this after every authoritative shot.
+        if(!m_bDevWeaponQa &&
+           m_bPrimaryAmmoKnown &&
+           m_nPrimaryAmmoInClip > 0)
+        {
+            --m_nPrimaryAmmoInClip;
+        }
 
         const char *pFireAnim = pDef->sAnimFire;
 
@@ -1199,6 +1240,9 @@ bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
     m_bViewWeaponAction = false;
     m_bSemiAutoTriggerHeld = false;
     m_bReloading = false;
+    m_nPrimaryAmmoInClip = 0;
+    m_nPrimaryAmmoReserve = 0;
+    m_bPrimaryAmmoKnown = false;
     m_fReloadComplete = 0.0f;
     m_fNextPrimaryClientShot = 0.0f;
 
@@ -1563,6 +1607,14 @@ bool CPlayerClnt::ReloadWeapon()
        pDef->nClipSize == 0 ||
        pDef->eType == FT_WEAPON_MELEE ||
        m_bReloading)
+    {
+        return false;
+    }
+
+    if(!m_bDevWeaponQa &&
+       m_bPrimaryAmmoKnown &&
+       (m_nPrimaryAmmoReserve == 0 ||
+        m_nPrimaryAmmoInClip >= pDef->nClipSize))
     {
         return false;
     }

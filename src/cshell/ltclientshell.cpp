@@ -747,6 +747,13 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             uint16 nReserve = pMessage->Readuint16();
             FT_SetPrimaryAmmo(nClip, nReserve);
 
+            if(m_pPlayer)
+            {
+                m_pPlayer->SetPrimaryAmmo(
+                    nClip,
+                    nReserve);
+            }
+
             // Normal Fireteam behavior: an empty magazine with reserve ammo
             // immediately requests a server-authoritative reload. A future
             // Expert mode can deliberately disable this convenience.

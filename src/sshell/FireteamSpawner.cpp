@@ -278,34 +278,107 @@ bool Spawner::SpawnZombie()
 
 bool Spawner::SpawnCrawlerSeal()
 {
-    HCLASS hSealClass = g_pLTServer->GetClass("Seal");
+    HCLASS hSealClass =
+        g_pLTServer->GetClass("Seal");
+
     if(!hSealClass)
     {
         return false;
     }
 
+    // The easter egg belongs inside the cabin rather than entering through a
+    // perimeter infected spawner. Reuse the map's authored player starts so
+    // this remains correct if the supported map has multiple spawn points.
+    static const uint32 kMaxPlayerStarts = 32;
+    HOBJECT aPlayerStarts[kMaxPlayerStarts];
+    uint32 nPlayerStartCount = 0;
+
+    HCLASS hStartClass =
+        g_pLTServer->GetClass(
+            "GameStartPoint");
+
+    if(hStartClass)
+    {
+        for(HOBJECT hObj =
+                g_pLTServer->GetNextObject(
+                    LTNULL);
+            hObj &&
+            nPlayerStartCount <
+                kMaxPlayerStarts;
+            hObj =
+                g_pLTServer->GetNextObject(
+                    hObj))
+        {
+            HCLASS hClass =
+                g_pLTServer->GetObjectClass(
+                    hObj);
+
+            if(hClass &&
+               g_pLTServer->IsKindOf(
+                   hClass,
+                   hStartClass))
+            {
+                aPlayerStarts[
+                    nPlayerStartCount++] =
+                    hObj;
+            }
+        }
+    }
+
+    HOBJECT hSpawnPoint =
+        nPlayerStartCount > 0
+        ? aPlayerStarts[
+            rand() % nPlayerStartCount]
+        : m_hObject;
+
     LTVector vBasePos;
     LTRotation rBaseRot;
-    g_pLTServer->GetObjectPos(m_hObject, &vBasePos);
-    g_pLTServer->GetObjectRotation(m_hObject, &rBaseRot);
+
+    g_pLTServer->GetObjectPos(
+        hSpawnPoint,
+        &vBasePos);
+    g_pLTServer->GetObjectRotation(
+        hSpawnPoint,
+        &rBaseRot);
 
     ObjectCreateStruct ocs;
     ocs.Clear();
     ocs.m_ObjectType = OT_MODEL;
-    strcpy(ocs.m_Filename, "Models/seal.ltb");
-    strcpy(ocs.m_SkinName, "ModelTextures/seal.dtx");
+    strcpy(
+        ocs.m_Filename,
+        "Models/seal.ltb");
+    strcpy(
+        ocs.m_SkinName,
+        "ModelTextures/seal.dtx");
 
     ocs.m_Pos = vBasePos;
-    ocs.m_Pos.x += (float)((rand() % 41) - 20);
-    ocs.m_Pos.z += (float)((rand() % 41) - 20);
-    ocs.m_Pos.y += 80.0f;
+    ocs.m_Pos.x +=
+        (float)((rand() % 31) - 15);
+    ocs.m_Pos.z +=
+        (float)((rand() % 31) - 15);
+
+    // Give the legacy Seal::Spawn ground ray enough room to settle the model
+    // without dropping it through the cabin floor.
+    ocs.m_Pos.y += 48.0f;
     ocs.m_Rotation = rBaseRot;
 
-    if(g_pLTServer->CreateObject(hSealClass, &ocs))
+    if(g_pLTServer->CreateObject(
+        hSealClass,
+        &ocs))
     {
-        g_pLTServer->CPrint(
-            "Fireteam: crawler seal easter egg spawned from %s.",
-            m_sName);
+        if(nPlayerStartCount > 0)
+        {
+            g_pLTServer->CPrint(
+                "Fireteam: crawler seal easter egg spawned at cabin player start (%u available).",
+                nPlayerStartCount);
+        }
+        else
+        {
+            g_pLTServer->CPrint(
+                "Fireteam: crawler seal easter egg fallback spawn from %s; no GameStartPoint found.",
+                m_sName);
+        }
+
         return true;
     }
 

@@ -19,11 +19,19 @@ function Expand-OptionalZip([string]$ZipName, [string]$RezSubdir) {
     $zipPath = Join-Path $assetRoot $ZipName
     $actualZipName = $ZipName
 
-    # Browser/Windows downloads often rename a second copy to FX(1).zip.
-    # Accept the newest local FX*.zip without requiring the player/modder to
-    # rename their private Combat Arms asset archive.
-    if (-not (Test-Path -LiteralPath $zipPath) -and $ZipName -ieq "FX.zip") {
-        $candidate = Get-ChildItem -LiteralPath $assetRoot -Filter "FX*.zip" -File |
+    # Browser/Windows downloads often rename a second copy to FX(1).zip or
+    # SND(1).zip. Accept the newest matching local archive without forcing a
+    # rename of private Combat Arms assets.
+    $duplicatePattern = $null
+    if($ZipName -ieq "FX.zip") {
+        $duplicatePattern = "FX*.zip"
+    }
+    elseif($ZipName -ieq "SND.zip") {
+        $duplicatePattern = "SND*.zip"
+    }
+
+    if (-not (Test-Path -LiteralPath $zipPath) -and $duplicatePattern) {
+        $candidate = Get-ChildItem -LiteralPath $assetRoot -Filter $duplicatePattern -File |
             Sort-Object LastWriteTimeUtc -Descending |
             Select-Object -First 1
 
@@ -79,6 +87,7 @@ if (Test-Path -LiteralPath $mapPath) {
 
 Expand-OptionalZip "TEXTURES.zip" "Textures"
 Expand-OptionalZip "FX.zip" "FX"
+Expand-OptionalZip "SND.zip" "Snd"
 Expand-OptionalZip "RS.zip" "RenderStyles"
 Expand-OptionalZip "CLIENTFX.zip" "ClientFX"
 

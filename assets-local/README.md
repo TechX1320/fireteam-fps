@@ -9,6 +9,7 @@ Place these files here:
 - `CABINFEVER.DAT`
 - `TEXTURES.zip`
 - `FX.zip`
+- `SND.zip` - Cabin Fever ambient, environmental, sting and map sound assets
 - `RS.zip`
 
 The staging script now reads the texture paths embedded in `CABINFEVER.DAT`. When the DAT expects a flattened path such as `Textures\Objects\roof01.dtx` but the extracted archive stores that file deeper (for example `Textures\OBJECTS\CLOTHINGS\ROOF01.DTX`), it creates a local alias automatically. Ambiguous non-identical matches are reported instead of guessed.

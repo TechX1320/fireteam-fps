@@ -44,6 +44,7 @@ public:
     bool                SelectWeaponSlot(uint8 nSlot);
     void                CycleWeapon(int nDirection);
     bool                ReloadWeapon();
+    void                SetPrimaryAmmo(uint16 nClip, uint16 nReserve);
     bool                IsDevWeaponQa() const { return m_bDevWeaponQa; }
     void                ToggleDevWeaponQuarantine();
     void                AdjustDevWeaponView(float fDeltaX, float fDeltaY, float fDeltaZ);
@@ -123,6 +124,9 @@ private:
     bool                m_bSemiAutoTriggerHeld;
     bool                m_bReloading;
     float               m_fReloadComplete;
+    uint16              m_nPrimaryAmmoInClip;
+    uint16              m_nPrimaryAmmoReserve;
+    bool                m_bPrimaryAmmoKnown;
     FTWeaponDef         m_WeaponDefs[6];
     FTWeaponDef*        m_pDevWeaponDefs;
     uint32              m_nDevWeaponCount;
