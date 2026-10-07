@@ -847,9 +847,28 @@ void CPlayerSrvr::FirePrimary(
     }
     vDir.Normalize();
 
-    LTVector vServerFrom;
-    g_pLTServer->GetObjectPos(m_hObject, &vServerFrom);
-    vServerFrom.y += 30.0f;
+    LTVector vPlayerPos;
+    g_pLTServer->GetObjectPos(
+        m_hObject,
+        &vPlayerPos);
+
+    // The client fires from the actual first-person camera. The old server
+    // prototype replaced that with player-origin +30, which can put the
+    // authoritative ray inside a nearby doorframe even though the crosshair
+    // has a clear line. Trust the camera position only while it remains close
+    // enough to the authoritative player body to be physically plausible.
+    LTVector vServerFrom = vPlayerPos;
+    vServerFrom.y += 65.0f;
+
+    LTVector vReportedOffset =
+        vFrom - vPlayerPos;
+
+    if(vReportedOffset.MagSqr() <= (140.0f * 140.0f) &&
+       vReportedOffset.y >= -20.0f &&
+       vReportedOffset.y <= 120.0f)
+    {
+        vServerFrom = vFrom;
+    }
 
     m_fNextWeaponShot[m_nWeaponSlot] =
         fNow + pDef->fFireInterval;
@@ -878,106 +897,243 @@ void CPlayerSrvr::FirePrimary(
         return;
     }
 
-    LTVector vStart = vServerFrom;
-
-    IntersectQuery query;
-    IntersectInfo info;
-
-    query.m_From = vStart + (vDir * 4.0f);
-    query.m_To = query.m_From + (vDir * pDef->fRange);
-    query.m_Flags =
-        INTERSECT_OBJECTS |
-        IGNORE_NONSOLID |
-        INTERSECT_HPOLY;
-
     FTFireFilterData filterData;
     filterData.hPlayer = m_hObject;
     filterData.hWeapon = m_hClub;
 
-    query.m_FilterFn = FTFireFilter;
-    query.m_pUserData = &filterData;
-
-    if(!g_pLTServer->IntersectSegment(&query, &info))
-    {
-        g_pLTServer->CPrint(
-            "Fireteam weapon: %s no hit (%u/%u)",
-            pDef->sName,
-            (uint32)m_nWeaponAmmoInClip[m_nWeaponSlot],
-            (uint32)m_nWeaponAmmoReserve[m_nWeaponSlot]);
-        return;
-    }
-
-    const float fDistance =
-        (info.m_Point - query.m_From).Mag();
-
-    if(!info.m_hObject ||
-       g_pLTSPhysics->IsWorldObject(info.m_hObject) == LT_YES)
-    {
-        g_pLTServer->CPrint(
-            "Fireteam weapon: %s world hit %.1f",
-            pDef->sName,
-            fDistance);
-        return;
-    }
-
-    HCLASS hTarget =
-        g_pLTServer->GetObjectClass(info.m_hObject);
     HCLASS hZombie =
         g_pLTServer->GetClass("FireteamZombie");
     HCLASS hSeal =
         g_pLTServer->GetClass("Seal");
+    HCLASS hPlayer =
+        g_pLTServer->GetClass("CPlayerSrvr");
 
-    const bool bEnemy =
-        (hZombie && hTarget &&
-         g_pLTServer->IsKindOf(hTarget, hZombie)) ||
-        (hSeal && hTarget &&
-         g_pLTServer->IsKindOf(hTarget, hSeal));
+    LTVector vTraceFrom =
+        vServerFrom + (vDir * 4.0f);
 
-    if(!bEnemy)
+    float fRemainingRange =
+        pDef->fRange;
+    float fTravelled = 0.0f;
+    float fPenetrationDamageScale = 1.0f;
+
+    // NOLF2's vector projectile code continues a ray after a shoot-through
+    // surface by finding the exit point with a reverse trace. FIRETEAM keeps
+    // the same geometry model while exposing weapon penetration in cfg until
+    // CA's material/surface table is fully mapped.
+    const uint32 kMaxPenetrations = 2;
+
+    for(uint32 nPass = 0;
+        nPass <= kMaxPenetrations &&
+        fRemainingRange > 1.0f;
+        ++nPass)
     {
-        // Co-op invariant: players never receive weapon damage.
-        return;
-    }
+        IntersectQuery query;
+        IntersectInfo info;
 
-    float fDamageMult = pDef->fDamageMult0;
+        query.m_From = vTraceFrom;
+        query.m_To =
+            vTraceFrom +
+            (vDir * fRemainingRange);
+        query.m_Flags =
+            INTERSECT_OBJECTS |
+            IGNORE_NONSOLID |
+            INTERSECT_HPOLY;
+        query.m_FilterFn = FTFireFilter;
+        query.m_pUserData = &filterData;
 
-    if(pDef->fEffectRange1 > 0.0f &&
-       fDistance > pDef->fEffectRange1)
-    {
-        fDamageMult = pDef->fDamageMult2;
-    }
-    else if(pDef->fEffectRange0 > 0.0f &&
-            fDistance > pDef->fEffectRange0)
-    {
-        fDamageMult = pDef->fDamageMult1;
-    }
+        if(!g_pLTServer->IntersectSegment(
+            &query,
+            &info))
+        {
+            if(nPass == 0)
+            {
+                g_pLTServer->CPrint(
+                    "Fireteam weapon: %s no hit (%u/%u)",
+                    pDef->sName,
+                    (uint32)m_nWeaponAmmoInClip[m_nWeaponSlot],
+                    (uint32)m_nWeaponAmmoReserve[m_nWeaponSlot]);
+            }
+            return;
+        }
 
-    uint8 nDamage =
-        (uint8)((float)pDef->nDamage * fDamageMult + 0.5f);
+        const float fSegmentDistance =
+            (info.m_Point - query.m_From).Mag();
 
-    if(nDamage == 0 && pDef->nDamage > 0)
-    {
-        nDamage = 1;
-    }
+        fTravelled += fSegmentDistance;
+        fRemainingRange -= fSegmentDistance;
 
-    ILTMessage_Write *pDamage = LTNULL;
-    if(g_pLTSCommon->CreateMessage(pDamage) == LT_OK && pDamage)
-    {
-        pDamage->IncRef();
-        pDamage->Writeuint32(OBJ_MID_DAMAGE);
-        pDamage->Writeuint8(nDamage);
-        g_pLTServer->SendToObject(
-            pDamage->Read(),
-            m_hObject,
-            info.m_hObject,
-            0);
-        pDamage->DecRef();
+        HCLASS hTarget = info.m_hObject
+            ? g_pLTServer->GetObjectClass(
+                info.m_hObject)
+            : LTNULL;
+
+        const bool bEnemy =
+            (hZombie && hTarget &&
+             g_pLTServer->IsKindOf(
+                 hTarget,
+                 hZombie)) ||
+            (hSeal && hTarget &&
+             g_pLTServer->IsKindOf(
+                 hTarget,
+                 hSeal));
+
+        if(bEnemy)
+        {
+            float fDamageMult =
+                pDef->fDamageMult0;
+
+            if(pDef->fEffectRange1 > 0.0f &&
+               fTravelled > pDef->fEffectRange1)
+            {
+                fDamageMult =
+                    pDef->fDamageMult2;
+            }
+            else if(
+                pDef->fEffectRange0 > 0.0f &&
+                fTravelled > pDef->fEffectRange0)
+            {
+                fDamageMult =
+                    pDef->fDamageMult1;
+            }
+
+            float fDamage =
+                (float)pDef->nDamage *
+                fDamageMult *
+                fPenetrationDamageScale;
+
+            if(fDamage < 1.0f &&
+               pDef->nDamage > 0)
+            {
+                fDamage = 1.0f;
+            }
+            if(fDamage > 255.0f)
+            {
+                fDamage = 255.0f;
+            }
+
+            const uint8 nDamage =
+                (uint8)(fDamage + 0.5f);
+
+            ILTMessage_Write *pDamage = LTNULL;
+            if(g_pLTSCommon->CreateMessage(
+                pDamage) == LT_OK &&
+               pDamage)
+            {
+                pDamage->IncRef();
+                pDamage->Writeuint32(
+                    OBJ_MID_DAMAGE);
+                pDamage->Writeuint8(
+                    nDamage);
+                g_pLTServer->SendToObject(
+                    pDamage->Read(),
+                    m_hObject,
+                    info.m_hObject,
+                    0);
+                pDamage->DecRef();
+
+                g_pLTServer->CPrint(
+                    "Fireteam weapon: %s infected hit damage=%u distance=%.1f penetrations=%u",
+                    pDef->sName,
+                    (uint32)nDamage,
+                    fTravelled,
+                    nPass);
+            }
+            return;
+        }
+
+        // Players stop bullets but never receive damage.
+        if(hPlayer && hTarget &&
+           g_pLTServer->IsKindOf(
+               hTarget,
+               hPlayer))
+        {
+            return;
+        }
+
+        if(pDef->fPenetrationMaxThickness <= 0.0f ||
+           nPass >= kMaxPenetrations ||
+           fRemainingRange <= 1.0f)
+        {
+            g_pLTServer->CPrint(
+                "Fireteam weapon: %s world/solid hit %.1f",
+                pDef->sName,
+                fTravelled);
+            return;
+        }
+
+        const LTVector vEntry =
+            info.m_Point;
+
+        // Start just beyond the maximum allowed thickness and trace backwards
+        // to the entry point. If another surface is found, that is the exit.
+        IntersectQuery exitQuery;
+        IntersectInfo exitInfo;
+
+        exitQuery.m_From =
+            vEntry +
+            (vDir *
+             (pDef->fPenetrationMaxThickness +
+              2.0f));
+        exitQuery.m_To =
+            vEntry -
+            (vDir * 2.0f);
+        exitQuery.m_Flags =
+            INTERSECT_OBJECTS |
+            IGNORE_NONSOLID |
+            INTERSECT_HPOLY;
+        exitQuery.m_FilterFn =
+            FTFireFilter;
+        exitQuery.m_pUserData =
+            &filterData;
+
+        if(!g_pLTServer->IntersectSegment(
+            &exitQuery,
+            &exitInfo))
+        {
+            g_pLTServer->CPrint(
+                "Fireteam weapon: %s penetration failed - no exit.",
+                pDef->sName);
+            return;
+        }
+
+        const float fThickness =
+            (exitInfo.m_Point -
+             vEntry).Mag();
+
+        if(fThickness < 0.5f ||
+           fThickness >
+                pDef->fPenetrationMaxThickness)
+        {
+            g_pLTServer->CPrint(
+                "Fireteam weapon: %s penetration blocked thickness=%.1f max=%.1f.",
+                pDef->sName,
+                fThickness,
+                pDef->fPenetrationMaxThickness);
+            return;
+        }
+
+        fTravelled += fThickness;
+        fRemainingRange -= fThickness;
+
+        if(fRemainingRange <= 1.0f)
+        {
+            return;
+        }
+
+        fPenetrationDamageScale *=
+            pDef->fPenetrationDamageMult;
+
+        fRemainingRange *=
+            pDef->fPenetrationRangeMult;
+
+        vTraceFrom =
+            exitInfo.m_Point +
+            (vDir * 3.0f);
 
         g_pLTServer->CPrint(
-            "Fireteam weapon: %s infected hit damage=%u distance=%.1f",
+            "Fireteam weapon: %s penetrated %.1f units.",
             pDef->sName,
-            (uint32)nDamage,
-            fDistance);
+            fThickness);
     }
 }
 
