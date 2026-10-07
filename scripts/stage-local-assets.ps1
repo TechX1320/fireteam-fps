@@ -105,6 +105,39 @@ Expand-OptionalZip "SHADERS.zip" "Shaders"
 Expand-OptionalZip "CLIENTFX.zip" "ClientFX"
 
 $zombieAmbience = Join-Path $assetRoot "ZombieAmbience.wav"
+$zombieAmbienceMp3 = Join-Path $assetRoot "ZombieAmbience.mp3"
+
+# Jupiter's ordinary sound-buffer path expects a RIFF/WAVE container. If the
+# user supplied the MP3 and ffmpeg is already installed, create a compact
+# IMA-ADPCM WAV locally. Commercial/research audio stays outside Git.
+if((-not (Test-Path -LiteralPath $zombieAmbience)) -and
+   (Test-Path -LiteralPath $zombieAmbienceMp3)) {
+    $ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
+
+    if($ffmpeg) {
+        Write-Host "[UPDATE] Converting ZombieAmbience.mp3 to Jupiter-compatible IMA ADPCM WAV..."
+
+        & $ffmpeg.Source `
+            -y `
+            -hide_banner `
+            -loglevel error `
+            -i $zombieAmbienceMp3 `
+            -ar 44100 `
+            -ac 2 `
+            -c:a adpcm_ima_wav `
+            $zombieAmbience
+
+        if($LASTEXITCODE -ne 0 -or
+           -not (Test-Path -LiteralPath $zombieAmbience)) {
+            Write-Host "[WARN] ZombieAmbience conversion failed; ambience loop will be skipped."
+        }
+    }
+    else {
+        Write-Host "[INFO] ZombieAmbience.mp3 found, but Jupiter expects RIFF/WAV for this path."
+        Write-Host "       Put ZombieAmbience.wav beside it, or install ffmpeg and rebuild."
+    }
+}
+
 if(Test-Path -LiteralPath $zombieAmbience) {
     $ambientDir = Join-Path $rezRoot "Snd\Fireteam"
     $ambientDest = Join-Path $ambientDir "ZombieAmbience.wav"
@@ -118,10 +151,6 @@ if(Test-Path -LiteralPath $zombieAmbience) {
     } else {
         Write-Host "[OK] ZombieAmbience.wav unchanged"
     }
-}
-elseif(Test-Path -LiteralPath (Join-Path $assetRoot "ZombieAmbience.mp3")) {
-    Write-Host "[INFO] ZombieAmbience.mp3 found, but Jupiter's normal sound path expects RIFF/WAV."
-    Write-Host "       Convert it to assets-local\ZombieAmbience.wav to enable the ambience loop."
 }
 
 

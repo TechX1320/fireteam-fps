@@ -184,3 +184,13 @@ infected gameplay/collision values across `characters.cfg` and
 The committed game code is derived from the LithTech Jupiter Enterprise SealHunter sample and is distributed under the GNU GPL v2; see `LICENSE`. Original copyright notices are retained in imported source files.
 
 Combat Arms maps, models, textures, sounds, decrypted attributes, GMS files, and other commercial/extracted data are **not** committed to this repository. Those remain local-only under `assets-local/` or `.local/`.
+
+
+## Current gameplay presentation notes
+
+- Difficulty is now a 0-10 launcher slider. Level 4 preserves the previous Normal baseline, level 5 fills the Normal-to-Hard gap, level 7 is an expert challenge, and level 10 is the former Nightmare profile / Nightmare++ target.
+- Headshot and Nut Shot accolades are now killing-shot-only and use tighter hit regions.
+- Combat Arms accolade art is queued instead of stacked, enters oversized, settles to full size, holds, and fades.
+- The original CA `ROUNDSTART` texture is used with the existing Cabin Fever round-start sting.
+- Optional `ZombieAmbience.wav` plays as a low-volume local loop while in-world.
+- `SHADERS.zip` is staged for the upcoming render/effect integration pass; copying the FX files alone does not alter the scene.

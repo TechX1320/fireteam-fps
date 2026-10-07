@@ -12,6 +12,11 @@ Place these files here:
 - `SND.zip` / `SND(2).zip` - sound archive; the largest `SND*.zip` is staged automatically
 - `UI_Items.zip` - optional CA HUD art for headshots, Nut Shots and kill-chain announcements
 - `RS.zip`
+- `SHADERS.zip` - original CA effect-shader pack; staged under `rez\Shaders`
+- `ZombieAmbience.mp3` or `ZombieAmbience.wav` - optional low-volume zombie ambience loop
+- `ATTACHMENTS.zip` - player attachment research archive; not bulk-staged yet
+
+If `ZombieAmbience.mp3` is present and `ffmpeg` is already installed, the staging script automatically creates a Jupiter-compatible IMA ADPCM `ZombieAmbience.wav`. A supplied WAV is preferred and requires no converter.
 
 The supplied all-sounds archive includes original Cabin Fever rain, screams, section stings and four NPC/infected voice banks (`NORMAL`, `LIGHT`, `HEAVY`, `EXPLODE`). The current normal infected uses the real `COOPMODE/NPC_VOICE/CABINFEVER/NORMAL` alert, attack and death WAVs.
 
@@ -75,3 +80,12 @@ Characters/
 The first-person Bowie model references `ANI_G_BOWIEKNIFE_CH.LTB` for animations. Confirmed animation names include `select`, `idle_0`, `idle_1`, `fire_0`, `fire_1`, `alt_fire_0`, and `alt_fire_1`.
 
 After adding or changing local assets, just run `build.cmd`. Missing optional archives do not stop setup so map resources can be filled in progressively.
+
+
+## Shaders and attachments
+
+`SHADERS.zip` contains six fullscreen effects (`BLACKANDWHITE`, `BLOOM`, `GBLUR`, `JITTER`, `NIGHTVISION`, `SATURATE`), supporting image textures, and a sprite refraction shader. The files are staged, but staging alone does not enable a fullscreen effect. FIRETEAM still needs a render-target/effect-shader integration pass before bloom or desaturation can be evaluated in-game.
+
+`ATTACHMENTS.zip` contains 585 files: 227 `ATTACH_M` model files and 358 `ATTACH_T` texture/sprite files. The archive is predominantly player cosmetics such as backpacks, masks, glasses and headgear. It is useful for a future backpack/armor visual system; it is not the missing source for weapon scopes, suppressors or magazines.
+
+See `docs\CA_SHADER_ATTACHMENT_NOTES.md`.
