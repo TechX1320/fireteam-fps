@@ -1233,10 +1233,20 @@ void FireteamZombie::UpdateZombie()
 
         if(m_fStuckTime >= 1.50f)
         {
-            const bool bEscaped =
-                BuildLocalEscapeWaypoint(
-                    vNewPos,
-                    vMoveTarget);
+            bool bEscaped = false;
+
+            // One local sidestep gets a chance to clear a jamb/stair edge.
+            // If that escape itself stalls, throw it away and rebuild the
+            // authored-volume route instead of inserting endless temporary
+            // waypoints (the old behavior could grow paths 1/8 -> 1/11 ->
+            // 1/14 while the infected stayed in the same spot).
+            if(m_fForcePathTime <= 0.0f)
+            {
+                bEscaped =
+                    BuildLocalEscapeWaypoint(
+                        vNewPos,
+                        vMoveTarget);
+            }
 
             if(!bEscaped)
             {
