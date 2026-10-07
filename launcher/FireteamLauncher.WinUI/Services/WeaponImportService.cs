@@ -72,10 +72,24 @@ public sealed class WeaponImportService
                         group =>
                             group.First(),
                         StringComparer.OrdinalIgnoreCase);
+
+            ByFileName =
+                Entries
+                    .GroupBy(
+                        entry =>
+                            entry.Name,
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        group =>
+                            group.Key,
+                        group =>
+                            group.ToList(),
+                        StringComparer.OrdinalIgnoreCase);
         }
 
         public IReadOnlyList<ZipArchiveEntry> Entries { get; }
         public Dictionary<string, ZipArchiveEntry> Exact { get; }
+        public Dictionary<string, List<ZipArchiveEntry>> ByFileName { get; }
     }
 
     private sealed record AssetResult(
@@ -214,15 +228,11 @@ public sealed class WeaponImportService
         Directory.CreateDirectory(
             localImportRoot);
 
-        var game =
-            LauncherPaths.FindGameDirectory();
-
-        var runtimeRezRoot =
-            game is null
-            ? null
-            : Path.Combine(
-                game,
-                "rez");
+        // Import is intentionally local-only. Copying thousands of archive
+        // files into the live runtime during the UI import made the operation
+        // unnecessarily slow and doubled disk I/O. stage-imported-weapons.cmd
+        // performs the explicit runtime staging step after import.
+        string? runtimeRezRoot = null;
 
         var gunsHHPath =
             FindGunsHH(
@@ -311,7 +321,9 @@ public sealed class WeaponImportService
                 }
 
                 if(activeNames.Contains(
-                    identity))
+                       identity) &&
+                   !existingCatalog.ContainsKey(
+                       identity))
                 {
                     ++existingSkipped;
                     continue;
@@ -363,20 +375,23 @@ public sealed class WeaponImportService
                 var warningList =
                     new List<string>();
 
+                var pvModelEntry =
+                    ResolveAsset(
+                        guns,
+                        weapon.Get(
+                            "PVModelNormal"),
+                        tokens,
+                        "GUNS_M_PV",
+                        ".ltb",
+                        entry =>
+                            !IsAnimationEntry(entry) &&
+                            !entry.Name.Contains(
+                                "I_INFO",
+                                StringComparison.OrdinalIgnoreCase));
+
                 var pvModel =
                     StageAsset(
-                        ResolveAsset(
-                            guns,
-                            weapon.Get(
-                                "PVModelNormal"),
-                            tokens,
-                            "GUNS_M_PV",
-                            ".ltb",
-                            entry =>
-                                !IsAnimationEntry(entry) &&
-                                !entry.Name.Contains(
-                                    "I_INFO",
-                                    StringComparison.OrdinalIgnoreCase)),
+                        pvModelEntry,
                         localImportRoot,
                         runtimeRezRoot,
                         null);
@@ -491,7 +506,9 @@ public sealed class WeaponImportService
                     StageAsset(
                         FindAnimation(
                             guns,
-                            tokens),
+                            pvModelEntry,
+                            weapon.Get(
+                                "PVModelNormal")),
                         localImportRoot,
                         runtimeRezRoot,
                         null);
@@ -1127,27 +1144,112 @@ public sealed class WeaponImportService
         Func<ZipArchiveEntry, bool> extraFilter)
     {
         if(!string.IsNullOrWhiteSpace(
-            desiredPath) &&
-           archive.Exact.TryGetValue(
-               NormalizeArchivePath(
-                   desiredPath),
-               out var exact))
+            desiredPath))
+        {
+            // Decrypted CA attributes already tell us the intended asset.
+            // Never substitute an unrelated gun just because a generic token
+            // such as "Gold" or "Event" happens to match another filename.
+            return ResolveDeclaredAsset(
+                archive,
+                desiredPath,
+                pathToken,
+                extension,
+                extraFilter);
+        }
+
+        return ResolveByTokens(
+            archive,
+            tokens,
+            pathToken,
+            extension,
+            extraFilter);
+    }
+
+    private static ZipArchiveEntry? ResolveDeclaredAsset(
+        ArchiveIndex archive,
+        string desiredPath,
+        string pathToken,
+        string extension,
+        Func<ZipArchiveEntry, bool> extraFilter)
+    {
+        var normalized =
+            NormalizeArchivePath(
+                desiredPath);
+
+        if(archive.Exact.TryGetValue(
+               normalized,
+               out var exact) &&
+           AssetMatches(
+               exact,
+               pathToken,
+               extension,
+               extraFilter))
         {
             return exact;
         }
 
+        var fileName =
+            normalized
+                .Split('\\')
+                .LastOrDefault() ??
+            string.Empty;
+
+        if(fileName.Length == 0 ||
+           !archive.ByFileName.TryGetValue(
+               fileName,
+               out var candidates))
+        {
+            return null;
+        }
+
+        var valid =
+            candidates
+                .Where(entry =>
+                    AssetMatches(
+                        entry,
+                        pathToken,
+                        extension,
+                        extraFilter))
+                .ToList();
+
+        var suffix =
+            valid.FirstOrDefault(entry =>
+                NormalizeArchivePath(
+                    entry.FullName)
+                    .EndsWith(
+                        normalized,
+                        StringComparison.OrdinalIgnoreCase));
+
+        if(suffix is not null)
+        {
+            return suffix;
+        }
+
+        // Filename + expected archive family is still deterministic when
+        // exactly one candidate exists. More than one candidate is ambiguous
+        // and should remain unsupported rather than silently choosing wrong.
+        return valid.Count == 1
+            ? valid[0]
+            : null;
+    }
+
+    private static ZipArchiveEntry? ResolveByTokens(
+        ArchiveIndex archive,
+        IReadOnlyList<string> tokens,
+        string pathToken,
+        string extension,
+        Func<ZipArchiveEntry, bool> extraFilter)
+    {
         ZipArchiveEntry? best = null;
         var bestScore = 0;
 
         foreach(var entry in archive.Entries)
         {
-            if(!entry.FullName.Contains(
+            if(!AssetMatches(
+                   entry,
                    pathToken,
-                   StringComparison.OrdinalIgnoreCase) ||
-               !entry.Name.EndsWith(
                    extension,
-                   StringComparison.OrdinalIgnoreCase) ||
-               !extraFilter(entry))
+                   extraFilter))
             {
                 continue;
             }
@@ -1160,9 +1262,10 @@ public sealed class WeaponImportService
 
             foreach(var token in tokens)
             {
-                if(identity.Contains(
-                    token,
-                    StringComparison.OrdinalIgnoreCase))
+                if(token.Length >= 4 &&
+                   identity.Contains(
+                       token,
+                       StringComparison.OrdinalIgnoreCase))
                 {
                     score =
                         Math.Max(
@@ -1178,8 +1281,23 @@ public sealed class WeaponImportService
             }
         }
 
-        return best;
+        return bestScore >= 4
+            ? best
+            : null;
     }
+
+    private static bool AssetMatches(
+        ZipArchiveEntry entry,
+        string pathToken,
+        string extension,
+        Func<ZipArchiveEntry, bool> extraFilter) =>
+        entry.FullName.Contains(
+            pathToken,
+            StringComparison.OrdinalIgnoreCase) &&
+        entry.Name.EndsWith(
+            extension,
+            StringComparison.OrdinalIgnoreCase) &&
+        extraFilter(entry);
 
     private static ZipArchiveEntry? ResolveSound(
         ArchiveIndex archive,
@@ -1188,66 +1306,80 @@ public sealed class WeaponImportService
         string stem)
     {
         if(!string.IsNullOrWhiteSpace(
-            desiredPath) &&
-           archive.Exact.TryGetValue(
-               NormalizeArchivePath(
-                   desiredPath),
-               out var exact))
+            desiredPath))
         {
-            return exact;
+            return ResolveDeclaredAsset(
+                archive,
+                desiredPath,
+                "GUNS_SND",
+                ".wav",
+                entry =>
+                    entry.Name.StartsWith(
+                        stem,
+                        StringComparison.OrdinalIgnoreCase));
         }
 
-        ZipArchiveEntry? best = null;
-        var bestScore = 0;
-
-        foreach(var entry in archive.Entries)
-        {
-            if(!entry.FullName.Contains(
-                   "GUNS_SND",
-                   StringComparison.OrdinalIgnoreCase) ||
-               !entry.Name.EndsWith(
-                   ".wav",
-                   StringComparison.OrdinalIgnoreCase) ||
-               !entry.Name.StartsWith(
-                   stem,
-                   StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var identity =
-                NormalizeIdentity(
-                    entry.FullName);
-
-            var score = 0;
-
-            foreach(var token in tokens)
-            {
-                if(identity.Contains(
-                    token,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    score =
-                        Math.Max(
-                            score,
-                            token.Length);
-                }
-            }
-
-            if(score > bestScore)
-            {
-                bestScore = score;
-                best = entry;
-            }
-        }
-
-        return best;
+        return ResolveByTokens(
+            archive,
+            tokens,
+            "GUNS_SND",
+            ".wav",
+            entry =>
+                entry.Name.StartsWith(
+                    stem,
+                    StringComparison.OrdinalIgnoreCase));
     }
 
     private static ZipArchiveEntry? FindAnimation(
         ArchiveIndex archive,
-        IReadOnlyList<string> tokens)
+        ZipArchiveEntry? pvModel,
+        string declaredModelPath)
     {
+        var modelName =
+            pvModel?.Name;
+
+        if(string.IsNullOrWhiteSpace(
+            modelName))
+        {
+            var normalized =
+                NormalizeArchivePath(
+                    declaredModelPath);
+
+            modelName =
+                normalized
+                    .Split('\\')
+                    .LastOrDefault();
+        }
+
+        if(string.IsNullOrWhiteSpace(
+            modelName))
+        {
+            return null;
+        }
+
+        var modelTokens =
+            BuildModelTokens(
+                modelName);
+
+        if(modelTokens.Count == 0)
+        {
+            return null;
+        }
+
+        var pvFamily =
+            pvModel is null
+            ? string.Empty
+            : NormalizeArchivePath(
+                pvModel.FullName);
+
+        var familySlash =
+            pvFamily.LastIndexOf('\\');
+
+        var family =
+            familySlash > 0
+            ? pvFamily[..familySlash]
+            : string.Empty;
+
         ZipArchiveEntry? best = null;
         var bestScore = 0;
 
@@ -1264,24 +1396,32 @@ public sealed class WeaponImportService
                 continue;
             }
 
+            var entryPath =
+                NormalizeArchivePath(
+                    entry.FullName);
+
+            if(family.Length > 0 &&
+               !entryPath.StartsWith(
+                   family + "\\",
+                   StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             var identity =
                 NormalizeIdentity(
                     entry.Name);
 
-            var score = 0;
-
-            foreach(var token in tokens)
-            {
-                if(identity.Contains(
-                    token,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    score =
-                        Math.Max(
-                            score,
-                            token.Length);
-                }
-            }
+            var score =
+                modelTokens
+                    .Where(token =>
+                        identity.Contains(
+                            token,
+                            StringComparison.OrdinalIgnoreCase))
+                    .Select(token =>
+                        token.Length)
+                    .DefaultIfEmpty(0)
+                    .Max();
 
             if(score > bestScore)
             {
@@ -1290,7 +1430,39 @@ public sealed class WeaponImportService
             }
         }
 
-        return best;
+        return bestScore >= 4
+            ? best
+            : null;
+    }
+
+    private static IReadOnlyList<string> BuildModelTokens(
+        string modelName)
+    {
+        var ignored =
+            new HashSet<string>(
+                new[]
+                {
+                    "PV", "AR", "SR", "MG", "SMG", "SG", "PISTOL",
+                    "ML", "HND", "CM", "NM", "DF", "SH", "CH", "BC",
+                    "LTB", "ANI", "ANIBASE"
+                },
+                StringComparer.OrdinalIgnoreCase);
+
+        return Regex.Split(
+                Path.GetFileNameWithoutExtension(
+                    modelName),
+                @"[^A-Za-z0-9]+")
+            .Select(
+                NormalizeIdentity)
+            .Where(token =>
+                token.Length >= 4 &&
+                !ignored.Contains(
+                    token))
+            .Distinct(
+                StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(token =>
+                token.Length)
+            .ToList();
     }
 
     private static bool IsAnimationEntry(
@@ -1392,6 +1564,15 @@ public sealed class WeaponImportService
         {
             Directory.CreateDirectory(
                 parent);
+        }
+
+        if(File.Exists(
+               destination) &&
+           new FileInfo(
+               destination).Length ==
+           entry.Length)
+        {
+            return;
         }
 
         using var input =
