@@ -959,6 +959,33 @@ public sealed class WeaponImportService
                         fireteamType == "grenade"
                         ? "3.0"
                         : "6.0");
+
+                    // Mechanical grenade/rocket support does not require a
+                    // ClientFX entry. Prefer the third-person/held model for
+                    // the actual projectile and fall back to the PV model so
+                    // imported explosives remain visible even when CA's HH
+                    // archive match is incomplete.
+                    Set(
+                        doc,
+                        section,
+                        "projectile_model",
+                        hhModel.Found
+                        ? hhModel.RuntimePath
+                        : pvModel.RuntimePath);
+                    Set(
+                        doc,
+                        section,
+                        "projectile_texture",
+                        hhTexture.Found
+                        ? hhTexture.RuntimePath
+                        : pvTexture.RuntimePath);
+                    Set(
+                        doc,
+                        section,
+                        "projectile_scale",
+                        fireteamType == "grenade"
+                        ? "0.60"
+                        : "0.85");
                 }
 
                 Set(
