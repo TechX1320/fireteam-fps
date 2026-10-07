@@ -2531,14 +2531,10 @@ public sealed partial class MainWindow
         else if(tag ==
                 "weapon-editor")
         {
-            if(_arsenal.Count == 0)
-            {
-                ReloadArsenal();
-            }
-            else
-            {
-                ApplyArsenalFilter();
-            }
+            // QA mode can change the runtime quarantine file while the
+            // launcher remains open. Reload here so quarantined weapons
+            // disappear as soon as the user returns to the editor.
+            ReloadArsenal();
         }
         else if(tag == "tools")
         {
