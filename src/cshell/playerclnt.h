@@ -43,6 +43,7 @@ public:
     void                UpdateWeaponView(bool bFirstPerson);
     bool                AltAttack();
     bool                SelectWeaponSlot(uint8 nSlot);
+    bool                SelectFirstWeaponType(FTWeaponType eType);
     void                CycleWeapon(int nDirection);
     bool                ReloadWeapon();
     void                SetPrimaryAmmo(uint16 nClip, uint16 nReserve);
