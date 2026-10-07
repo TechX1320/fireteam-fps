@@ -18,6 +18,12 @@ struct FTFeedbackImage
     uint32 nHeight;
 };
 
+enum
+{
+    FT_FEEDBACK_ROUNDSTART = 100,
+    FT_FEEDBACK_QUEUE_SIZE = 16
+};
+
 static FTFeedbackImage s_Headshot = { LTNULL, 0, 0 };
 static FTFeedbackImage s_Nutshot = { LTNULL, 0, 0 };
 static FTFeedbackImage s_FirstKill = { LTNULL, 0, 0 };
@@ -26,15 +32,16 @@ static FTFeedbackImage s_MultiKill = { LTNULL, 0, 0 };
 static FTFeedbackImage s_UltraKill = { LTNULL, 0, 0 };
 static FTFeedbackImage s_Fantastic = { LTNULL, 0, 0 };
 static FTFeedbackImage s_Unbelievable = { LTNULL, 0, 0 };
+static FTFeedbackImage s_RoundStart = { LTNULL, 0, 0 };
 
 static CUIFont *s_pFeedbackFont = LTNULL;
-static CUIFormattedPolyString *s_pRegionFallback = LTNULL;
-static CUIFormattedPolyString *s_pStreakFallback = LTNULL;
+static CUIFormattedPolyString *s_pFallback = LTNULL;
 
-static uint8 s_nRegionFeedback = 0;
-static uint8 s_nStreakFeedback = 0;
-static float s_fRegionUntil = 0.0f;
-static float s_fStreakUntil = 0.0f;
+static uint8 s_aQueue[FT_FEEDBACK_QUEUE_SIZE];
+static uint8 s_nQueueHead = 0;
+static uint8 s_nQueueCount = 0;
+static uint8 s_nActiveFeedback = 0;
+static float s_fActiveStart = 0.0f;
 
 static void FT_LoadFeedbackImage(
     FTFeedbackImage &image,
@@ -99,6 +106,8 @@ static FTFeedbackImage* FT_ImageForFeedback(
             return &s_Fantastic;
         case FT_COMBAT_FEEDBACK_UNBELIEVABLE:
             return &s_Unbelievable;
+        case FT_FEEDBACK_ROUNDSTART:
+            return &s_RoundStart;
         default:
             return LTNULL;
     }
@@ -125,6 +134,8 @@ static const char* FT_TextForFeedback(
             return "FANTASTIC";
         case FT_COMBAT_FEEDBACK_UNBELIEVABLE:
             return "UNBELIEVABLE";
+        case FT_FEEDBACK_ROUNDSTART:
+            return "ROUND START";
         default:
             return "";
     }
@@ -141,41 +152,125 @@ static void FT_PlayFeedbackCue(
         return;
     }
 
-    PlaySoundInfo soundInfo;
-    PLAYSOUNDINFO_INIT(
-        soundInfo);
-
-    soundInfo.m_dwFlags =
+    PlaySoundInfo info;
+    PLAYSOUNDINFO_INIT(info);
+    info.m_dwFlags =
         PLAYSOUND_LOCAL |
         PLAYSOUND_CTRL_VOL;
-    soundInfo.m_nVolume =
-        nVolume;
+    info.m_nVolume = nVolume;
 
     strncpy(
-        soundInfo.m_szSoundName,
+        info.m_szSoundName,
         pPath,
-        sizeof(soundInfo.m_szSoundName) - 1);
-    soundInfo.m_szSoundName[
-        sizeof(soundInfo.m_szSoundName) - 1] =
+        sizeof(info.m_szSoundName) - 1);
+    info.m_szSoundName[
+        sizeof(info.m_szSoundName) - 1] =
         '\0';
 
-    HLTSOUND hSound =
-        LTNULL;
-
+    HLTSOUND hSound = LTNULL;
     g_pLTCSoundMgr->PlaySound(
-        &soundInfo,
+        &info,
         hSound);
 }
 
-static void FT_DrawFeedbackImage(
+static void FT_StartFeedback(
+    uint8 nFeedback)
+{
+    s_nActiveFeedback = nFeedback;
+    s_fActiveStart =
+        g_pLTClient
+        ? g_pLTClient->GetTime()
+        : 0.0f;
+}
+
+static void FT_QueueFeedback(
+    uint8 nFeedback)
+{
+    if(!nFeedback)
+        return;
+
+    if(!s_nActiveFeedback)
+    {
+        FT_StartFeedback(nFeedback);
+        return;
+    }
+
+    if(s_nQueueCount >=
+       FT_FEEDBACK_QUEUE_SIZE)
+    {
+        return;
+    }
+
+    const uint8 nTail =
+        (uint8)(
+            (s_nQueueHead +
+             s_nQueueCount) %
+            FT_FEEDBACK_QUEUE_SIZE);
+
+    s_aQueue[nTail] = nFeedback;
+    ++s_nQueueCount;
+}
+
+static void FT_AdvanceFeedback()
+{
+    if(!s_nQueueCount)
+    {
+        s_nActiveFeedback = 0;
+        s_fActiveStart = 0.0f;
+        return;
+    }
+
+    const uint8 nNext =
+        s_aQueue[s_nQueueHead];
+
+    s_nQueueHead =
+        (uint8)(
+            (s_nQueueHead + 1) %
+            FT_FEEDBACK_QUEUE_SIZE);
+    --s_nQueueCount;
+
+    FT_StartFeedback(nNext);
+}
+
+static float FT_BaseWidth(
+    uint8 nFeedback,
+    uint32 nScreenW)
+{
+    float fWidth =
+        (float)nScreenW * 0.46f;
+    float fMax = 780.0f;
+
+    if(nFeedback ==
+           FT_COMBAT_FEEDBACK_HEADSHOT ||
+       nFeedback ==
+           FT_COMBAT_FEEDBACK_NUTSHOT)
+    {
+        fMax = 690.0f;
+    }
+    else if(nFeedback ==
+            FT_FEEDBACK_ROUNDSTART)
+    {
+        fMax = 720.0f;
+    }
+
+    if(fWidth > fMax)
+        fWidth = fMax;
+    if(fWidth < 380.0f)
+        fWidth = 380.0f;
+
+    return fWidth;
+}
+
+static void FT_DrawImage(
     FTFeedbackImage *pImage,
     float fCenterY,
-    float fMaxWidth)
+    float fWidth,
+    uint8 nAlpha)
 {
     if(!pImage ||
        !pImage->hTexture ||
-       pImage->nWidth == 0 ||
-       pImage->nHeight == 0)
+       !pImage->nWidth ||
+       !pImage->nHeight)
     {
         return;
     }
@@ -187,20 +282,10 @@ static void FT_DrawFeedbackImage(
         &nScreenW,
         &nScreenH);
 
-    float fWidth =
-        (float)nScreenW * 0.30f;
-
-    if(fWidth > fMaxWidth)
-        fWidth = fMaxWidth;
-
-    if(fWidth < 220.0f)
-        fWidth = 220.0f;
-
     const float fHeight =
         fWidth *
         ((float)pImage->nHeight /
          (float)pImage->nWidth);
-
     const float fLeft =
         ((float)nScreenW - fWidth) *
         0.5f;
@@ -237,7 +322,7 @@ static void FT_DrawFeedbackImage(
     poly.rgba.r = 255;
     poly.rgba.g = 255;
     poly.rgba.b = 255;
-    poly.rgba.a = 255;
+    poly.rgba.a = nAlpha;
 
     g_pLTCDrawPrim->SetTexture(
         pImage->hTexture);
@@ -270,24 +355,18 @@ static void FT_DrawFeedbackImage(
 }
 
 static void FT_DrawFallback(
-    CUIFormattedPolyString *pText,
     uint8 nFeedback,
-    float fCenterY)
+    float fCenterY,
+    uint8 nAlpha)
 {
-    if(!pText)
-    {
+    if(!s_pFallback)
         return;
-    }
 
     const char *pLabel =
-        FT_TextForFeedback(
-            nFeedback);
+        FT_TextForFeedback(nFeedback);
 
-    if(!pLabel ||
-       !pLabel[0])
-    {
+    if(!pLabel || !pLabel[0])
         return;
-    }
 
     uint32 nScreenW = 0;
     uint32 nScreenH = 0;
@@ -296,16 +375,26 @@ static void FT_DrawFallback(
         &nScreenW,
         &nScreenH);
 
-    pText->SetText(
-        pLabel);
-    pText->SetPosition(
+    const uint32 nRgb =
+        (nFeedback ==
+             FT_COMBAT_FEEDBACK_HEADSHOT ||
+         nFeedback ==
+             FT_COMBAT_FEEDBACK_NUTSHOT)
+        ? 0x00FFB000
+        : 0x00FFFFFF;
+
+    s_pFallback->SetColor(
+        ((uint32)nAlpha << 24) |
+        nRgb);
+    s_pFallback->SetText(pLabel);
+    s_pFallback->SetPosition(
         ((float)nScreenW -
-         pText->GetWidth()) *
+         s_pFallback->GetWidth()) *
             0.5f,
         fCenterY -
-        (pText->GetHeight() *
+        (s_pFallback->GetHeight() *
          0.5f));
-    pText->Render();
+    s_pFallback->Render();
 }
 
 void FT_CombatFeedbackInit()
@@ -334,6 +423,9 @@ void FT_CombatFeedbackInit()
     FT_LoadFeedbackImage(
         s_Unbelievable,
         "UI_HUD_MESSAGE/EFFECT/UNBELIEVABLE.DTX");
+    FT_LoadFeedbackImage(
+        s_RoundStart,
+        "UI_HUD_MESSAGE/EFFECT/ROUNDSTART.DTX");
 
     if(!s_pFeedbackFont &&
        g_pLTCFontManager)
@@ -342,34 +434,28 @@ void FT_CombatFeedbackInit()
             g_pLTCFontManager->CreateFont(
                 "fonts/SQR721B.TTF",
                 "Square721 BT",
-                28,
-                44,
+                42,
+                64,
                 255);
 
         if(s_pFeedbackFont)
         {
             s_pFeedbackFont->SetDefCharWidth(
-                8);
+                11);
             s_pFeedbackFont->SetDefColor(
-                0xFFFFB000);
+                0xFFFFFFFF);
 
-            s_pRegionFallback =
+            s_pFallback =
                 g_pLTCFontManager->CreateFormattedPolyString(
                     s_pFeedbackFont,
                     "");
-            s_pStreakFallback =
-                g_pLTCFontManager->CreateFormattedPolyString(
-                    s_pFeedbackFont,
-                    "");
-
-            if(s_pRegionFallback)
-                s_pRegionFallback->SetColor(
-                    0xFFFFB000);
-            if(s_pStreakFallback)
-                s_pStreakFallback->SetColor(
-                    0xFFFFFFFF);
         }
     }
+
+    s_nQueueHead = 0;
+    s_nQueueCount = 0;
+    s_nActiveFeedback = 0;
+    s_fActiveStart = 0.0f;
 }
 
 void FT_CombatFeedbackTerm()
@@ -382,19 +468,13 @@ void FT_CombatFeedbackTerm()
     FT_ReleaseFeedbackImage(s_UltraKill);
     FT_ReleaseFeedbackImage(s_Fantastic);
     FT_ReleaseFeedbackImage(s_Unbelievable);
+    FT_ReleaseFeedbackImage(s_RoundStart);
 
-    if(s_pRegionFallback)
+    if(s_pFallback)
     {
         g_pLTCFontManager->DestroyPolyString(
-            s_pRegionFallback);
-        s_pRegionFallback = LTNULL;
-    }
-
-    if(s_pStreakFallback)
-    {
-        g_pLTCFontManager->DestroyPolyString(
-            s_pStreakFallback);
-        s_pStreakFallback = LTNULL;
+            s_pFallback);
+        s_pFallback = LTNULL;
     }
 
     if(s_pFeedbackFont)
@@ -404,64 +484,69 @@ void FT_CombatFeedbackTerm()
         s_pFeedbackFont = LTNULL;
     }
 
-    s_nRegionFeedback = 0;
-    s_nStreakFeedback = 0;
-    s_fRegionUntil = 0.0f;
-    s_fStreakUntil = 0.0f;
+    s_nQueueHead = 0;
+    s_nQueueCount = 0;
+    s_nActiveFeedback = 0;
+    s_fActiveStart = 0.0f;
 }
 
 void FT_CombatFeedbackHandleMessage(
     ILTMessage_Read *pMessage)
 {
     if(!pMessage)
-    {
         return;
-    }
 
     const uint8 nFeedback =
         pMessage->Readuint8();
-    const float fNow =
-        g_pLTClient->GetTime();
 
+    FT_QueueFeedback(nFeedback);
+
+    // The supplied CA SND archive does not contain the literal announcer VO.
+    // Keep the native Training target cues as restrained kill confirmation.
     if(nFeedback ==
-           FT_COMBAT_FEEDBACK_HEADSHOT ||
-       nFeedback ==
-           FT_COMBAT_FEEDBACK_NUTSHOT)
+       FT_COMBAT_FEEDBACK_HEADSHOT)
     {
-        s_nRegionFeedback =
-            nFeedback;
-        s_fRegionUntil =
-            fNow + 1.20f;
-
-        // No literal HEADSHOT/NUTSHOT announcer VO exists in the supplied
-        // SND archive. These are short native CA target cues, used as a
-        // restrained local hit-confirm layer rather than fake announcer VO.
         FT_PlayFeedbackCue(
-            nFeedback ==
-                FT_COMBAT_FEEDBACK_HEADSHOT
-            ? "Snd/TRAINING/TARGET_DOWN1.WAV"
-            : "Snd/TRAINING/TARGET_UP1.WAV",
+            "Snd/TRAINING/TARGET_DOWN1.WAV",
             62);
     }
-    else
+    else if(nFeedback ==
+            FT_COMBAT_FEEDBACK_NUTSHOT)
     {
-        s_nStreakFeedback =
-            nFeedback;
-        s_fStreakUntil =
-            fNow + 1.65f;
+        FT_PlayFeedbackCue(
+            "Snd/TRAINING/TARGET_UP1.WAV",
+            62);
     }
+}
+
+void FT_CombatFeedbackShowRoundStart()
+{
+    FT_QueueFeedback(
+        FT_FEEDBACK_ROUNDSTART);
 }
 
 void FT_RenderCombatFeedback()
 {
     if(!g_pLTClient ||
-       !g_pLTCDrawPrim)
+       !g_pLTCDrawPrim ||
+       !s_nActiveFeedback)
     {
         return;
     }
 
-    const float fNow =
-        g_pLTClient->GetTime();
+    const float fAge =
+        g_pLTClient->GetTime() -
+        s_fActiveStart;
+
+    const float kZoomSeconds = 0.18f;
+    const float kHoldUntil = 1.45f;
+    const float kTotalSeconds = 2.10f;
+
+    if(fAge >= kTotalSeconds)
+    {
+        FT_AdvanceFeedback();
+        return;
+    }
 
     uint32 nScreenW = 0;
     uint32 nScreenH = 0;
@@ -470,51 +555,61 @@ void FT_RenderCombatFeedback()
         &nScreenW,
         &nScreenH);
 
-    if(s_nRegionFeedback &&
-       fNow < s_fRegionUntil)
-    {
-        FTFeedbackImage *pImage =
-            FT_ImageForFeedback(
-                s_nRegionFeedback);
+    float fScale = 1.0f;
 
-        if(pImage &&
-           pImage->hTexture)
-        {
-            FT_DrawFeedbackImage(
-                pImage,
-                (float)nScreenH * 0.37f,
-                340.0f);
-        }
-        else
-        {
-            FT_DrawFallback(
-                s_pRegionFallback,
-                s_nRegionFeedback,
-                (float)nScreenH * 0.37f);
-        }
+    if(fAge < kZoomSeconds)
+    {
+        const float fProgress =
+            fAge / kZoomSeconds;
+
+        // Original-style impact: oversized first frame, quickly settling down.
+        fScale =
+            1.45f -
+            (0.45f * fProgress);
     }
 
-    if(s_nStreakFeedback &&
-       fNow < s_fStreakUntil)
-    {
-        FTFeedbackImage *pImage =
-            FT_ImageForFeedback(
-                s_nStreakFeedback);
+    uint8 nAlpha = 255;
 
-        if(pImage &&
-           pImage->hTexture)
-        {
-            FT_DrawFeedbackImage(
-                pImage,
-                (float)nScreenH * 0.50f,
-                390.0f);
-        }
-        else
-        {
-            FT_DrawFallback(
-                s_pStreakFallback,
-                s_nStreakFeedback,
-                (float)nScreenH * 0.50f);
-        }
+    if(fAge > kHoldUntil)
+    {
+        float fFade =
+            1.0f -
+            ((fAge - kHoldUntil) /
+             (kTotalSeconds - kHoldUntil));
+
+        if(fFade < 0.0f)
+            fFade = 0.0f;
+
+        nAlpha =
+            (uint8)(fFade * 255.0f);
+    }
+
+    const float fWidth =
+        FT_BaseWidth(
+            s_nActiveFeedback,
+            nScreenW) *
+        fScale;
+    const float fCenterY =
+        (float)nScreenH * 0.39f;
+
+    FTFeedbackImage *pImage =
+        FT_ImageForFeedback(
+            s_nActiveFeedback);
+
+    if(pImage &&
+       pImage->hTexture)
+    {
+        FT_DrawImage(
+            pImage,
+            fCenterY,
+            fWidth,
+            nAlpha);
+    }
+    else
+    {
+        FT_DrawFallback(
+            s_nActiveFeedback,
+            fCenterY,
+            nAlpha);
     }
 }

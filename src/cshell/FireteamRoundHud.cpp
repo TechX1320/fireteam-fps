@@ -1,4 +1,5 @@
 #include "FireteamRoundHud.h"
+#include "FireteamCombatFeedback.h"
 #include "clientinterfaces.h"
 
 #include <iltclient.h>
@@ -219,9 +220,10 @@ void FT_RoundHudHandleMessage(
         s_fAnnouncementUntil =
             g_pLTClient->GetTime() + 3.0f;
 
-        // Original Cabin Fever section sting, borrowed as the round-start cue.
+        // Original Cabin Fever section sting + original CA round-start art.
         FT_PlayRoundCue(
             "Snd/CABINFEVER/SECTION1.WAV");
+        FT_CombatFeedbackShowRoundStart();
     }
     else if(nState == 2)
     {
