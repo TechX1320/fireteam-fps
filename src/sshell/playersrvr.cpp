@@ -1016,6 +1016,12 @@ void CPlayerSrvr::SendPrimaryAmmo()
 }
 
 
+void CPlayerSrvr::SyncPrimaryAmmo()
+{
+    CompleteReloadIfReady();
+    SendPrimaryAmmo();
+}
+
 void CPlayerSrvr::ReloadWeapon()
 {
     if(!m_bAlive)
