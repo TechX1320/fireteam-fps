@@ -937,9 +937,25 @@ void FireteamZombie::UpdateZombie()
                 &floorQuery,
                 &floorInfo))
             {
-                vDesired.y =
+                const float fFloorY =
                     floorInfo.m_Point.y +
                     m_vCollisionDims.y;
+
+                const float fHeightDelta =
+                    fFloorY - vPos.y;
+
+                // Step onto stairs/low ledges, but do not snap through a
+                // ceiling or teleport to another floor when several solid
+                // WorldModels overlap the vertical probe.
+                if(fHeightDelta <= 40.0f &&
+                   fHeightDelta >= -80.0f)
+                {
+                    vDesired.y = fFloorY;
+                }
+                else
+                {
+                    vDesired.y = vPos.y;
+                }
             }
             else
             {
