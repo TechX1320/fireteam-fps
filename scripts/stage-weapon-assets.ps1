@@ -152,42 +152,26 @@ if(Test-Path -LiteralPath $weaponImports) {
   Write-Host "[WEAPON] Staging enabled launcher/catalog imports..."
 
   $weaponsCfg = Join-Path $RepoRoot "config\weapons.cfg"
-  $enabledCatalogIds = New-Object System.Collections.Generic.List[string]
-  $catalogSectionCount = 0
+  $catalogEntries = @{}
+  $currentCatalog = $null
 
   if(Test-Path -LiteralPath $weaponsCfg) {
-    $currentCatalog = $null
-    $currentId = $null
-    $currentEnabled = $false
-
-    function Commit-CatalogSection {
-      if($script:currentCatalog) {
-        $script:catalogSectionCount++
-        if($script:currentEnabled) {
-          $id = $script:currentId
-          if(-not $id) { $id = $script:currentCatalog }
-          if(-not $script:enabledCatalogIds.Contains($id)) {
-            $script:enabledCatalogIds.Add($id)
-          }
-        }
-      }
-    }
-
     foreach($rawLine in Get-Content -LiteralPath $weaponsCfg) {
       $line = $rawLine.Trim()
-      if($line -match '^\[catalog\.(.+)\]) {
-        Commit-CatalogSection
+
+      if($line -match '^\[catalog\.(.+)\]$') {
         $currentCatalog = $Matches[1]
-        $currentId = $null
-        $currentEnabled = $false
+        if(-not $catalogEntries.ContainsKey($currentCatalog)) {
+          $catalogEntries[$currentCatalog] = @{
+            id = $currentCatalog
+            enabled = $false
+          }
+        }
         continue
       }
 
       if($line -match '^\[') {
-        Commit-CatalogSection
         $currentCatalog = $null
-        $currentId = $null
-        $currentEnabled = $false
         continue
       }
 
@@ -198,17 +182,14 @@ if(Test-Path -LiteralPath $weaponImports) {
         continue
       }
 
-      if($line -match '^id\s*=\s*(.+)) {
-        $currentId = $Matches[1].Trim()
-      } elseif($line -match '^enabled\s*=\s*(1|true|yes|on)\s*) {
-        $currentEnabled = $true
+      if($line -match '^id\s*=\s*(.+)$') {
+        $catalogEntries[$currentCatalog].id = $Matches[1].Trim()
+      } elseif($line -match '^enabled\s*=\s*(1|true|yes|on)\s*$') {
+        $catalogEntries[$currentCatalog].enabled = $true
       } elseif($line -match '^enabled\s*=') {
-        $currentEnabled = $false
+        $catalogEntries[$currentCatalog].enabled = $false
       }
     }
-
-    Commit-CatalogSection
-    Remove-Item function:Commit-CatalogSection -ErrorAction SilentlyContinue
   }
 
   $catalogImportRoot = Join-Path $weaponImports "Weapons\imported"
@@ -220,8 +201,14 @@ if(Test-Path -LiteralPath $weaponImports) {
     Remove-Item -LiteralPath $runtimeImportRoot -Recurse -Force
   }
 
-  if($catalogSectionCount -gt 0) {
-    foreach($weaponId in $enabledCatalogIds) {
+  if($catalogEntries.Count -gt 0) {
+    foreach($catalogName in $catalogEntries.Keys) {
+      $entry = $catalogEntries[$catalogName]
+      if(-not $entry.enabled) {
+        continue
+      }
+
+      $weaponId = [string]$entry.id
       $sourceWeapon = Join-Path $catalogImportRoot $weaponId
       if(-not (Test-Path -LiteralPath $sourceWeapon)) {
         Write-Host "[SKIP] Enabled catalog weapon has no imported assets: $weaponId"
