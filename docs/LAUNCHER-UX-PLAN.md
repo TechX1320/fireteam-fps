@@ -114,6 +114,9 @@ Weapon authoring is not a top-level player tab.
 - scanner command validates imported asset references in local source + BUILT runtime
 
 ### Phase 1.2 — loadout armory
+- catalog parsing is cached; hidden 1,300+ definition lists are not rendered on startup
+- enable/disable state is stored in config/weapon-library.cfg for fast checkbox saves
+- weapon import runs off the UI thread and skips unchanged local archive files
 - CA Guntype mapping drives launcher inventory categories
 - three saved loadout presets in config/loadouts.cfg
 - Combat Arms-inspired category browser + stat inspector
@@ -126,6 +129,11 @@ Weapon authoring is not a top-level player tab.
 - selected-nav styling / hover menus
 - server browser shell
 - map selection when more official maps exist
+
+### Phase 2.1 — portable LithTech weapon authoring
+- per-weapon animation aliases for select / idle / fire / alt-fire / reload
+- keep code-timed FIRETEAM weapon logic independent of model string keyframes
+- inspect model-key aliasing only if a future imported LTB actually requires key-driven gameplay
 
 ### Phase 3 — content-tool windows
 - open Weapon Editor as its own tool window

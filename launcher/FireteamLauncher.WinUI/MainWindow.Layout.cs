@@ -529,9 +529,9 @@ public sealed partial class MainWindow
                 Margin =
                     new Thickness(
                         30, 24, 30, 32),
-                MaxWidth = 1220,
+                MaxWidth = 1120,
                 HorizontalAlignment =
-                    HorizontalAlignment.Stretch
+                    HorizontalAlignment.Center
             };
 
         var header =
@@ -559,6 +559,8 @@ public sealed partial class MainWindow
             ScrollBarVisibility.Disabled;
         HomeView.VerticalScrollBarVisibility =
             ScrollBarVisibility.Auto;
+        HomeView.HorizontalContentAlignment =
+            HorizontalAlignment.Center;
 
         var page =
             new StackPanel
@@ -570,9 +572,9 @@ public sealed partial class MainWindow
                         20,
                         30,
                         30),
-                MaxWidth = 1220,
+                MaxWidth = 1120,
                 HorizontalAlignment =
-                    HorizontalAlignment.Stretch
+                    HorizontalAlignment.Center
             };
 
         var header =
@@ -1094,6 +1096,8 @@ public sealed partial class MainWindow
 
         LoadoutView.VerticalScrollBarVisibility =
             ScrollBarVisibility.Auto;
+        LoadoutView.HorizontalContentAlignment =
+            HorizontalAlignment.Center;
 
         var page =
             new StackPanel
@@ -1105,9 +1109,9 @@ public sealed partial class MainWindow
                         18,
                         26,
                         24),
-                MaxWidth = 1280,
+                MaxWidth = 1120,
                 HorizontalAlignment =
-                    HorizontalAlignment.Stretch
+                    HorizontalAlignment.Center
             };
 
         var header =
@@ -1141,7 +1145,7 @@ public sealed partial class MainWindow
             {
                 Width =
                     new GridLength(
-                        230)
+                        205)
             });
 
         workspace.ColumnDefinitions.Add(
@@ -1640,6 +1644,8 @@ public sealed partial class MainWindow
             Visibility.Collapsed;
         ModsView.HorizontalScrollBarVisibility =
             ScrollBarVisibility.Disabled;
+        ModsView.HorizontalContentAlignment =
+            HorizontalAlignment.Center;
 
         var page =
             NewPagePanel(
@@ -1809,17 +1815,35 @@ public sealed partial class MainWindow
     {
         ArsenalView.Visibility =
             Visibility.Collapsed;
-        ArsenalView.Margin =
-            new Thickness(30, 24, 30, 30);
-        ArsenalView.ColumnSpacing = 18;
+        ArsenalView.HorizontalScrollBarVisibility =
+            ScrollBarVisibility.Disabled;
+        ArsenalView.VerticalScrollBarVisibility =
+            ScrollBarVisibility.Auto;
+        ArsenalView.HorizontalContentAlignment =
+            HorizontalAlignment.Center;
 
-        ArsenalView.ColumnDefinitions.Add(
+        var page =
+            new Grid
+            {
+                Margin =
+                    new Thickness(
+                        22,
+                        18,
+                        22,
+                        26),
+                ColumnSpacing = 16,
+                MaxWidth = 1120,
+                HorizontalAlignment =
+                    HorizontalAlignment.Center
+            };
+
+        page.ColumnDefinitions.Add(
             new ColumnDefinition
             {
                 Width =
-                    new GridLength(330)
+                    new GridLength(280)
             });
-        ArsenalView.ColumnDefinitions.Add(
+        page.ColumnDefinitions.Add(
             new ColumnDefinition
             {
                 Width =
@@ -1844,7 +1868,7 @@ public sealed partial class MainWindow
                 28));
         left.Children.Add(
             BodyText(
-                "Development/content tool. Search an installed definition, edit supported values, then save back to config."));
+                "Search or author FIRETEAM weapon definitions. The list renders a capped working set so the 1,300+ weapon CA catalog stays responsive."));
 
         var import =
             SecondaryButton(
@@ -1854,10 +1878,10 @@ public sealed partial class MainWindow
         left.Children.Add(import);
         left.Children.Add(
             BodyText(
-                "Reads decrypted WEAPONS.txt plus Guns.zip, auto-detects GunsHH.zip when it is beside the archive, stages matching assets locally and writes disabled catalog entries for review."));
+                "Import runs on a worker thread. Commercial assets stay local; use stage-imported-weapons.cmd when you are ready to copy them into BUILT."));
 
         WeaponSearchBox.PlaceholderText =
-            "Search name or ID...";
+            "Search name, ID or category...";
         WeaponSearchBox.TextChanged +=
             WeaponSearchBox_TextChanged;
         left.Children.Add(
@@ -1865,8 +1889,8 @@ public sealed partial class MainWindow
 
         WeaponList.DisplayMemberPath =
             "DisplayName";
-        WeaponList.MinHeight = 420;
-        WeaponList.MaxHeight = 560;
+        WeaponList.MinHeight = 360;
+        WeaponList.MaxHeight = 470;
         WeaponList.SelectionChanged +=
             WeaponList_SelectionChanged;
         left.Children.Add(
@@ -1885,14 +1909,17 @@ public sealed partial class MainWindow
                 left,
                 CyanBrush);
 
-        Grid.SetColumn(leftCard, 0);
-        ArsenalView.Children.Add(leftCard);
+        Grid.SetColumn(
+            leftCard,
+            0);
+        page.Children.Add(
+            leftCard);
 
         var editor =
             CardHeading(
                 "WEAPON AUTHORING",
                 "Definition",
-                "Gameplay authority remains server-side. This editor changes external FIRETEAM weapon data.",
+                "Gameplay authority remains server-side. Presentation, animation aliases and loadout availability are data-driven here.",
                 AccentBrush);
 
         WeaponTitleText.Text =
@@ -1916,10 +1943,16 @@ public sealed partial class MainWindow
                 ColumnSpacing = 14,
                 RowSpacing = 10,
                 Margin =
-                    new Thickness(0, 10, 0, 0)
+                    new Thickness(
+                        0,
+                        10,
+                        0,
+                        0)
             };
 
-        for(var i = 0; i < 4; ++i)
+        for(var i = 0;
+            i < 4;
+            ++i)
         {
             fields.RowDefinitions.Add(
                 new RowDefinition
@@ -1993,18 +2026,107 @@ public sealed partial class MainWindow
 
         editor.Children.Add(fields);
 
+        editor.Children.Add(
+            Eyebrow(
+                "ANIMATION ALIASES",
+                CyanBrush));
+
+        editor.Children.Add(
+            BodyText(
+                "Use the animation names already embedded in an LTB from another LithTech title instead of renaming them in ModelEdit. Leave blank to keep FIRETEAM's current select/idle/fire/reload fallback behavior. FIRETEAM firing and reload timing are code-driven, so model string keyframes are not currently required."));
+
+        var animationFields =
+            new Grid
+            {
+                ColumnSpacing = 14,
+                RowSpacing = 10
+            };
+
+        for(var i = 0;
+            i < 3;
+            ++i)
+        {
+            animationFields.RowDefinitions.Add(
+                new RowDefinition
+                {
+                    Height =
+                        GridLength.Auto
+                });
+        }
+
+        animationFields.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(90)
+            });
+        animationFields.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+        animationFields.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(90)
+            });
+        animationFields.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+
+        AddEditorField(
+            animationFields, 0, 0,
+            "SELECT",
+            AnimSelectBox);
+        AddEditorField(
+            animationFields, 0, 2,
+            "IDLE",
+            AnimIdleBox);
+        AddEditorField(
+            animationFields, 1, 0,
+            "FIRE",
+            AnimFireBox);
+        AddEditorField(
+            animationFields, 1, 2,
+            "ALT FIRE",
+            AnimAltFireBox);
+        AddEditorField(
+            animationFields, 2, 0,
+            "RELOAD",
+            AnimReloadBox);
+
+        editor.Children.Add(
+            animationFields);
+
         WeaponEnabledCheckBox.Content =
             "Enabled for Loadout";
         WeaponEnabledCheckBox.Foreground =
             PrimaryTextBrush;
         WeaponEnabledCheckBox.Margin =
-            new Thickness(0, 8, 0, 0);
+            new Thickness(
+                0,
+                8,
+                0,
+                0);
 
         var enabledHelp =
             BodyText(
-                "Disabled catalog weapons stay in the Weapon Editor but are hidden from the player loadout picker. Active slot definitions are always enabled.");
+                "Enable/disable is stored in a tiny launcher sidecar now, so this checkbox no longer rewrites the entire imported CA catalog.");
         enabledHelp.Margin =
-            new Thickness(26, -4, 0, 0);
+            new Thickness(
+                26,
+                -4,
+                0,
+                0);
 
         editor.Children.Add(
             WeaponEnabledCheckBox);
@@ -2018,7 +2140,11 @@ public sealed partial class MainWindow
                     Orientation.Horizontal,
                 Spacing = 10,
                 Margin =
-                    new Thickness(0, 10, 0, 0)
+                    new Thickness(
+                        0,
+                        10,
+                        0,
+                        0)
             };
 
         var reload =
@@ -2049,9 +2175,14 @@ public sealed partial class MainWindow
                 editor,
                 AccentBrush);
 
-        Grid.SetColumn(editorCard, 1);
-        ArsenalView.Children.Add(
+        Grid.SetColumn(
+            editorCard,
+            1);
+        page.Children.Add(
             editorCard);
+
+        ArsenalView.Content =
+            page;
     }
 
     private static void AddEditorField(
@@ -2085,6 +2216,8 @@ public sealed partial class MainWindow
             Visibility.Collapsed;
         SettingsView.HorizontalScrollBarVisibility =
             ScrollBarVisibility.Disabled;
+        SettingsView.HorizontalContentAlignment =
+            HorizontalAlignment.Center;
 
         var page =
             NewPagePanel(

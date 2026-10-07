@@ -574,17 +574,25 @@ bool CPlayerClnt::Attack()
 
         m_fNextPrimaryClientShot = fNow + pDef->fFireInterval;
 
+        const char *pFireAnim = pDef->sAnimFire;
+
         HMODELANIM hFire = INVALID_MODEL_ANIM;
-        if(m_hViewWeaponObject)
+        if(!pFireAnim[0] &&
+           m_hViewWeaponObject)
         {
             hFire = g_pLTClient->GetAnimIndex(
                 m_hViewWeaponObject,
                 (char*)"fire_0");
         }
 
-        m_bViewWeaponAction = PlayViewWeaponAnimation(
-            hFire != INVALID_MODEL_ANIM ? "fire_0" : "fire",
-            false);
+        m_bViewWeaponAction =
+            PlayViewWeaponAnimation(
+                pFireAnim[0]
+                    ? pFireAnim
+                    : (hFire != INVALID_MODEL_ANIM
+                        ? "fire_0"
+                        : "fire"),
+                false);
         PlayViewWeaponSound("FIRE.WAV");
         FT_WeaponHudOnShot(m_nWeaponSlot);
         return true;
@@ -598,7 +606,11 @@ bool CPlayerClnt::Attack()
     PlayAttackAnimation("UMFi", m_idUpperBodyTracker);
     m_bAttacking = true;
     m_bViewWeaponAction =
-        PlayViewWeaponAnimation("fire_0", false);
+        PlayViewWeaponAnimation(
+            pDef->sAnimFire[0]
+                ? pDef->sAnimFire
+                : "fire_0",
+            false);
     PlayViewWeaponSound("FIRE.WAV");
     return true;
 }
@@ -625,8 +637,15 @@ bool CPlayerClnt::AltAttack()
     PlayAttackAnimation("UMFi", m_idUpperBodyTracker);
     m_bAttacking = true;
 
+    const FTWeaponDef *pDef =
+        GetCurrentWeaponDef();
+
     m_bViewWeaponAction =
-        PlayViewWeaponAnimation("fire_1", false);
+        PlayViewWeaponAnimation(
+            pDef && pDef->sAnimAltFire[0]
+                ? pDef->sAnimAltFire
+                : "fire_1",
+            false);
     PlayViewWeaponSound("FIRE.WAV");
 
     return true;
@@ -732,16 +751,22 @@ bool CPlayerClnt::ReloadWeapon()
     }
 
     HMODELANIM hReload = INVALID_MODEL_ANIM;
-    if(m_hViewWeaponObject)
+    if(!pDef->sAnimReload[0] &&
+       m_hViewWeaponObject)
     {
         hReload = g_pLTClient->GetAnimIndex(
             m_hViewWeaponObject,
             (char*)"reload");
     }
 
-    m_bViewWeaponAction = PlayViewWeaponAnimation(
-        hReload != INVALID_MODEL_ANIM ? "reload" : "reload_0",
-        false);
+    m_bViewWeaponAction =
+        PlayViewWeaponAnimation(
+            pDef->sAnimReload[0]
+                ? pDef->sAnimReload
+                : (hReload != INVALID_MODEL_ANIM
+                    ? "reload"
+                    : "reload_0"),
+            false);
     PlayViewWeaponSound("RELOAD.WAV");
     return true;
 }
@@ -1086,13 +1111,24 @@ void CPlayerClnt::CreateViewWeapon()
         return;
     }
 
-    HMODELANIM hSelect = g_pLTClient->GetAnimIndex(
-        m_hViewWeaponObject,
-        (char*)"select");
+    HMODELANIM hSelect = INVALID_MODEL_ANIM;
 
-    m_bViewWeaponAction = PlayViewWeaponAnimation(
-        hSelect != INVALID_MODEL_ANIM ? "select" : "select_0",
-        false);
+    if(!pDef->sAnimSelect[0])
+    {
+        hSelect =
+            g_pLTClient->GetAnimIndex(
+                m_hViewWeaponObject,
+                (char*)"select");
+    }
+
+    m_bViewWeaponAction =
+        PlayViewWeaponAnimation(
+            pDef->sAnimSelect[0]
+                ? pDef->sAnimSelect
+                : (hSelect != INVALID_MODEL_ANIM
+                    ? "select"
+                    : "select_0"),
+            false);
     PlayViewWeaponSound("SELECT.WAV");
 }
 
@@ -1173,12 +1209,27 @@ void CPlayerClnt::UpdateViewWeaponAnimation()
 
     if(nAnimLen > 0 && nAnimTime >= nAnimLen)
     {
-        HMODELANIM hIdle = g_pLTClient->GetAnimIndex(
-            m_hViewWeaponObject,
-            (char*)"idle_0");
+        const FTWeaponDef *pDef =
+            GetCurrentWeaponDef();
+
+        HMODELANIM hIdle = INVALID_MODEL_ANIM;
+
+        if((!pDef ||
+            !pDef->sAnimIdle[0]) &&
+           m_hViewWeaponObject)
+        {
+            hIdle =
+                g_pLTClient->GetAnimIndex(
+                    m_hViewWeaponObject,
+                    (char*)"idle_0");
+        }
 
         PlayViewWeaponAnimation(
-            hIdle != INVALID_MODEL_ANIM ? "idle_0" : "idle",
+            pDef && pDef->sAnimIdle[0]
+                ? pDef->sAnimIdle
+                : (hIdle != INVALID_MODEL_ANIM
+                    ? "idle_0"
+                    : "idle"),
             true);
 
         m_bViewWeaponAction = false;

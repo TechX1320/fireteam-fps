@@ -66,7 +66,7 @@ public sealed partial class MainWindow : Window
     private readonly Button LoadoutEquipButton = new();
     private readonly TextBlock LoadoutStatusText = new();
 
-    private readonly Grid ArsenalView = new();
+    private readonly ScrollViewer ArsenalView = new();
     private readonly TextBox WeaponSearchBox = new();
     private readonly ListView WeaponList = new();
     private readonly TextBlock WeaponTitleText = new();
@@ -79,6 +79,11 @@ public sealed partial class MainWindow : Window
     private readonly TextBox ReserveBox = new();
     private readonly TextBox FireIntervalBox = new();
     private readonly TextBox ReloadBox = new();
+    private readonly TextBox AnimSelectBox = new();
+    private readonly TextBox AnimIdleBox = new();
+    private readonly TextBox AnimFireBox = new();
+    private readonly TextBox AnimAltFireBox = new();
+    private readonly TextBox AnimReloadBox = new();
     private readonly CheckBox WeaponEnabledCheckBox = new();
     private readonly TextBlock ArsenalStatusText = new();
 
@@ -214,12 +219,14 @@ public sealed partial class MainWindow : Window
         SettingsStatusText.Text = "Current FIRETEAM settings loaded.";
     }
 
-    private void ReloadWeapons()
+    private void ReloadWeapons(
+        bool force = false)
     {
         try
         {
             var all =
-                App.Instance.Services.Weapons.Load();
+                App.Instance.Services.Weapons.Load(
+                    force);
 
             var active =
                 all
@@ -233,9 +240,9 @@ public sealed partial class MainWindow : Window
 
             _arsenal = all;
             _choices =
-                App.Instance.Services.Weapons.GetArsenalChoices();
+                App.Instance.Services.Weapons.GetArsenalChoices(
+                    all);
 
-            ApplyArsenalFilter();
             RefreshHomeLoadoutSummary(
                 active);
 
@@ -269,7 +276,17 @@ public sealed partial class MainWindow : Window
                     active);
             }
 
-            ApplyLoadoutInventoryFilter();
+            if(LoadoutView.Visibility ==
+               Visibility.Visible)
+            {
+                ApplyLoadoutInventoryFilter();
+            }
+
+            if(ArsenalView.Visibility ==
+               Visibility.Visible)
+            {
+                ApplyArsenalFilter();
+            }
 
             var catalogCount =
                 all.Count(
@@ -294,9 +311,11 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void ReloadArsenal()
+    private void ReloadArsenal(
+        bool force = false)
     {
-        ReloadWeapons();
+        ReloadWeapons(
+            force);
     }
 
     private void RefreshHomeLoadoutSummary(
@@ -598,6 +617,39 @@ public sealed partial class MainWindow : Window
                 "reload") +
             " s";
 
+        var equippedSlot =
+            Array.FindIndex(
+                _draftLoadout,
+                candidate =>
+                    candidate is not null &&
+                    SameWeapon(
+                        candidate,
+                        weapon));
+
+        if(equippedSlot >= 0)
+        {
+            var equippedLabel =
+                LoadoutSlotLabel(
+                    equippedSlot);
+
+            LoadoutEquipSlotCombo.ItemsSource =
+                new[]
+                {
+                    equippedLabel
+                };
+
+            LoadoutEquipSlotCombo.SelectedIndex =
+                0;
+
+            LoadoutEquipButton.Content =
+                "EQUIPPED";
+
+            LoadoutEquipButton.IsEnabled =
+                false;
+
+            return;
+        }
+
         var slots =
             AllowedLoadoutSlots(
                 weapon.LoadoutCategory);
@@ -610,9 +662,45 @@ public sealed partial class MainWindow : Window
             ? 0
             : -1;
 
+        LoadoutEquipButton.Content =
+            "EQUIP WEAPON";
+
         LoadoutEquipButton.IsEnabled =
             slots.Count > 0;
     }
+
+    private static bool SameWeapon(
+        WeaponDefinition left,
+        WeaponDefinition right)
+    {
+        var leftKey =
+            string.IsNullOrWhiteSpace(
+                left.Id)
+            ? left.Name
+            : left.Id;
+
+        var rightKey =
+            string.IsNullOrWhiteSpace(
+                right.Id)
+            ? right.Name
+            : right.Id;
+
+        return leftKey.Equals(
+            rightKey,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string LoadoutSlotLabel(
+        int slot) =>
+        slot switch
+        {
+            0 => "PRIMARY",
+            1 => "SIDEARM",
+            2 => "MELEE",
+            3 => "BACKPACK 1",
+            4 => "BACKPACK 2",
+            _ => "UNKNOWN"
+        };
 
     private static string WeaponValue(
         WeaponDefinition weapon,
@@ -702,6 +790,11 @@ public sealed partial class MainWindow : Window
             _selectedLoadoutWeapon;
 
         RefreshLoadoutSlotButtons();
+
+        LoadoutEquipButton.Content =
+            "EQUIPPED";
+        LoadoutEquipButton.IsEnabled =
+            false;
 
         LoadoutStatusText.Text =
             $"Equipped {_selectedLoadoutWeapon.Name} to {slotName}. Save the preset or activate it for FIRETEAM.";
@@ -920,29 +1013,64 @@ public sealed partial class MainWindow : Window
 
     private void ApplyArsenalFilter()
     {
-        var query = WeaponSearchBox.Text?.Trim() ?? string.Empty;
+        const int RenderLimit = 250;
 
-        var visible = _arsenal
-            .Where(w =>
-                query.Length == 0 ||
-                w.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                w.Id.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                w.Type.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(w => w.IsActiveSlot)
-            .ThenBy(w => w.Name)
-            .ToList();
+        var query =
+            WeaponSearchBox.Text?
+                .Trim() ??
+            string.Empty;
 
-        WeaponList.ItemsSource = visible;
+        var matches =
+            _arsenal
+                .Where(w =>
+                    query.Length == 0 ||
+                    w.Name.Contains(
+                        query,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    w.Id.Contains(
+                        query,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    w.Type.Contains(
+                        query,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    w.LoadoutCategory.Contains(
+                        query,
+                        StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(w =>
+                    w.IsActiveSlot)
+                .ThenByDescending(w =>
+                    w.Enabled)
+                .ThenBy(w =>
+                    w.Name)
+                .ToList();
+
+        var visible =
+            matches
+                .Take(
+                    RenderLimit)
+                .ToList();
+
+        WeaponList.ItemsSource =
+            visible;
+
+        if(matches.Count > RenderLimit)
+        {
+            ArsenalStatusText.Text =
+                $"Showing first {RenderLimit} of {matches.Count} definitions. Search by name, ID or category to narrow the catalog.";
+        }
 
         if(visible.Count > 0)
         {
-            WeaponList.SelectedIndex = 0;
+            WeaponList.SelectedIndex =
+                0;
         }
         else
         {
             _selectedWeapon = null;
-            WeaponTitleText.Text = "No matching weapons";
-            WeaponSectionText.Text = string.Empty;
+            WeaponTitleText.Text =
+                "No matching weapons";
+            WeaponSectionText.Text =
+                string.Empty;
         }
     }
 
@@ -968,25 +1096,34 @@ public sealed partial class MainWindow : Window
         SetWeaponField(ReserveBox, weapon, "reserve");
         SetWeaponField(FireIntervalBox, weapon, "fire_interval");
         SetWeaponField(ReloadBox, weapon, "reload");
+        SetWeaponField(AnimSelectBox, weapon, "anim_select");
+        SetWeaponField(AnimIdleBox, weapon, "anim_idle");
+        SetWeaponField(AnimFireBox, weapon, "anim_fire");
+        SetWeaponField(AnimAltFireBox, weapon, "anim_alt_fire");
+        SetWeaponField(AnimReloadBox, weapon, "anim_reload");
         WeaponEnabledCheckBox.IsChecked =
             weapon.Enabled || weapon.IsActiveSlot;
         WeaponEnabledCheckBox.IsEnabled =
             !weapon.IsActiveSlot;
     }
 
-    private void SaveWeaponButton_Click(object sender, RoutedEventArgs e)
+    private void SaveWeaponButton_Click(
+        object sender,
+        RoutedEventArgs e)
     {
         if(_selectedWeapon is null)
         {
-            ArsenalStatusText.Text = "Select a weapon first.";
+            ArsenalStatusText.Text =
+                "Select a weapon first.";
             return;
         }
 
         try
         {
-            var values = new Dictionary<string, string>(
-                _selectedWeapon.Values,
-                StringComparer.OrdinalIgnoreCase);
+            var values =
+                new Dictionary<string, string>(
+                    _selectedWeapon.Values,
+                    StringComparer.OrdinalIgnoreCase);
 
             Put(values, "name", WeaponNameBox.Text);
             Put(values, "id", WeaponIdBox.Text);
@@ -996,39 +1133,151 @@ public sealed partial class MainWindow : Window
             Put(values, "reserve", ReserveBox.Text);
             Put(values, "fire_interval", FireIntervalBox.Text);
             Put(values, "reload", ReloadBox.Text);
+            Put(values, "anim_select", AnimSelectBox.Text);
+            Put(values, "anim_idle", AnimIdleBox.Text);
+            Put(values, "anim_fire", AnimFireBox.Text);
+            Put(values, "anim_alt_fire", AnimAltFireBox.Text);
+            Put(values, "anim_reload", AnimReloadBox.Text);
 
-            var updated = new WeaponDefinition
+            var enabled =
+                _selectedWeapon.IsActiveSlot ||
+                WeaponEnabledCheckBox.IsChecked == true;
+
+            var definitionChanged =
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "name",
+                    WeaponNameBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "id",
+                    WeaponIdBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "type",
+                    WeaponTypeCombo.SelectedItem?.ToString()) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "damage",
+                    DamageBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "clip",
+                    ClipBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "reserve",
+                    ReserveBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "fire_interval",
+                    FireIntervalBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "reload",
+                    ReloadBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "anim_select",
+                    AnimSelectBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "anim_idle",
+                    AnimIdleBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "anim_fire",
+                    AnimFireBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "anim_alt_fire",
+                    AnimAltFireBox.Text) ||
+                WeaponEditorValueChanged(
+                    _selectedWeapon,
+                    "anim_reload",
+                    AnimReloadBox.Text);
+
+            var enabledChanged =
+                enabled !=
+                _selectedWeapon.Enabled;
+
+            if(!definitionChanged &&
+               !enabledChanged)
             {
-                Section = _selectedWeapon.Section,
-                Id = WeaponIdBox.Text.Trim(),
-                Name = WeaponNameBox.Text.Trim(),
-                Type = WeaponTypeCombo.SelectedItem?.ToString()
-                    ?? _selectedWeapon.Type,
-                Enabled =
-                    _selectedWeapon.IsActiveSlot ||
-                    WeaponEnabledCheckBox.IsChecked == true,
-                Supported = _selectedWeapon.Supported,
-                IsActiveSlot = _selectedWeapon.IsActiveSlot,
-                Source = _selectedWeapon.Source,
-                Values = values
-            };
+                ArsenalStatusText.Text =
+                    "No weapon changes to save.";
+                return;
+            }
 
-            App.Instance.Services.Weapons.SaveDefinition(updated);
+            var updated =
+                new WeaponDefinition
+                {
+                    Section = _selectedWeapon.Section,
+                    Id = WeaponIdBox.Text.Trim(),
+                    Name = WeaponNameBox.Text.Trim(),
+                    Type =
+                        WeaponTypeCombo.SelectedItem?.ToString()
+                        ?? _selectedWeapon.Type,
+                    Enabled = enabled,
+                    Supported = _selectedWeapon.Supported,
+                    IsActiveSlot = _selectedWeapon.IsActiveSlot,
+                    Source = _selectedWeapon.Source,
+                    Values = values
+                };
+
+            if(definitionChanged)
+            {
+                App.Instance.Services.Weapons.SaveDefinition(
+                    updated);
+            }
+            else
+            {
+                // Enable/disable is launcher library state. Keep it in the
+                // tiny sidecar instead of rewriting the 65k-line CA catalog.
+                App.Instance.Services.Weapons.SetEnabled(
+                    updated.Section,
+                    updated.Enabled);
+            }
+
             ArsenalStatusText.Text =
-                $"Saved {updated.Name}. Gameplay authority remains server-side.";
+                definitionChanged
+                ? $"Saved {updated.Name} definition."
+                : $"{updated.Name} loadout availability updated.";
 
-            ReloadWeapons();
+            ReloadWeapons(
+                definitionChanged);
         }
         catch(Exception ex)
         {
             ArsenalStatusText.Text =
-                "Save failed: " + ex.Message;
+                "Save failed: " +
+                ex.Message;
         }
+    }
+
+    private static bool WeaponEditorValueChanged(
+        WeaponDefinition weapon,
+        string key,
+        string? value)
+    {
+        var current =
+            weapon.Values.TryGetValue(
+                key,
+                out var stored)
+            ? stored.Trim()
+            : string.Empty;
+
+        return !string.Equals(
+            current,
+            value?.Trim() ??
+            string.Empty,
+            StringComparison.Ordinal);
     }
 
     private void ReloadArsenalButton_Click(object sender, RoutedEventArgs e)
     {
-        ReloadArsenal();
+        ReloadArsenal(
+            true);
         ArsenalStatusText.Text = "Reloaded config/weapons.cfg.";
     }
 
@@ -1088,11 +1337,16 @@ public sealed partial class MainWindow : Window
                 "Importing Combat Arms weapon attributes and assets...";
 
             var result =
-                App.Instance.Services.WeaponImports.Import(
-                    weaponsPath,
-                    gunsPath);
+                await Task.Run(
+                    () =>
+                        App.Instance.Services.WeaponImports.Import(
+                            weaponsPath,
+                            gunsPath));
 
-            ReloadWeapons();
+            App.Instance.Services.Weapons.Invalidate();
+
+            ReloadWeapons(
+                true);
 
             ArsenalStatusText.Text =
                 result.Summary;

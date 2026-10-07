@@ -76,6 +76,14 @@ struct FTWeaponDef
     char sHHModel[128];
     char sHHTexture[128];
     char sSoundDir[128];
+
+    // Optional animation aliases for LTBs whose embedded animation names do
+    // not match FIRETEAM/Combat Arms conventions. Empty keeps legacy fallback.
+    char sAnimSelect[64];
+    char sAnimIdle[64];
+    char sAnimFire[64];
+    char sAnimAltFire[64];
+    char sAnimReload[64];
 };
 
 inline void FT_CopyWeaponString(char *pDest, uint32 nDestLen, const char *pSrc)
@@ -236,6 +244,11 @@ inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
         else if(_stricmp(pKey, "hh_model") == 0) FT_CopyWeaponString(def.sHHModel, sizeof(def.sHHModel), pValue);
         else if(_stricmp(pKey, "hh_texture") == 0) FT_CopyWeaponString(def.sHHTexture, sizeof(def.sHHTexture), pValue);
         else if(_stricmp(pKey, "sound_dir") == 0) FT_CopyWeaponString(def.sSoundDir, sizeof(def.sSoundDir), pValue);
+        else if(_stricmp(pKey, "anim_select") == 0) FT_CopyWeaponString(def.sAnimSelect, sizeof(def.sAnimSelect), pValue);
+        else if(_stricmp(pKey, "anim_idle") == 0) FT_CopyWeaponString(def.sAnimIdle, sizeof(def.sAnimIdle), pValue);
+        else if(_stricmp(pKey, "anim_fire") == 0) FT_CopyWeaponString(def.sAnimFire, sizeof(def.sAnimFire), pValue);
+        else if(_stricmp(pKey, "anim_alt_fire") == 0) FT_CopyWeaponString(def.sAnimAltFire, sizeof(def.sAnimAltFire), pValue);
+        else if(_stricmp(pKey, "anim_reload") == 0) FT_CopyWeaponString(def.sAnimReload, sizeof(def.sAnimReload), pValue);
     }
 
     fclose(pFile);
