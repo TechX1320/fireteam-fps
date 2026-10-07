@@ -110,7 +110,7 @@ public sealed class WeaponImportService
             configPaths.Source ??
             configPaths.Runtime ??
             throw new FileNotFoundException(
-                "Could not locate config\weapons.cfg.");
+                "Could not locate config\\weapons.cfg.");
 
         var sections =
             ParseSections(
