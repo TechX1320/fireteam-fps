@@ -1507,6 +1507,7 @@ LTRESULT CLTClientShell::PollInput()
 	}
 
     uint8 dwMoveFlags = 0;
+    bool bControllerQuickGrenade = false;
 
 	// left
 	if (g_pLTClient->IsCommandOn(COMMAND_MOVE_LEFT))
@@ -1534,6 +1535,22 @@ LTRESULT CLTClientShell::PollInput()
 
     if(controller.bConnected)
     {
+        if(controller.nPressed &
+           FT_PAD_LB)
+        {
+            m_pCamera->ClearWeaponZoom();
+
+            bControllerQuickGrenade =
+                m_pPlayer->SelectFirstWeaponType(
+                    FT_WEAPON_GRENADE);
+
+            if(!bControllerQuickGrenade)
+            {
+                g_pLTClient->CPrint(
+                    "Fireteam controller: LB grenade requested, but no grenade is equipped.");
+            }
+        }
+
         if(controller.nButtons &
            FT_PAD_B)
         {
@@ -1555,16 +1572,17 @@ LTRESULT CLTClientShell::PollInput()
                 MOVE_JUMP;
         }
 
-        // Reserved in the requested Xbox layout until the gameplay systems
-        // exist: LB grenade, RB equipment, D-pad Up mark/light,
-        // Left grenade switcher, Down AI scan, Right drop weapon.
+        // Reserved in the requested Xbox layout until those gameplay systems
+        // exist: RB equipment, D-pad Up mark/light, Left grenade switcher,
+        // Down AI scan, Right drop weapon. LB is live as quick grenade.
     }
 
 	// Fireteam weapon fire. The client only sends an action + view ray;
     // the server owns weapon type, ammo, fire timing and damage.
     if (g_pLTClient->IsCommandOn(COMMAND_SHOOT) ||
         (controller.bConnected &&
-         controller.bRightTriggerDown))
+         controller.bRightTriggerDown) ||
+        bControllerQuickGrenade)
     {
         const FTWeaponDef *pWeaponDef = m_pPlayer->GetCurrentWeaponDef();
 
