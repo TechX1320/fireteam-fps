@@ -752,10 +752,16 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
                 pMessage->Readfloat();
             const float fOneHitSeconds =
                 pMessage->Readfloat();
+            const float fGodSeconds =
+                pMessage->Readfloat();
+            const float fWallhackSeconds =
+                pMessage->Readfloat();
 
             FT_RoundHudSetTimedPowerups(
                 fBottomlessSeconds,
-                fOneHitSeconds);
+                fOneHitSeconds,
+                fGodSeconds,
+                fWallhackSeconds);
         }
         break;
     case MSG_SC_COMBAT_FEEDBACK:
