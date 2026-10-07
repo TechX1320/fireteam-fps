@@ -15,6 +15,8 @@ void FT_WeaponHudSetWeaponDefinition(
 void FT_WeaponHudSetQaProgress(
     uint32 nCurrent,
     uint32 nTotal);
+void FT_WeaponHudSetQaQuarantined(
+    bool bQuarantined);
 void FT_RenderWeaponHud(
     uint8 nWeaponSlot,
     bool bFirstPerson,
