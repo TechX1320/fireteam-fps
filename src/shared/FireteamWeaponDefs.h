@@ -38,6 +38,11 @@ struct FTWeaponDef
     float fDamageMult2;
     float fReloadSeconds;
 
+    // Combat Arms / NOLF2 vector perturb values. The original engine stores
+    // these as thousandths of a right/up direction offset.
+    uint16 nMinPerturb;
+    uint16 nMaxPerturb;
+
     // NOLF2-style vector shoot-through. A thickness <= 0 disables it.
     float fPenetrationMaxThickness;
     float fPenetrationDamageMult;
@@ -179,6 +184,8 @@ inline void FT_AssignWeaponField(
     else if(_stricmp(pKey, "damage_mult1") == 0) def.fDamageMult1 = (float)atof(pValue);
     else if(_stricmp(pKey, "damage_mult2") == 0) def.fDamageMult2 = (float)atof(pValue);
     else if(_stricmp(pKey, "reload") == 0) def.fReloadSeconds = (float)atof(pValue);
+    else if(_stricmp(pKey, "min_perturb") == 0) def.nMinPerturb = (uint16)atoi(pValue);
+    else if(_stricmp(pKey, "max_perturb") == 0) def.nMaxPerturb = (uint16)atoi(pValue);
     else if(_stricmp(pKey, "penetration_max_thickness") == 0) def.fPenetrationMaxThickness = (float)atof(pValue);
     else if(_stricmp(pKey, "penetration_damage_mult") == 0) def.fPenetrationDamageMult = (float)atof(pValue);
     else if(_stricmp(pKey, "penetration_range_mult") == 0) def.fPenetrationRangeMult = (float)atof(pValue);
