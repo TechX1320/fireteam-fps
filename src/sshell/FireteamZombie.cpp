@@ -26,7 +26,10 @@ FireteamZombie::FireteamZombie() :
     m_fAttackCooldown(0.0f),
     m_fRepathCooldown(0.0f),
     m_fStuckTime(0.0f),
-    m_nPathLane((s_nZombieSerial++) % 3),
+    m_fForcePathTime(0.0f),
+    m_bDying(false),
+    m_fDeathTimeRemaining(0.0f),
+    m_nPathLane((s_nZombieSerial++) % 5),
     m_nWaypoint(0),
     m_hFace(LTNULL),
     m_hFaceAttachment(LTNULL),
@@ -34,6 +37,7 @@ FireteamZombie::FireteamZombie() :
 {
     m_vLastPos.Init(0.0f, 0.0f, 0.0f);
     m_vCollisionDims.Init(24.0f, 53.0f, 24.0f);
+    m_sCurrentAnimation[0] = '\0';
 
     m_bDefLoaded =
         FT_LoadDefaultInfectedDef(
@@ -276,6 +280,141 @@ void FireteamZombie::CreateInfectedFace()
         m_Def.fFaceRotZ);
 }
 
+void FireteamZombie::SetZombieAnimation(
+    const char *pAnimation,
+    bool bLooping)
+{
+    if(!pAnimation ||
+       !pAnimation[0] ||
+       strcmp(
+           m_sCurrentAnimation,
+           pAnimation) == 0)
+    {
+        return;
+    }
+
+    HMODELANIM hAnim =
+        g_pLTServer->GetAnimIndex(
+            m_hObject,
+            (char*)pAnimation);
+
+    if(hAnim == INVALID_MODEL_ANIM)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam infected: animation missing: %s",
+            pAnimation);
+        return;
+    }
+
+    g_pLTSModel->SetCurAnim(
+        m_hObject,
+        MAIN_TRACKER,
+        hAnim);
+    g_pLTSModel->SetLooping(
+        m_hObject,
+        MAIN_TRACKER,
+        bLooping ? LTTRUE : LTFALSE);
+
+    FT_CopyInfectedString(
+        m_sCurrentAnimation,
+        sizeof(m_sCurrentAnimation),
+        pAnimation);
+}
+
+struct FTZombieMovementFilterData
+{
+    HOBJECT hZombie;
+};
+
+static bool FTZombieMovementFilter(
+    HOBJECT hObject,
+    void *pUserData)
+{
+    FTZombieMovementFilterData *pData =
+        (FTZombieMovementFilterData*)pUserData;
+
+    if(!pData)
+    {
+        return true;
+    }
+
+    if(hObject == pData->hZombie)
+    {
+        return false;
+    }
+
+    HCLASS hClass =
+        g_pLTServer->GetObjectClass(
+            hObject);
+
+    HCLASS hZombieClass =
+        g_pLTServer->GetClass(
+            "FireteamZombie");
+    HCLASS hPlayerClass =
+        g_pLTServer->GetClass(
+            "CPlayerSrvr");
+
+    if(hClass &&
+       ((hZombieClass &&
+         g_pLTServer->IsKindOf(
+             hClass,
+             hZombieClass)) ||
+        (hPlayerClass &&
+         g_pLTServer->IsKindOf(
+             hClass,
+             hPlayerClass))))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool FireteamZombie::IsMovementStepClear(
+    const LTVector &vPos,
+    const LTVector &vDirection,
+    float fDistance)
+{
+    LTVector vDir = vDirection;
+    vDir.y = 0.0f;
+
+    if(vDir.MagSqr() < 0.001f)
+    {
+        return true;
+    }
+
+    vDir.Normalize();
+
+    LTVector vProbeFrom = vPos;
+    vProbeFrom.y +=
+        m_vCollisionDims.y * 0.45f;
+
+    IntersectQuery query;
+    IntersectInfo info;
+
+    query.m_From = vProbeFrom;
+    query.m_To =
+        vProbeFrom +
+        (vDir *
+         (fDistance +
+          m_vCollisionDims.x));
+    query.m_Flags =
+        INTERSECT_OBJECTS |
+        IGNORE_NONSOLID |
+        INTERSECT_HPOLY;
+
+    FTZombieMovementFilterData filter;
+    filter.hZombie = m_hObject;
+    query.m_FilterFn =
+        FTZombieMovementFilter;
+    query.m_pUserData =
+        &filter;
+
+    return !g_pLTServer->IntersectSegment(
+        &query,
+        &info);
+}
+
 HOBJECT FireteamZombie::FindNearestPlayer()
 {
     HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
@@ -451,53 +590,89 @@ void FireteamZombie::UpdateZombie()
         (m_Def.fUpdateSeconds > 0.0f)
         ? m_Def.fUpdateSeconds
         : 0.10f;
-    const float kMoveSpeed = m_Def.fRunSpeed;
-    const float kAttackRange = m_Def.fAttackRange;
+    const float kMoveSpeed =
+        m_Def.fRunSpeed;
+    const float kAttackRange =
+        m_Def.fAttackRange;
 
-    // Navigation mechanics, not character content.
     const float kWaypointRadius = 30.0f;
     const float kSeparationRadius = 58.0f;
 
-    if(m_fAttackCooldown > 0.0f) m_fAttackCooldown -= kUpdate;
-    if(m_fRepathCooldown > 0.0f) m_fRepathCooldown -= kUpdate;
+    if(m_fAttackCooldown > 0.0f)
+        m_fAttackCooldown -= kUpdate;
+    if(m_fRepathCooldown > 0.0f)
+        m_fRepathCooldown -= kUpdate;
+    if(m_fForcePathTime > 0.0f)
+        m_fForcePathTime -= kUpdate;
 
-    HOBJECT hTarget = FindNearestPlayer();
+    HOBJECT hTarget =
+        FindNearestPlayer();
+
     if(!hTarget)
     {
         LTVector vStop(0.0f, 0.0f, 0.0f);
-        g_pLTSPhysics->SetVelocity(m_hObject, &vStop);
+        g_pLTSPhysics->SetVelocity(
+            m_hObject,
+            &vStop);
+        SetZombieAnimation(
+            m_Def.sIdleAnim,
+            true);
         return;
     }
 
     LTVector vPos;
     LTVector vTarget;
-    g_pLTServer->GetObjectPos(m_hObject, &vPos);
-    g_pLTServer->GetObjectPos(hTarget, &vTarget);
+    g_pLTServer->GetObjectPos(
+        m_hObject,
+        &vPos);
+    g_pLTServer->GetObjectPos(
+        hTarget,
+        &vTarget);
 
-    LTVector vToPlayer = vTarget - vPos;
+    LTVector vToPlayer =
+        vTarget - vPos;
     vToPlayer.y = 0.0f;
-    float fPlayerDistance = vToPlayer.Mag();
+
+    const float fPlayerDistance =
+        vToPlayer.Mag();
 
     if(fPlayerDistance <= kAttackRange)
     {
         LTVector vStop(0.0f, 0.0f, 0.0f);
-        g_pLTSPhysics->SetVelocity(m_hObject, &vStop);
+        g_pLTSPhysics->SetVelocity(
+            m_hObject,
+            &vStop);
+
+        SetZombieAnimation(
+            m_Def.sIdleAnim,
+            true);
 
         if(fPlayerDistance > 1.0f)
         {
             vToPlayer.Normalize();
-            LTRotation rLook(vToPlayer, LTVector(0.0f, 1.0f, 0.0f));
-            g_pLTServer->SetObjectRotation(m_hObject, &rLook);
+            LTRotation rLook(
+                vToPlayer,
+                LTVector(0.0f, 1.0f, 0.0f));
+            g_pLTServer->SetObjectRotation(
+                m_hObject,
+                &rLook);
         }
 
         if(m_fAttackCooldown <= 0.0f)
         {
-            CPlayerSrvr *pPlayer = (CPlayerSrvr*)g_pLTServer->HandleToObject(hTarget);
+            CPlayerSrvr *pPlayer =
+                (CPlayerSrvr*)
+                g_pLTServer->HandleToObject(
+                    hTarget);
+
             if(pPlayer)
             {
-                pPlayer->ApplyDamage(m_Def.nAttackDamage);
+                pPlayer->ApplyDamage(
+                    m_Def.nAttackDamage);
             }
-            m_fAttackCooldown = m_Def.fAttackCooldown;
+
+            m_fAttackCooldown =
+                m_Def.fAttackCooldown;
         }
 
         m_fStuckTime = 0.0f;
@@ -505,7 +680,11 @@ void FireteamZombie::UpdateZombie()
         return;
     }
 
+    // Direct pursuit is useful in open space, but once an infected proves it
+    // is stuck we temporarily force the authored AIVolume path instead of
+    // immediately choosing the same blocked player ray again.
     const bool bDirectPursuit =
+        m_fForcePathTime <= 0.0f &&
         HasDirectPathToTarget(
             hTarget,
             vPos,
@@ -527,12 +706,17 @@ void FireteamZombie::UpdateZombie()
 
         while(m_nWaypoint < m_aPath.size())
         {
-            LTVector vCheck = m_aPath[m_nWaypoint] - vPos;
+            LTVector vCheck =
+                m_aPath[m_nWaypoint] -
+                vPos;
             vCheck.y = 0.0f;
-            if(vCheck.Mag() > kWaypointRadius)
+
+            if(vCheck.Mag() >
+               kWaypointRadius)
             {
                 break;
             }
+
             ++m_nWaypoint;
         }
 
@@ -549,35 +733,69 @@ void FireteamZombie::UpdateZombie()
             ? m_aPath[m_nWaypoint]
             : vTarget);
 
-    LTVector vMove = vMoveTarget - vPos;
+    LTVector vMove =
+        vMoveTarget - vPos;
     vMove.y = 0.0f;
 
-    LTVector vSeparation(0.0f, 0.0f, 0.0f);
-    HCLASS hZombieClass = g_pLTServer->GetClass("FireteamZombie");
+    LTVector vSeparation(
+        0.0f,
+        0.0f,
+        0.0f);
+
+    HCLASS hZombieClass =
+        g_pLTServer->GetClass(
+            "FireteamZombie");
 
     if(hZombieClass)
     {
-        for(HOBJECT hObj = g_pLTServer->GetNextObject(LTNULL);
+        for(HOBJECT hObj =
+                g_pLTServer->GetNextObject(
+                    LTNULL);
             hObj;
-            hObj = g_pLTServer->GetNextObject(hObj))
+            hObj =
+                g_pLTServer->GetNextObject(
+                    hObj))
         {
-            if(hObj == m_hObject) continue;
+            if(hObj == m_hObject)
+                continue;
 
-            HCLASS hClass = g_pLTServer->GetObjectClass(hObj);
-            if(!hClass || !g_pLTServer->IsKindOf(hClass, hZombieClass)) continue;
+            HCLASS hClass =
+                g_pLTServer->GetObjectClass(
+                    hObj);
+
+            if(!hClass ||
+               !g_pLTServer->IsKindOf(
+                    hClass,
+                    hZombieClass))
+            {
+                continue;
+            }
 
             LTVector vOther;
-            g_pLTServer->GetObjectPos(hObj, &vOther);
+            g_pLTServer->GetObjectPos(
+                hObj,
+                &vOther);
 
-            LTVector vAway = vPos - vOther;
+            LTVector vAway =
+                vPos - vOther;
             vAway.y = 0.0f;
-            float fDistance = vAway.Mag();
 
-            if(fDistance > 0.5f && fDistance < kSeparationRadius)
+            const float fDistance =
+                vAway.Mag();
+
+            if(fDistance > 0.5f &&
+               fDistance <
+                    kSeparationRadius)
             {
                 vAway.Normalize();
-                float fStrength = (kSeparationRadius - fDistance) / kSeparationRadius;
-                vSeparation += vAway * fStrength;
+
+                const float fStrength =
+                    (kSeparationRadius -
+                     fDistance) /
+                    kSeparationRadius;
+
+                vSeparation +=
+                    vAway * fStrength;
             }
         }
     }
@@ -585,61 +803,205 @@ void FireteamZombie::UpdateZombie()
     if(vMove.Mag() > 1.0f)
     {
         vMove.Normalize();
-        // When the player is directly visible, favor the player ray strongly
-        // so crowd separation cannot push an infected sideways into a doorjamb.
+
         const float fSeparationWeight =
-            bDirectPursuit ? 0.25f : 0.85f;
+            bDirectPursuit
+            ? 0.25f
+            : 0.70f;
+
         LTVector vSteer =
-            vMove + (vSeparation * fSeparationWeight);
+            vMove +
+            (vSeparation *
+             fSeparationWeight);
 
-        if(vSteer.Mag() > 0.1f) vSteer.Normalize();
-        else vSteer = vMove;
+        if(vSteer.Mag() > 0.1f)
+            vSteer.Normalize();
+        else
+            vSteer = vMove;
 
-        LTRotation rLook(vSteer, LTVector(0.0f, 1.0f, 0.0f));
-        g_pLTServer->SetObjectRotation(m_hObject, &rLook);
+        const float fStepDistance =
+            kMoveSpeed * kUpdate;
 
-        // NOLF2's cheap human movement advances the desired X/Z position,
-        // finds the floor beneath it, then uses MoveObject. This handles stairs
-        // and small height changes much better than forcing a horizontal velocity.
-        LTVector vDesired = vPos + (vSteer * (kMoveSpeed * kUpdate));
-
-        IntersectQuery floorQuery;
-        IntersectInfo floorInfo;
-        floorQuery.m_From = LTVector(
-            vDesired.x,
-            vPos.y + m_vCollisionDims.y + 32.0f,
-            vDesired.z);
-        floorQuery.m_To   = LTVector(vDesired.x, vPos.y - 530.0f, vDesired.z);
-        floorQuery.m_Flags = INTERSECT_OBJECTS | IGNORE_NONSOLID | INTERSECT_HPOLY;
-
-        if(g_pLTServer->IntersectSegment(&floorQuery, &floorInfo) &&
-           floorInfo.m_hObject &&
-           g_pLTSPhysics->IsWorldObject(floorInfo.m_hObject) == LT_YES)
+        // Local obstacle recovery inspired by NOLF2's movement strategy:
+        // when the immediate steering ray is blocked, try sliding around the
+        // obstruction before declaring the path stuck.
+        if(!IsMovementStepClear(
+            vPos,
+            vSteer,
+            fStepDistance))
         {
-            vDesired.y =
-                floorInfo.m_Point.y +
-                m_vCollisionDims.y;
+            LTVector vRight(
+                -vSteer.z,
+                0.0f,
+                vSteer.x);
+
+            LTVector vSlideA =
+                vSteer +
+                (vRight * 0.85f);
+            LTVector vSlideB =
+                vSteer -
+                (vRight * 0.85f);
+
+            vSlideA.Normalize();
+            vSlideB.Normalize();
+
+            const bool bA =
+                IsMovementStepClear(
+                    vPos,
+                    vSlideA,
+                    fStepDistance);
+            const bool bB =
+                IsMovementStepClear(
+                    vPos,
+                    vSlideB,
+                    fStepDistance);
+
+            if(bA && bB)
+            {
+                vSteer =
+                    (m_nPathLane & 1)
+                    ? vSlideA
+                    : vSlideB;
+            }
+            else if(bA)
+            {
+                vSteer = vSlideA;
+            }
+            else if(bB)
+            {
+                vSteer = vSlideB;
+            }
+            else
+            {
+                // Let the stuck detector below force a fresh volume path.
+                vSteer.Init(0.0f, 0.0f, 0.0f);
+            }
+        }
+
+        if(vSteer.MagSqr() > 0.001f)
+        {
+            LTRotation rLook(
+                vSteer,
+                LTVector(0.0f, 1.0f, 0.0f));
+
+            g_pLTServer->SetObjectRotation(
+                m_hObject,
+                &rLook);
+
+            SetZombieAnimation(
+                m_Def.sRunAnim[0]
+                    ? m_Def.sRunAnim
+                    : m_Def.sWalkAnim,
+                true);
+
+            LTVector vDesired =
+                vPos +
+                (vSteer *
+                 fStepDistance);
+
+            IntersectQuery floorQuery;
+            IntersectInfo floorInfo;
+
+            floorQuery.m_From =
+                LTVector(
+                    vDesired.x,
+                    vPos.y +
+                        m_vCollisionDims.y +
+                        48.0f,
+                    vDesired.z);
+
+            floorQuery.m_To =
+                LTVector(
+                    vDesired.x,
+                    vPos.y - 530.0f,
+                    vDesired.z);
+
+            floorQuery.m_Flags =
+                INTERSECT_OBJECTS |
+                IGNORE_NONSOLID |
+                INTERSECT_HPOLY;
+
+            FTZombieMovementFilterData floorFilter;
+            floorFilter.hZombie =
+                m_hObject;
+            floorQuery.m_FilterFn =
+                FTZombieMovementFilter;
+            floorQuery.m_pUserData =
+                &floorFilter;
+
+            // Do not require IsWorldObject here. Cabin Fever stairs and other
+            // authored walkable geometry may be solid WorldModels rather than
+            // the main BSP world. NOLF2's floor logic accepts the walkable
+            // collision surface, not only the root world object.
+            if(g_pLTServer->IntersectSegment(
+                &floorQuery,
+                &floorInfo))
+            {
+                vDesired.y =
+                    floorInfo.m_Point.y +
+                    m_vCollisionDims.y;
+            }
+            else
+            {
+                vDesired.y = vPos.y;
+            }
+
+            LTVector vZero(
+                0.0f,
+                0.0f,
+                0.0f);
+
+            g_pLTSPhysics->SetVelocity(
+                m_hObject,
+                &vZero);
+
+            g_pLTServer->MoveObject(
+                m_hObject,
+                &vDesired);
         }
         else
         {
-            vDesired.y = vPos.y;
+            SetZombieAnimation(
+                m_Def.sIdleAnim,
+                true);
         }
-
-        LTVector vZero(0.0f, 0.0f, 0.0f);
-        g_pLTSPhysics->SetVelocity(m_hObject, &vZero);
-        g_pLTServer->MoveObject(m_hObject, &vDesired);
+    }
+    else
+    {
+        SetZombieAnimation(
+            m_Def.sIdleAnim,
+            true);
     }
 
-    LTVector vMoved = vPos - m_vLastPos;
+    LTVector vNewPos;
+    g_pLTServer->GetObjectPos(
+        m_hObject,
+        &vNewPos);
+
+    LTVector vMoved =
+        vNewPos - m_vLastPos;
     vMoved.y = 0.0f;
 
-    if(vMoved.Mag() < 1.0f)
+    if(vMoved.Mag() < 0.75f)
     {
         m_fStuckTime += kUpdate;
-        if(m_fStuckTime >= 0.80f)
+
+        if(m_fStuckTime >= 0.60f)
         {
-            m_nPathLane = (m_nPathLane + 1) % 3;
+            m_nPathLane =
+                (m_nPathLane + 1) % 5;
+
+            m_fForcePathTime = 2.0f;
             m_fRepathCooldown = 0.0f;
+            m_aPath.clear();
+            m_nWaypoint = 0;
+            RebuildPath(vTarget);
+
+            g_pLTServer->CPrint(
+                "Fireteam infected: stuck recovery lane=%u path=%u.",
+                m_nPathLane,
+                (uint32)m_aPath.size());
+
             m_fStuckTime = 0.0f;
         }
     }
@@ -648,7 +1010,7 @@ void FireteamZombie::UpdateZombie()
         m_fStuckTime = 0.0f;
     }
 
-    m_vLastPos = vPos;
+    m_vLastPos = vNewPos;
 }
 
 uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
@@ -905,31 +1267,9 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                     (uint32)m_Def.nHealth,
                     m_Def.fRunSpeed);
 
-                if(m_Def.sIdleAnim[0])
-                {
-                    HMODELANIM hAnim =
-                        g_pLTServer->GetAnimIndex(
-                            m_hObject,
-                            m_Def.sIdleAnim);
-
-                    if(hAnim != INVALID_MODEL_ANIM)
-                    {
-                        g_pLTSModel->SetCurAnim(
-                            m_hObject,
-                            MAIN_TRACKER,
-                            hAnim);
-                        g_pLTSModel->SetLooping(
-                            m_hObject,
-                            MAIN_TRACKER,
-                            LTTRUE);
-                    }
-                    else
-                    {
-                        g_pLTServer->CPrint(
-                            "Fireteam infected: animation missing: %s",
-                            m_Def.sIdleAnim);
-                    }
-                }
+                SetZombieAnimation(
+                    m_Def.sIdleAnim,
+                    true);
 
                 CreateInfectedFace();
 
@@ -988,13 +1328,34 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
         break;
 
         case MID_UPDATE:
-            UpdateZombie();
+        {
+            const float fUpdate =
+                m_Def.fUpdateSeconds > 0.0f
+                ? m_Def.fUpdateSeconds
+                : 0.10f;
+
+            if(m_bDying)
+            {
+                m_fDeathTimeRemaining -=
+                    fUpdate;
+
+                if(m_fDeathTimeRemaining <= 0.0f)
+                {
+                    g_pLTServer->RemoveObject(
+                        m_hObject);
+                    return 1;
+                }
+            }
+            else
+            {
+                UpdateZombie();
+            }
+
             g_pLTServer->SetNextUpdate(
                 m_hObject,
-                m_Def.fUpdateSeconds > 0.0f
-                    ? m_Def.fUpdateSeconds
-                    : 0.10f);
-            break;
+                fUpdate);
+        }
+        break;
 
         default:
             break;
@@ -1008,21 +1369,48 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
     pMsg->SeekTo(0);
     uint32 messageID = pMsg->Readuint32();
 
-    if(messageID == OBJ_MID_DAMAGE)
+    if(messageID == OBJ_MID_DAMAGE &&
+       !m_bDying)
     {
-        uint8 nDamage = pMsg->Readuint8();
-        m_nHealth = (nDamage >= m_nHealth) ? 0 : (uint16)(m_nHealth - nDamage);
+        const uint8 nDamage =
+            pMsg->Readuint8();
+
+        m_nHealth =
+            (nDamage >= m_nHealth)
+            ? 0
+            : (uint16)(
+                m_nHealth - nDamage);
 
         if(m_nHealth == 0)
         {
+            m_bDying = true;
+            m_fDeathTimeRemaining =
+                m_Def.fDeathSeconds > 0.0f
+                ? m_Def.fDeathSeconds
+                : 1.8f;
+
+            LTVector vStop(
+                0.0f,
+                0.0f,
+                0.0f);
+            g_pLTSPhysics->SetVelocity(
+                m_hObject,
+                &vStop);
+
+            SetZombieAnimation(
+                m_Def.sDeathAnim,
+                false);
+
             FT_OnFireteamEnemyKilled();
 
             if(hSender)
             {
                 HCLASS hPlayerClass =
-                    g_pLTServer->GetClass("CPlayerSrvr");
+                    g_pLTServer->GetClass(
+                        "CPlayerSrvr");
                 HCLASS hSenderClass =
-                    g_pLTServer->GetObjectClass(hSender);
+                    g_pLTServer->GetObjectClass(
+                        hSender);
 
                 if(hPlayerClass &&
                    hSenderClass &&
@@ -1030,15 +1418,18 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
                        hSenderClass,
                        hPlayerClass))
                 {
-                    ILTMessage_Write *pKill = LTNULL;
-                    if(g_pLTSCommon->CreateMessage(pKill) == LT_OK &&
+                    ILTMessage_Write *pKill =
+                        LTNULL;
+
+                    if(g_pLTSCommon->CreateMessage(
+                        pKill) == LT_OK &&
                        pKill)
                     {
                         pKill->IncRef();
                         pKill->Writeuint32(
                             OBJ_MID_KILLSCORE);
-                        // Legacy score protocol still reads a money field.
-                        pKill->Writefloat(0.0f);
+                        pKill->Writefloat(
+                            0.0f);
                         g_pLTServer->SendToObject(
                             pKill->Read(),
                             m_hObject,
@@ -1050,9 +1441,15 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
             }
 
             g_pLTServer->CPrint(
-                "Fireteam: infected %s killed.",
-                m_bDefLoaded ? m_Def.sId : "unknown");
-            g_pLTServer->RemoveObject(m_hObject);
+                "Fireteam: infected %s killed; death anim=%s %.2fs.",
+                m_bDefLoaded
+                    ? m_Def.sId
+                    : "unknown",
+                m_Def.sDeathAnim[0]
+                    ? m_Def.sDeathAnim
+                    : "<none>",
+                m_fDeathTimeRemaining);
+
             return 1;
         }
     }
