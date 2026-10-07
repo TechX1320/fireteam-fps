@@ -76,8 +76,10 @@ enum EObjMessageID
 {
     OBJ_MID_PICKUP              = 0,
     OBJ_MID_DAMAGE              = 1,
-    OBJ_MID_KILLSCORE           = 2,  
-    OBJ_MID_KILLSCORE_SNOWMAN   = 3,  
+    OBJ_MID_KILLSCORE           = 2,
+    OBJ_MID_KILLSCORE_SNOWMAN   = 3,
+    OBJ_MID_DAMAGE_REGIONAL     = 4,
+    OBJ_MID_KILLSCORE_INFECTED  = 5,
 };
 
 

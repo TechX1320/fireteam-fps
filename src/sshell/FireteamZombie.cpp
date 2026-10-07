@@ -2019,11 +2019,20 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
     pMsg->SeekTo(0);
     uint32 messageID = pMsg->Readuint32();
 
-    if(messageID == OBJ_MID_DAMAGE &&
+    if((messageID == OBJ_MID_DAMAGE ||
+        messageID == OBJ_MID_DAMAGE_REGIONAL) &&
        !m_bDying)
     {
         const uint8 nDamage =
             pMsg->Readuint8();
+
+        uint8 nKillingHitRegion = 0;
+        if(messageID ==
+           OBJ_MID_DAMAGE_REGIONAL)
+        {
+            nKillingHitRegion =
+                pMsg->Readuint8();
+        }
 
         m_nHealth =
             (nDamage >= m_nHealth)
@@ -2101,9 +2110,11 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
                     {
                         pKill->IncRef();
                         pKill->Writeuint32(
-                            OBJ_MID_KILLSCORE);
+                            OBJ_MID_KILLSCORE_INFECTED);
                         pKill->Writefloat(
                             0.0f);
+                        pKill->Writeuint8(
+                            nKillingHitRegion);
                         g_pLTServer->SendToObject(
                             pKill->Read(),
                             m_hObject,

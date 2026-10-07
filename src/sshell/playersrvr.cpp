@@ -173,15 +173,14 @@ static FTFireteamHitRegion FT_GetZombieHitRegion(
         fNormalizedY = 1.0f;
     }
 
-    // Top ~28% of the collision/model height is the head/neck zone.
-    if(fNormalizedY >= 0.72f)
+    // Tighter kill regions: avoid awarding most upper-torso/pelvis hits.
+    if(fNormalizedY >= 0.80f)
     {
         return FT_HITREGION_HEAD;
     }
 
-    // Combat Arms-style "Nut Shot" region: narrow lower-torso/pelvis band.
-    if(fNormalizedY >= 0.42f &&
-       fNormalizedY <= 0.52f)
+    if(fNormalizedY >= 0.455f &&
+       fNormalizedY <= 0.505f)
     {
         return FT_HITREGION_GROIN;
     }
@@ -381,13 +380,40 @@ uint32 CPlayerSrvr::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
             break;
         case OBJ_MID_KILLSCORE_SNOWMAN:
         case OBJ_MID_KILLSCORE:
+        case OBJ_MID_KILLSCORE_INFECTED:
             {
-                //if it's a snowman don't inc the score.
-                m_iScore+= (OBJ_MID_KILLSCORE_SNOWMAN == messageID) ? 0:1; 
-                //m_fMoney += 9.95f;
-				m_fMoney += pMsg->Readfloat();
+                const bool bSnowman =
+                    (OBJ_MID_KILLSCORE_SNOWMAN == messageID);
+                const bool bInfected =
+                    (OBJ_MID_KILLSCORE_INFECTED == messageID);
 
-                if(messageID == OBJ_MID_KILLSCORE)
+                if(!bSnowman)
+                {
+                    ++m_iScore;
+                }
+
+                m_fMoney += pMsg->Readfloat();
+
+                if(bInfected)
+                {
+                    const uint8 nKillingRegion =
+                        pMsg->Readuint8();
+
+                    if(nKillingRegion ==
+                       (uint8)FT_HITREGION_HEAD)
+                    {
+                        SendCombatFeedback(
+                            FT_COMBAT_FEEDBACK_HEADSHOT);
+                    }
+                    else if(nKillingRegion ==
+                            (uint8)FT_HITREGION_GROIN)
+                    {
+                        SendCombatFeedback(
+                            FT_COMBAT_FEEDBACK_NUTSHOT);
+                    }
+                }
+
+                if(!bSnowman)
                 {
                     const float fNow =
                         g_pLTServer->GetTime();
@@ -1546,29 +1572,30 @@ void CPlayerSrvr::FirePrimary(
                pDamage)
             {
                 pDamage->IncRef();
-                pDamage->Writeuint32(
-                    OBJ_MID_DAMAGE);
-                pDamage->Writeuint8(
-                    nDamage);
+
+                if(bZombie)
+                {
+                    pDamage->Writeuint32(
+                        OBJ_MID_DAMAGE_REGIONAL);
+                    pDamage->Writeuint8(
+                        nDamage);
+                    pDamage->Writeuint8(
+                        (uint8)eHitRegion);
+                }
+                else
+                {
+                    pDamage->Writeuint32(
+                        OBJ_MID_DAMAGE);
+                    pDamage->Writeuint8(
+                        nDamage);
+                }
+
                 g_pLTServer->SendToObject(
                     pDamage->Read(),
                     m_hObject,
                     info.m_hObject,
                     0);
                 pDamage->DecRef();
-
-                if(eHitRegion ==
-                   FT_HITREGION_HEAD)
-                {
-                    SendCombatFeedback(
-                        FT_COMBAT_FEEDBACK_HEADSHOT);
-                }
-                else if(eHitRegion ==
-                        FT_HITREGION_GROIN)
-                {
-                    SendCombatFeedback(
-                        FT_COMBAT_FEEDBACK_NUTSHOT);
-                }
 
                 g_pLTServer->CPrint(
                     "Fireteam weapon: %s infected hit region=%s damage=%u distance=%.1f penetrations=%u",
