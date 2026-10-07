@@ -108,10 +108,21 @@ echo.
 echo [LAUNCHER 3/4] Staging clean launcher runtime...
 if not exist "%BUILT_DIR%" mkdir "%BUILT_DIR%" >nul
 
+rem A previously launched bootstrap or WinUI child can keep the self-contained
+rem runtime DLLs locked. Stop both copies before replacing BUILT\Launcher\App.
+taskkill /IM FireteamLauncher.exe /T /F >nul 2>nul
+timeout /t 1 /nobreak >nul 2>nul
+
 rem Remove the previous raw WinUI publish completely. This cleans the old
 rem DLL/language-folder sprawl that earlier FIRETEAM launcher builds left
 rem directly under BUILT\Launcher.
 if exist "%SUPPORT_DIR%" rmdir /s /q "%SUPPORT_DIR%"
+
+if exist "%SUPPORT_DIR%" (
+  echo [ERROR] Could not remove the previous launcher runtime.
+  echo         Close FireteamLauncher.exe and run build.cmd again.
+  goto :fail
+)
 
 mkdir "%APP_DIR%" >nul 2>nul
 mkdir "%SUPPORT_DIR%\Logs" >nul 2>nul
