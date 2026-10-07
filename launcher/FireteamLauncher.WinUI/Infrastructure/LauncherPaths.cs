@@ -4,6 +4,33 @@ namespace FireteamLauncher.Infrastructure;
 
 public static class LauncherPaths
 {
+    public static string SupportRoot
+    {
+        get
+        {
+            var baseDir =
+                new DirectoryInfo(
+                    AppContext.BaseDirectory);
+
+            // Runtime lives at Launcher/App. Keep writable launcher state one
+            // level up so App stays a clean dependency folder.
+            if(baseDir.Parent is not null &&
+               baseDir.Name.Equals(
+                   "App",
+                   StringComparison.OrdinalIgnoreCase))
+            {
+                return baseDir.Parent.FullName;
+            }
+
+            return baseDir.FullName;
+        }
+    }
+
+    public static string LogsRoot =>
+        Path.Combine(
+            SupportRoot,
+            "Logs");
+
     public static string? FindGameDirectory()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -91,6 +118,9 @@ public static class LauncherPaths
 
     public static void EnsureLayout()
     {
+        Directory.CreateDirectory(
+            LogsRoot);
+
         var mods = ModsDirectory;
         if(mods is not null)
         {
