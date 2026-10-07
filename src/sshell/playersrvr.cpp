@@ -139,6 +139,7 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
             {
                 UpdateHazards();
                 CompleteReloadIfReady();
+                UpdatePowerups();
             }
 
             //Do we need to send score stats?
@@ -753,6 +754,10 @@ void CPlayerSrvr::Respawn()
     m_fPoisonCarry = 0.0f;
     m_bReloading = false;
     m_nReloadSlot = 0;
+    m_fBottomlessUntil = 0.0f;
+    m_fOneHitUntil = 0.0f;
+    m_bBottomlessWasActive = false;
+    m_bOneHitWasActive = false;
 
     for(uint8 nSlot = 1; nSlot <= 5; ++nSlot)
     {
@@ -805,6 +810,188 @@ void CPlayerSrvr::SendHealth()
     g_pLTServer->SendToClient(pMsg->Read(), m_hClient, MESSAGE_GUARANTEED);
     pMsg->DecRef();
 }
+void CPlayerSrvr::NotifyPowerup(
+    const char *pText,
+    float fSeconds)
+{
+    if(!m_hClient ||
+       !pText ||
+       !pText[0])
+    {
+        return;
+    }
+
+    ILTMessage_Write *pMsg = LTNULL;
+
+    if(g_pLTSCommon->CreateMessage(
+        pMsg) != LT_OK ||
+       !pMsg)
+    {
+        return;
+    }
+
+    pMsg->IncRef();
+    pMsg->Writeuint8(
+        MSG_SC_POWERUP);
+    pMsg->WriteString(
+        pText);
+    pMsg->Writefloat(
+        fSeconds);
+
+    g_pLTServer->SendToClient(
+        pMsg->Read(),
+        m_hClient,
+        MESSAGE_GUARANTEED);
+
+    pMsg->DecRef();
+}
+
+void CPlayerSrvr::GrantAmmoMagazines(
+    uint32 nMagazines)
+{
+    if(nMagazines == 0)
+    {
+        return;
+    }
+
+    for(uint8 nSlot = 1;
+        nSlot <= 5;
+        ++nSlot)
+    {
+        const FTWeaponDef *pDef =
+            FT_GetWeaponDef(
+                m_WeaponDefs,
+                nSlot);
+
+        if(!pDef ||
+           pDef->eType ==
+               FT_WEAPON_MELEE ||
+           pDef->nClipSize == 0)
+        {
+            continue;
+        }
+
+        uint32 nAdd =
+            (uint32)pDef->nClipSize *
+            nMagazines;
+
+        uint32 nReserve =
+            (uint32)
+                m_nWeaponAmmoReserve[nSlot] +
+            nAdd;
+
+        if(nReserve > 65535)
+        {
+            nReserve = 65535;
+        }
+
+        m_nWeaponAmmoReserve[nSlot] =
+            (uint16)nReserve;
+    }
+
+    SendPrimaryAmmo();
+}
+
+void CPlayerSrvr::GrantHealth(
+    uint32 nAmount)
+{
+    if(!m_bAlive ||
+       nAmount == 0)
+    {
+        return;
+    }
+
+    uint32 nHealth =
+        (uint32)m_nHealth +
+        nAmount;
+
+    if(nHealth >
+       (uint32)m_nMaxHealth)
+    {
+        nHealth =
+            m_nMaxHealth;
+    }
+
+    m_nHealth =
+        (uint8)nHealth;
+
+    SendHealth();
+}
+
+void CPlayerSrvr::GrantBottomless(
+    float fSeconds)
+{
+    if(fSeconds <= 0.0f)
+    {
+        return;
+    }
+
+    const float fUntil =
+        g_pLTServer->GetTime() +
+        fSeconds;
+
+    if(fUntil >
+       m_fBottomlessUntil)
+    {
+        m_fBottomlessUntil =
+            fUntil;
+    }
+
+    m_bBottomlessWasActive =
+        true;
+}
+
+void CPlayerSrvr::GrantOneHit(
+    float fSeconds)
+{
+    if(fSeconds <= 0.0f)
+    {
+        return;
+    }
+
+    const float fUntil =
+        g_pLTServer->GetTime() +
+        fSeconds;
+
+    if(fUntil >
+       m_fOneHitUntil)
+    {
+        m_fOneHitUntil =
+            fUntil;
+    }
+
+    m_bOneHitWasActive =
+        true;
+}
+
+void CPlayerSrvr::UpdatePowerups()
+{
+    const float fNow =
+        g_pLTServer->GetTime();
+
+    if(m_bBottomlessWasActive &&
+       fNow >= m_fBottomlessUntil)
+    {
+        m_bBottomlessWasActive =
+            false;
+
+        NotifyPowerup(
+            "BOTTOMLESS MAG ENDED",
+            2.0f);
+    }
+
+    if(m_bOneHitWasActive &&
+       fNow >= m_fOneHitUntil)
+    {
+        m_bOneHitWasActive =
+            false;
+
+        NotifyPowerup(
+            "ONE HIT KILL ENDED",
+            2.0f);
+    }
+}
+
 //-----------------------------------------------------------------------------
 // Fireteam loadout / primary weapon.
 //-----------------------------------------------------------------------------
@@ -927,13 +1114,23 @@ void CPlayerSrvr::FirePrimary(
     m_fNextWeaponShot[m_nWeaponSlot] =
         fNow + pDef->fFireInterval;
 
-    --m_nWeaponAmmoInClip[m_nWeaponSlot];
-    SendPrimaryAmmo();
+    const bool bBottomless =
+        fNow <
+        m_fBottomlessUntil;
 
-    if(m_nWeaponAmmoInClip[m_nWeaponSlot] == 0 &&
-       pDef->bAutoReload)
+    if(!bBottomless)
     {
-        ReloadWeapon();
+        --m_nWeaponAmmoInClip[
+            m_nWeaponSlot];
+
+        SendPrimaryAmmo();
+
+        if(m_nWeaponAmmoInClip[
+               m_nWeaponSlot] == 0 &&
+           pDef->bAutoReload)
+        {
+            ReloadWeapon();
+        }
     }
 
     if(pDef->eType == FT_WEAPON_GRENADE ||
@@ -1065,8 +1262,16 @@ void CPlayerSrvr::FirePrimary(
                 fDamage = 255.0f;
             }
 
+            const bool bOneHit =
+                fNow <
+                m_fOneHitUntil;
+
             const uint8 nDamage =
-                (uint8)(fDamage + 0.5f);
+                bOneHit
+                ? 255
+                : (uint8)(
+                    fDamage +
+                    0.5f);
 
             ILTMessage_Write *pDamage = LTNULL;
             if(g_pLTSCommon->CreateMessage(
