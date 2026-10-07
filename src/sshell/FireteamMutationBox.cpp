@@ -99,10 +99,15 @@ static HOBJECT FT_SpawnMutationBox(
     // Let gravity settle the pickup onto the nearby floor.
     ocs.m_Pos.y += 28.0f;
 
-    HOBJECT hObject =
-        g_pLTServer->CreateObject(
+    BaseClass *pObject =
+        (BaseClass*)g_pLTServer->CreateObject(
             hClass,
             &ocs);
+
+    HOBJECT hObject =
+        pObject
+        ? pObject->m_hObject
+        : LTNULL;
 
     if(hObject)
     {
