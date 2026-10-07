@@ -25,5 +25,8 @@ private:
 };
 
 void FT_OnFireteamEnemyKilled();
+void FT_SetQaZombiesEnabled(
+    bool bEnabled);
+bool FT_AreQaZombiesEnabled();
 
 #endif

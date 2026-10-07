@@ -8,8 +8,10 @@
 #include <stdio.h>
 
 static CUIFont *s_pAmmoFont = LTNULL;
+static CUIFont *s_pQaFont = LTNULL;
 static CUIFormattedPolyString *s_pAmmoText = LTNULL;
 static CUIFormattedPolyString *s_pWeaponName = LTNULL;
+static CUIFormattedPolyString *s_pQaMenuText = LTNULL;
 static FTWeaponDef s_WeaponDefs[6];
 
 static uint16 s_nPrimaryClip = 30;
@@ -21,6 +23,9 @@ static uint8 s_nCrosshairSlot = 0;
 static uint32 s_nQaCurrent = 0;
 static uint32 s_nQaTotal = 0;
 static bool s_bQaQuarantined = false;
+static bool s_bQaMenuOpen = false;
+static bool s_bQaZombiesEnabled = false;
+static float s_fQaMoveStep = 0.10f;
 
 static void FT_SetupQuad(
     LT_POLYF4 &poly,
@@ -111,10 +116,47 @@ void FT_WeaponHudInit()
     {
         s_pWeaponName->SetColor(0xFFFFFFFF);
     }
+
+    s_pQaFont = g_pLTCFontManager->CreateFont(
+        "fonts/SQR721B.TTF",
+        "Square721 BT",
+        14,
+        22,
+        255);
+
+    if(s_pQaFont)
+    {
+        s_pQaFont->SetDefCharWidth(5);
+        s_pQaFont->SetDefColor(0xFFFFFFFF);
+
+        s_pQaMenuText =
+            g_pLTCFontManager->CreateFormattedPolyString(
+                s_pQaFont,
+                "FIRETEAM QA TOOLS");
+
+        if(s_pQaMenuText)
+        {
+            s_pQaMenuText->SetColor(0xFFFFFFFF);
+        }
+    }
 }
 
 void FT_WeaponHudTerm()
 {
+    if(s_pQaMenuText)
+    {
+        g_pLTCFontManager->DestroyPolyString(
+            s_pQaMenuText);
+        s_pQaMenuText = LTNULL;
+    }
+
+    if(s_pQaFont)
+    {
+        g_pLTCFontManager->DestroyFont(
+            s_pQaFont);
+        s_pQaFont = LTNULL;
+    }
+
     if(s_pWeaponName)
     {
         g_pLTCFontManager->DestroyPolyString(s_pWeaponName);
@@ -168,6 +210,23 @@ void FT_WeaponHudSetQaQuarantined(
 {
     s_bQaQuarantined =
         bQuarantined;
+}
+
+void FT_WeaponHudSetQaMenu(
+    bool bOpen,
+    float fMoveStep,
+    bool bZombiesEnabled)
+{
+    s_bQaMenuOpen =
+        bOpen;
+    s_bQaZombiesEnabled =
+        bZombiesEnabled;
+
+    if(fMoveStep > 0.0f)
+    {
+        s_fQaMoveStep =
+            fMoveStep;
+    }
 }
 
 void FT_WeaponHudOnShot(uint8 nWeaponSlot)
@@ -354,7 +413,10 @@ void FT_RenderWeaponHud(
 
     }
 
-    if(s_pWeaponName && pDef)
+    if(s_pWeaponName &&
+       pDef &&
+       !(s_nQaTotal > 0 &&
+         s_bQaMenuOpen))
     {
         char szWeaponLabel[192];
 
@@ -362,7 +424,7 @@ void FT_RenderWeaponHud(
         {
             sprintf(
                 szWeaponLabel,
-                "QA %u/%u  %s%s  [X %.1f Y %.1f Z %.1f]",
+                "QA %u/%u  %s%s  [X %.2f Y %.2f Z %.2f]",
                 s_nQaCurrent,
                 s_nQaTotal,
                 s_bQaQuarantined
@@ -401,6 +463,111 @@ void FT_RenderWeaponHud(
                 (float)nScreenH - 102.0f);
         }
         s_pWeaponName->Render();
+    }
+
+    if(s_nQaTotal > 0 &&
+       s_bQaMenuOpen &&
+       pDef)
+    {
+        const float fPanelX = 18.0f;
+        const float fPanelY = 58.0f;
+        const float fPanelW = 540.0f;
+        const float fPanelH = 306.0f;
+
+        LT_POLYF4 qaPanel[4];
+
+        FT_SetupQuad(
+            qaPanel[0],
+            fPanelX,
+            fPanelY,
+            fPanelW,
+            fPanelH,
+            7,
+            9,
+            11,
+            232);
+
+        FT_SetupQuad(
+            qaPanel[1],
+            fPanelX,
+            fPanelY,
+            4.0f,
+            fPanelH,
+            0,
+            220,
+            255,
+            255);
+
+        FT_SetupQuad(
+            qaPanel[2],
+            fPanelX,
+            fPanelY,
+            fPanelW,
+            2.0f,
+            255,
+            184,
+            0,
+            255);
+
+        FT_SetupQuad(
+            qaPanel[3],
+            fPanelX + 14.0f,
+            fPanelY + 70.0f,
+            fPanelW - 28.0f,
+            1.0f,
+            72,
+            78,
+            84,
+            220);
+
+        FT_SetDrawState();
+        g_pLTCDrawPrim->BeginDrawPrim();
+        g_pLTCDrawPrim->DrawPrim(
+            qaPanel,
+            4);
+        g_pLTCDrawPrim->EndDrawPrim();
+
+        if(s_pQaMenuText)
+        {
+            char szQaMenu[1200];
+
+            sprintf(
+                szQaMenu,
+                "FIRETEAM QA TOOLS  /  WEAPON POSITION\n"
+                "%s%s   QA %u/%u\n"
+                "X %.2f   Y %.2f   Z %.2f   STEP %.2f\n"
+                "ZOMBIES: %s\n"
+                "\n"
+                "LEFT / RIGHT       move X\n"
+                "UP / DOWN          move Y\n"
+                "CTRL + UP / DOWN   move Z\n"
+                "+ / -              change increment\n"
+                "CTRL + S           save weapon position\n"
+                "Q                  enable / disable weapon\n"
+                "Z                  toggle zombies\n"
+                "MOUSE WHEEL        previous / next weapon\n"
+                "INSERT             close QA tools",
+                s_bQaQuarantined
+                    ? "[DISABLED] "
+                    : "",
+                pDef->sName,
+                s_nQaCurrent,
+                s_nQaTotal,
+                pDef->fViewX,
+                pDef->fViewY,
+                pDef->fViewZ,
+                s_fQaMoveStep,
+                s_bQaZombiesEnabled
+                    ? "YES"
+                    : "NO");
+
+            s_pQaMenuText->SetText(
+                szQaMenu);
+            s_pQaMenuText->SetPosition(
+                fPanelX + 18.0f,
+                fPanelY + 16.0f);
+            s_pQaMenuText->Render();
+        }
     }
 
     if(!bShowAmmo)

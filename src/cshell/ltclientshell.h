@@ -137,6 +137,7 @@ private:
 
     bool        			IsInWorld(){return m_bInWorld;}
     void        			SendPlayerName();
+    void                    SendQaZombieSetting();
 
 private:
 
@@ -147,6 +148,10 @@ private:
 	bool					m_bFirstUpdate;
 	bool					m_bHavePlayerStartInfo;
     bool                    m_bQaControlDown;
+    bool                    m_bQaMenuOpen;
+    bool                    m_bQaZombiesEnabled;
+    bool                    m_bQaZombieSettingSent;
+    uint8                   m_nQaMoveStepIndex;
 
 	LTVector				m_vPlayerStartPos;
 	LTRotation				m_rPlayerStartRot;

@@ -38,6 +38,7 @@ enum EMessageID
         MSG_CS_WEAPON_SLOT,         // client->server
         MSG_CS_RELOAD,              // client->server
         MSG_CS_AMMO_SYNC,           // client->server; authoritative HUD reconciliation
+        MSG_CS_QA_ZOMBIES,           // client->server; local QA spawn toggle
         MSG_CS_SCORE,
         MSG_SERVER_SCORES,          // server->client
         MSG_CS_CHAT,                // client->server

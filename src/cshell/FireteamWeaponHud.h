@@ -17,6 +17,10 @@ void FT_WeaponHudSetQaProgress(
     uint32 nTotal);
 void FT_WeaponHudSetQaQuarantined(
     bool bQuarantined);
+void FT_WeaponHudSetQaMenu(
+    bool bOpen,
+    float fMoveStep,
+    bool bZombiesEnabled);
 void FT_RenderWeaponHud(
     uint8 nWeaponSlot,
     bool bFirstPerson,

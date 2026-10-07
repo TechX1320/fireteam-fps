@@ -50,6 +50,21 @@ SETUP_CLIENTSHELL();
 
 CLTClientShell* g_pCShell = NULL;
 
+static const float g_aQaMoveSteps[] =
+{
+    0.01f,
+    0.05f,
+    0.10f,
+    0.25f,
+    0.50f,
+    1.00f
+};
+
+static const uint8 g_nQaMoveStepCount =
+    (uint8)(
+        sizeof(g_aQaMoveSteps) /
+        sizeof(g_aQaMoveSteps[0]));
+
 // Define the instantiation of the ClientShell interface.
 define_interface(CLTClientShell, IClientShell);
 
@@ -114,6 +129,10 @@ m_bRender(true),
 m_bFirstUpdate(true),
 m_bHavePlayerStartInfo(false),
 m_bQaControlDown(false),
+m_bQaMenuOpen(false),
+m_bQaZombiesEnabled(false),
+m_bQaZombieSettingSent(false),
+m_nQaMoveStepIndex(2),
 m_vPlayerStartPos(0.0f, 160.0f, 0.0f),
 m_pWorldPropsClnt(NULL),
 m_pPlayer(NULL),
@@ -603,6 +622,14 @@ void CLTClientShell::OnExitWorld()
     m_bInWorld = false;
     m_bFirstUpdate = true;
     m_bHavePlayerStartInfo = false;
+    m_bQaControlDown = false;
+    m_bQaMenuOpen = false;
+    m_bQaZombieSettingSent = false;
+
+    FT_WeaponHudSetQaMenu(
+        false,
+        g_aQaMoveSteps[m_nQaMoveStepIndex],
+        m_bQaZombiesEnabled);
 
     FT_ClearLightGroups();
 
@@ -1159,6 +1186,18 @@ LTRESULT CLTClientShell::PollInput()
         return LT_OK;
     }
 
+    if(m_pPlayer->IsDevWeaponQa() &&
+       !m_bQaZombieSettingSent)
+    {
+        SendQaZombieSetting();
+
+        FT_WeaponHudSetQaMenu(
+            m_bQaMenuOpen,
+            g_aQaMoveSteps[
+                m_nQaMoveStepIndex],
+            m_bQaZombiesEnabled);
+    }
+
 	fFrameTime = g_pLTClient->GetFrameTime();
 
     HLOCALOBJ hPlayer = m_pPlayer->GetPlayerObject();
@@ -1274,14 +1313,6 @@ LTRESULT CLTClientShell::PollInput()
         dwMoveFlags |= MOVE_CROUCH;
     }
 
-    if(m_pPlayer->IsDevWeaponQa() &&
-       m_bQaControlDown)
-    {
-        // Ctrl is reserved for QA editor shortcuts. Do not let Ctrl+S
-        // accidentally walk the player backward while saving a weapon.
-        dwMoveFlags = 0;
-    }
-
     if(g_pLTClient->IsCommandOn(COMMAND_SPRINT))
     {
         dwMoveFlags |= MOVE_SPRINT;
@@ -1300,6 +1331,16 @@ LTRESULT CLTClientShell::PollInput()
         LTVector vPos;
         g_pLTClient->GetObjectPos(hObject, &vPos);
         g_pLTClient->CPrint("***DBG*** CLIENTObj pos: %f %f %f", VEC_EXPAND(vPos));
+    }
+
+    if(m_pPlayer->IsDevWeaponQa() &&
+       (m_bQaMenuOpen ||
+        m_bQaControlDown))
+    {
+        // The QA tool owns the arrow/Ctrl keyboard combinations. Apply this
+        // after every movement command is sampled so legacy arrow bindings
+        // cannot move the player while editing a view model.
+        dwMoveFlags = 0;
     }
 
     m_pPlayer->UpdateMoveFlags(dwMoveFlags);
@@ -1380,6 +1421,45 @@ void CLTClientShell::SendVelPosAndRot(LTVector &vVel, LTVector &vPos, LTRotation
 //-----------------------------------------------------------------------------
 //  CLTClientShell::SendPlayerName()
 //
+//-----------------------------------------------------------------------------
+void CLTClientShell::SendQaZombieSetting()
+{
+    if(!m_pPlayer ||
+       !m_pPlayer->IsDevWeaponQa())
+    {
+        return;
+    }
+
+    ILTMessage_Write *pMessage = LTNULL;
+    if(g_pLTCCommon->CreateMessage(pMessage) != LT_OK ||
+       !pMessage)
+    {
+        return;
+    }
+
+    pMessage->IncRef();
+    pMessage->Writeuint8(
+        MSG_CS_QA_ZOMBIES);
+    pMessage->Writebool(
+        m_bQaZombiesEnabled);
+
+    g_pLTClient->SendToServer(
+        pMessage->Read(),
+        MESSAGE_GUARANTEED);
+
+    pMessage->DecRef();
+
+    m_bQaZombieSettingSent =
+        true;
+
+    g_pLTClient->CPrint(
+        "Fireteam QA zombies: %s",
+        m_bQaZombiesEnabled
+            ? "ON"
+            : "OFF");
+}
+
+
 //-----------------------------------------------------------------------------
 void CLTClientShell::SendPlayerName()
 {
@@ -1613,12 +1693,78 @@ void CLTClientShell::OnKeyDown(int key, int rep)
         else
         {
            if(m_pPlayer->IsDevWeaponQa() &&
-              'Q' == key &&
+              VK_INSERT == key &&
               rep == 0)
+           {
+               m_bQaMenuOpen =
+                   !m_bQaMenuOpen;
+
+               g_pLTClient->ClearInput();
+
+               FT_WeaponHudSetQaMenu(
+                   m_bQaMenuOpen,
+                   g_aQaMoveSteps[
+                       m_nQaMoveStepIndex],
+                   m_bQaZombiesEnabled);
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   'Q' == key &&
+                   rep == 0)
            {
                m_pPlayer->ToggleDevWeaponQuarantine();
            }
            else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaMenuOpen &&
+                   'Z' == key &&
+                   rep == 0)
+           {
+               m_bQaZombiesEnabled =
+                   !m_bQaZombiesEnabled;
+               SendQaZombieSetting();
+
+               FT_WeaponHudSetQaMenu(
+                   true,
+                   g_aQaMoveSteps[
+                       m_nQaMoveStepIndex],
+                   m_bQaZombiesEnabled);
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaMenuOpen &&
+                   (VK_OEM_PLUS == key ||
+                    VK_ADD == key) &&
+                   rep == 0)
+           {
+               if(m_nQaMoveStepIndex + 1 <
+                  g_nQaMoveStepCount)
+               {
+                   ++m_nQaMoveStepIndex;
+               }
+
+               FT_WeaponHudSetQaMenu(
+                   true,
+                   g_aQaMoveSteps[
+                       m_nQaMoveStepIndex],
+                   m_bQaZombiesEnabled);
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaMenuOpen &&
+                   (VK_OEM_MINUS == key ||
+                    VK_SUBTRACT == key) &&
+                   rep == 0)
+           {
+               if(m_nQaMoveStepIndex > 0)
+               {
+                   --m_nQaMoveStepIndex;
+               }
+
+               FT_WeaponHudSetQaMenu(
+                   true,
+                   g_aQaMoveSteps[
+                       m_nQaMoveStepIndex],
+                   m_bQaZombiesEnabled);
+           }
+           else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaMenuOpen &&
                    m_bQaControlDown &&
                    'S' == key &&
                    rep == 0)
@@ -1626,43 +1772,57 @@ void CLTClientShell::OnKeyDown(int key, int rep)
                m_pPlayer->SaveDevWeaponView();
            }
            else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaMenuOpen &&
                    VK_LEFT == key)
            {
                m_pPlayer->AdjustDevWeaponView(
-                   -0.5f,
+                   -g_aQaMoveSteps[
+                       m_nQaMoveStepIndex],
                    0.0f,
                    0.0f);
            }
            else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaMenuOpen &&
                    VK_RIGHT == key)
            {
                m_pPlayer->AdjustDevWeaponView(
-                   0.5f,
+                   g_aQaMoveSteps[
+                       m_nQaMoveStepIndex],
                    0.0f,
                    0.0f);
            }
            else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaMenuOpen &&
                    VK_UP == key)
            {
+               const float fStep =
+                   g_aQaMoveSteps[
+                       m_nQaMoveStepIndex];
+
                m_pPlayer->AdjustDevWeaponView(
                    0.0f,
                    m_bQaControlDown
                        ? 0.0f
-                       : 0.5f,
+                       : fStep,
                    m_bQaControlDown
-                       ? 0.5f
+                       ? fStep
                        : 0.0f);
            }
            else if(m_pPlayer->IsDevWeaponQa() &&
+                   m_bQaMenuOpen &&
                    VK_DOWN == key)
            {
+               const float fStep =
+                   g_aQaMoveSteps[
+                       m_nQaMoveStepIndex];
+
                m_pPlayer->AdjustDevWeaponView(
                    0.0f,
                    m_bQaControlDown
                        ? 0.0f
-                       : -0.5f,
+                       : -fStep,
                    m_bQaControlDown
-                       ? -0.5f
+                       ? -fStep
                        : 0.0f);
            }
            else if(key >= '1' && key <= '5')

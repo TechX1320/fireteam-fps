@@ -29,6 +29,7 @@ static int s_nLastSpawner = -1;
 
 static bool s_bRoundActive = false;
 static bool s_bRoundIntermission = false;
+static bool s_bQaZombiesEnabled = true;
 static uint32 s_nRound = 0;
 static uint32 s_nRoundTarget = 0;
 static uint32 s_nRoundSpawned = 0;
@@ -63,6 +64,93 @@ static void FT_BroadcastRoundState(uint8 nState)
         MESSAGE_GUARANTEED);
 
     pMsg->DecRef();
+}
+
+bool FT_AreQaZombiesEnabled()
+{
+    return s_bQaZombiesEnabled;
+}
+
+void FT_SetQaZombiesEnabled(
+    bool bEnabled)
+{
+    if(s_bQaZombiesEnabled ==
+       bEnabled)
+    {
+        return;
+    }
+
+    s_bQaZombiesEnabled =
+        bEnabled;
+
+    s_bRoundActive = false;
+    s_bRoundIntermission = false;
+    s_nRound = 0;
+    s_nRoundTarget = 0;
+    s_nRoundSpawned = 0;
+    s_nRoundAlive = 0;
+    s_nRoundKilled = 0;
+    s_nMaxAlive = 0;
+    s_fNextSpawnTime = 0.0f;
+    s_fNextRoundTime = 0.0f;
+
+    if(!bEnabled)
+    {
+        const uint32 kMaxQaClear =
+            512;
+        HOBJECT aRemove[kMaxQaClear];
+        uint32 nRemove = 0;
+
+        HCLASS hZombieClass =
+            g_pLTServer->GetClass(
+                "FireteamZombie");
+
+        if(hZombieClass)
+        {
+            for(HOBJECT hObj =
+                    g_pLTServer->GetNextObject(
+                        LTNULL);
+                hObj &&
+                nRemove < kMaxQaClear;
+                hObj =
+                    g_pLTServer->GetNextObject(
+                        hObj))
+            {
+                HCLASS hClass =
+                    g_pLTServer->GetObjectClass(
+                        hObj);
+
+                if(hClass &&
+                   g_pLTServer->IsKindOf(
+                       hClass,
+                       hZombieClass))
+                {
+                    aRemove[nRemove++] =
+                        hObj;
+                }
+            }
+        }
+
+        for(uint32 i = 0;
+            i < nRemove;
+            ++i)
+        {
+            g_pLTServer->RemoveObject(
+                aRemove[i]);
+        }
+
+        g_pLTServer->CPrint(
+            "Fireteam QA: zombies OFF; cleared %u infected.",
+            nRemove);
+    }
+    else
+    {
+        g_pLTServer->CPrint(
+            "Fireteam QA: zombies ON; round controller restarting.");
+    }
+
+    FT_BroadcastRoundState(
+        0);
 }
 
 Spawner::Spawner()
@@ -290,6 +378,11 @@ void Spawner::StartNextRound()
 void Spawner::UpdateRoundController()
 {
     if(s_hController != m_hObject)
+    {
+        return;
+    }
+
+    if(!s_bQaZombiesEnabled)
     {
         return;
     }

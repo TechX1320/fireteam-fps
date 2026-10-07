@@ -32,6 +32,7 @@
 
 #include "playersrvr.h"
 #include "FireteamPlayerDefs.h"
+#include "FireteamSpawner.h"
 #include "projectile.h"
 #include "statsmanager.h"
 
@@ -413,6 +414,18 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
             if(pPlayerClass)
             {
                 pPlayerClass->SyncPrimaryAmmo();
+            }
+        }
+        break;
+    case MSG_CS_QA_ZOMBIES:
+        {
+            // Weapon QA is a local/single-client developer workflow. Never
+            // expose a normal multiplayer client control over global spawning.
+            if(g_pStatsManager &&
+               g_pStatsManager->GetNumPlayers() <= 1)
+            {
+                FT_SetQaZombiesEnabled(
+                    pMessage->Readbool());
             }
         }
         break;
