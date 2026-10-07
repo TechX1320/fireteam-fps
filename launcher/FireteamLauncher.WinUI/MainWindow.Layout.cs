@@ -715,10 +715,43 @@ public sealed partial class MainWindow
             LabeledControl(
                 "MODE",
                 ModeCombo);
+        DifficultySlider.Minimum = 0;
+        DifficultySlider.Maximum = 10;
+        DifficultySlider.StepFrequency = 1;
+        DifficultySlider.SnapsTo =
+            SliderSnapsTo.StepValues;
+        DifficultySlider.Value = 4;
+        DifficultySlider.HorizontalAlignment =
+            HorizontalAlignment.Stretch;
+        DifficultySlider.ValueChanged +=
+            (sender, args) =>
+                UpdateDifficultyLabel();
+
+        DifficultyValueText.Foreground =
+            AccentBrush;
+        DifficultyValueText.FontFamily =
+            new FontFamily(
+                "Bahnschrift SemiCondensed");
+        DifficultyValueText.FontSize = 12;
+        DifficultyValueText.FontWeight =
+            Microsoft.UI.Text.FontWeights.Bold;
+        DifficultyValueText.CharacterSpacing = 25;
+        UpdateDifficultyLabel();
+
+        var difficultyControl =
+            new StackPanel
+            {
+                Spacing = 0
+            };
+        difficultyControl.Children.Add(
+            DifficultySlider);
+        difficultyControl.Children.Add(
+            DifficultyValueText);
+
         var difficulty =
             LabeledControl(
-                "DIFFICULTY",
-                DifficultyCombo);
+                "DIFFICULTY 0-10",
+                difficultyControl);
 
         var join =
             new Grid

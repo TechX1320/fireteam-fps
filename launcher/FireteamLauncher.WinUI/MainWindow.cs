@@ -41,7 +41,8 @@ public sealed partial class MainWindow : Window
     private readonly ScrollViewer HomeView = new();
     private readonly TextBox PlayerNameBox = new();
     private readonly ComboBox ModeCombo = new();
-    private readonly ComboBox DifficultyCombo = new();
+    private readonly Slider DifficultySlider = new();
+    private readonly TextBlock DifficultyValueText = new();
     private readonly TextBlock JoinIpLabel = new();
     private readonly TextBox JoinIpBox = new();
     private readonly TextBox CommandsBox = new();
@@ -129,15 +130,6 @@ public sealed partial class MainWindow : Window
             "Join Multiplayer"
         };
 
-        DifficultyCombo.ItemsSource = new string[]
-        {
-            "Easy",
-            "Normal",
-            "Hard",
-            "Extreme",
-            "Nightmare"
-        };
-
         WeaponTypeCombo.ItemsSource = new string[]
         {
             "hitscan",
@@ -212,7 +204,10 @@ public sealed partial class MainWindow : Window
         CommandsBox.Text = profile.CustomCommands;
 
         SelectString(ModeCombo, profile.Mode, "Single Player");
-        SelectString(DifficultyCombo, profile.Difficulty, "Normal");
+        DifficultySlider.Value =
+            ParseDifficultyLevel(
+                profile.Difficulty);
+        UpdateDifficultyLabel();
 
         RefreshModeVisibility();
 
@@ -1138,6 +1133,79 @@ public sealed partial class MainWindow : Window
         RefreshModeVisibility();
     }
 
+    private string DifficultyProfileValue()
+    {
+        var level =
+            (int)Math.Round(
+                DifficultySlider.Value);
+
+        return Math.Clamp(
+            level,
+            0,
+            10).ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static int ParseDifficultyLevel(
+        string? value)
+    {
+        if(int.TryParse(
+               value,
+               out var level))
+        {
+            return Math.Clamp(
+                level,
+                0,
+                10);
+        }
+
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            "easy" => 2,
+            "normal" => 4,
+            "medium" => 5,
+            "hard" => 6,
+            "expert" => 7,
+            "extreme" => 8,
+            "nightmare" => 10,
+            _ => 4
+        };
+    }
+
+    private static string DifficultyName(
+        int level) =>
+        level switch
+        {
+            0 => "TRAINING",
+            1 => "VERY EASY",
+            2 => "EASY",
+            3 => "STANDARD",
+            4 => "NORMAL",
+            5 => "MEDIUM",
+            6 => "HARD",
+            7 => "EXPERT",
+            8 => "EXTREME",
+            9 => "NIGHTMARE",
+            10 => "NIGHTMARE++",
+            _ => "NORMAL"
+        };
+
+    private void UpdateDifficultyLabel()
+    {
+        var level =
+            Math.Clamp(
+                (int)Math.Round(
+                    DifficultySlider.Value),
+                0,
+                10);
+
+        DifficultyValueText.Text =
+            $"{level}  •  {DifficultyName(level)}" +
+            (level == 4
+                ? "  •  ORIGINAL NORMAL"
+                : string.Empty);
+    }
+
     private void RefreshModeVisibility()
     {
         var join = string.Equals(
@@ -1652,8 +1720,7 @@ public sealed partial class MainWindow : Window
                         ? "Player"
                         : PlayerNameBox.Text.Trim(),
                     "Single Player",
-                    DifficultyCombo.SelectedItem?.ToString()
-                        ?? "Normal",
+                    DifficultyProfileValue(),
                     "127.0.0.1",
                     customCommands);
 

@@ -93,7 +93,7 @@ public sealed class SettingsService
         return new LauncherProfile(
             Environment.UserName,
             "Single Player",
-            "Normal",
+            "4",
             "127.0.0.1",
             string.Empty);
     }

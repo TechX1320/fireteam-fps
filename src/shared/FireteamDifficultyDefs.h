@@ -74,7 +74,7 @@ inline void FT_InitDifficultyDefaults(
     FT_CopyDifficultyString(
         def.sId,
         sizeof(def.sId),
-        "normal");
+        "4");
 
     def.nRoundBase = 6;
     def.nRoundGrowth = 2;
@@ -108,7 +108,7 @@ inline bool FT_ReadSessionDifficulty(
     FT_CopyDifficultyString(
         pOut,
         nOutLen,
-        "normal");
+        "4");
 
     FILE *pFile = fopen(pFilename, "rt");
     if(!pFile)
@@ -161,7 +161,7 @@ inline bool FT_LoadDifficultyDef(
 
     if(!pDifficultyId || !pDifficultyId[0])
     {
-        pDifficultyId = "normal";
+        pDifficultyId = "4";
     }
 
     FILE *pFile = fopen(pFilename, "rt");
@@ -271,18 +271,38 @@ inline bool FT_LoadActiveDifficulty(
         sDifficulty,
         sizeof(sDifficulty));
 
+    // Backward compatibility for launcher profiles/session.cfg files created
+    // before FIRETEAM switched from five names to the 0-10 difficulty scale.
+    const char *pMapped =
+        sDifficulty;
+
+    if(_stricmp(sDifficulty, "easy") == 0)
+        pMapped = "2";
+    else if(_stricmp(sDifficulty, "normal") == 0)
+        pMapped = "4";
+    else if(_stricmp(sDifficulty, "medium") == 0)
+        pMapped = "5";
+    else if(_stricmp(sDifficulty, "hard") == 0)
+        pMapped = "6";
+    else if(_stricmp(sDifficulty, "expert") == 0)
+        pMapped = "7";
+    else if(_stricmp(sDifficulty, "extreme") == 0)
+        pMapped = "8";
+    else if(_stricmp(sDifficulty, "nightmare") == 0)
+        pMapped = "10";
+
     if(FT_LoadDifficultyDef(
         pDifficultyFilename,
-        sDifficulty,
+        pMapped,
         def))
     {
         return true;
     }
 
-    // A bad/custom session value falls back to Normal.
+    // A bad/custom session value falls back to level 4: the old Normal.
     return FT_LoadDifficultyDef(
         pDifficultyFilename,
-        "normal",
+        "4",
         def);
 }
 
