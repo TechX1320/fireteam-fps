@@ -587,8 +587,13 @@ public sealed partial class MainWindow : Window
                 ? "TIMING VERIFIED"
                 : "DEV TIMING";
 
+        var validation =
+            weapon.Supported
+                ? "SUPPORTED"
+                : "MANUAL TEST";
+
         LoadoutWeaponMetaText.Text =
-            $"{weapon.LoadoutCategory.ToUpperInvariant()}  •  {timing}  •  {weapon.Source}";
+            $"{weapon.LoadoutCategory.ToUpperInvariant()}  •  {validation}  •  {timing}  •  {weapon.Source}";
 
         LoadoutWeaponStatsText.Text =
             "DAMAGE        " +
@@ -922,12 +927,11 @@ public sealed partial class MainWindow : Window
 
         foreach(var weapon in selections)
         {
-            if(!weapon.Supported ||
-               (!weapon.Enabled &&
-                !weapon.IsActiveSlot))
+            if(!weapon.Enabled &&
+               !weapon.IsActiveSlot)
             {
                 throw new InvalidOperationException(
-                    $"{weapon.Name} is disabled or unsupported.");
+                    $"{weapon.Name} is disabled.");
             }
         }
     }
@@ -1085,7 +1089,9 @@ public sealed partial class MainWindow : Window
 
         WeaponTitleText.Text = weapon.Name;
         WeaponSectionText.Text =
-            $"{weapon.Section}  •  {weapon.Id}  •  {weapon.Source}";
+            $"{weapon.Section}  •  {weapon.Id}  •  " +
+            $"{(weapon.Supported ? "SUPPORTED" : "UNVERIFIED")}  •  " +
+            weapon.Source;
 
         WeaponNameBox.Text = weapon.Name;
         WeaponIdBox.Text = weapon.Id;

@@ -1224,7 +1224,7 @@ public sealed partial class MainWindow
             CardHeading(
                 "FIGHTING LOAD",
                 "Current Kit",
-                "Primary, sidearm and melee have fixed roles. The two backpack slots can carry additional enabled equipment.",
+                "Primary, sidearm and melee have fixed roles. Backpack slots carry additional enabled equipment.",
                 CyanBrush);
 
         var slots =
@@ -1298,6 +1298,43 @@ public sealed partial class MainWindow
         fightingLoad.Children.Add(
             slots);
 
+        var kitActions =
+            new StackPanel
+            {
+                Orientation =
+                    Orientation.Horizontal,
+                Spacing = 10,
+                Margin =
+                    new Thickness(
+                        0,
+                        8,
+                        0,
+                        0)
+            };
+
+        var activate =
+            PrimaryButton(
+                "ACTIVATE LOADOUT");
+
+        activate.Click +=
+            ApplyLoadoutButton_Click;
+
+        var editor =
+            SecondaryButton(
+                "OPEN WEAPON EDITOR");
+
+        editor.Click +=
+            OpenArsenalButton_Click;
+
+        kitActions.Children.Add(
+            activate);
+
+        kitActions.Children.Add(
+            editor);
+
+        fightingLoad.Children.Add(
+            kitActions);
+
         armory.Children.Add(
             Card(
                 fightingLoad,
@@ -1307,7 +1344,7 @@ public sealed partial class MainWindow
             CardHeading(
                 "INVENTORY",
                 "Weapon Locker",
-                "Only enabled + supported weapons appear here. Enable more through Tools → Weapon Editor.");
+                "Enabled weapons appear here. UNVERIFIED imports can still be enabled for deliberate manual testing.");
 
         var categories =
             new StackPanel
@@ -1402,7 +1439,7 @@ public sealed partial class MainWindow
             new Grid
             {
                 ColumnSpacing = 14,
-                MinHeight = 285
+                MinHeight = 210
             };
 
         browser.ColumnDefinitions.Add(
@@ -1427,10 +1464,10 @@ public sealed partial class MainWindow
             "DisplayName";
 
         LoadoutInventoryList.MinHeight =
-            280;
+            205;
 
         LoadoutInventoryList.MaxHeight =
-            330;
+            245;
 
         LoadoutInventoryList.SelectionChanged +=
             LoadoutInventoryList_SelectionChanged;
@@ -1551,37 +1588,6 @@ public sealed partial class MainWindow
 
         inventory.Children.Add(
             browser);
-
-        var actions =
-            new StackPanel
-            {
-                Orientation =
-                    Orientation.Horizontal,
-                Spacing = 10
-            };
-
-        var activate =
-            PrimaryButton(
-                "ACTIVATE LOADOUT");
-
-        activate.Click +=
-            ApplyLoadoutButton_Click;
-
-        var editor =
-            SecondaryButton(
-                "OPEN WEAPON EDITOR");
-
-        editor.Click +=
-            OpenArsenalButton_Click;
-
-        actions.Children.Add(
-            activate);
-
-        actions.Children.Add(
-            editor);
-
-        inventory.Children.Add(
-            actions);
 
         LoadoutStatusText.Foreground =
             SecondaryTextBrush;

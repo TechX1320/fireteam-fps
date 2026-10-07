@@ -145,6 +145,7 @@ private:
 	HLOCALOBJ				m_hCamera;
 	bool					m_bRender;
 	bool					m_bFirstUpdate;
+	bool					m_bHavePlayerStartInfo;
 
 	LTVector				m_vPlayerStartPos;
 	LTRotation				m_rPlayerStartRot;

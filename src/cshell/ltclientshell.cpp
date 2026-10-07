@@ -112,6 +112,7 @@ m_hCamera(NULL),
 m_pCamera(NULL),
 m_bRender(true),
 m_bFirstUpdate(true),
+m_bHavePlayerStartInfo(false),
 m_vPlayerStartPos(0.0f, 160.0f, 0.0f),
 m_pWorldPropsClnt(NULL),
 m_pPlayer(NULL),
@@ -599,6 +600,8 @@ void CLTClientShell::OnExitWorld()
 	}
 
     m_bInWorld = false;
+    m_bFirstUpdate = true;
+    m_bHavePlayerStartInfo = false;
 
     FT_ClearLightGroups();
 
@@ -623,6 +626,7 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
         {
 			m_vPlayerStartPos = pMessage->ReadLTVector();
 			m_rPlayerStartRot = pMessage->ReadLTRotation();
+            m_bHavePlayerStartInfo = true;
             g_pLTClient->CPrint("CLIENT startpoint: %f %f %f", m_vPlayerStartPos.x, m_vPlayerStartPos.y, m_vPlayerStartPos.z);
 		}
 		break;
@@ -775,6 +779,13 @@ void CLTClientShell::Update()
         {
             if( m_bFirstUpdate )
             {
+                // Wait for the guaranteed authoritative startpoint before
+                // creating the separate local collision/player object.
+                if(!m_bHavePlayerStartInfo)
+                {
+                    return;
+                }
+
 				//Check to see if the client object is available, if not return
                 HLOCALOBJ hObject = g_pLTClient->GetClientObject();
                 if(!hObject)
@@ -782,8 +793,16 @@ void CLTClientShell::Update()
 					return;
 				}
 
-                //Set our client object non solid
+                // Set our client object non solid and pin the local
+                // presentation to the authoritative spawn before CreatePlayer
+                // samples its position. This removes the alt-tab/load race.
                 g_pLTCCommon->SetObjectFlags(hObject, OFT_Flags, FLAG_CLIENTNONSOLID, FLAG_CLIENTNONSOLID);
+                g_pLTClient->SetObjectPos(
+                    hObject,
+                    &m_vPlayerStartPos);
+                g_pLTClient->SetObjectRotation(
+                    hObject,
+                    &m_rPlayerStartRot);
                 m_pPlayer->SetClientObject(hObject);
                 m_pPlayer->CreatePlayer();
                 HLOCALOBJ hPlayer = m_pPlayer->GetPlayerObject();
@@ -1456,6 +1475,9 @@ void CLTClientShell::DestroyWorldPropObject()
 //-----------------------------------------------------------------------------
 LTRESULT CLTClientShell::StartMultiplayerServer()
 {
+    m_bFirstUpdate = true;
+    m_bHavePlayerStartInfo = false;
+
     LTRESULT result = this->InitGame(EGT_HOST);
 
     if(LT_OK == result)
@@ -1474,6 +1496,8 @@ LTRESULT CLTClientShell::StartMultiplayerServer()
 //-----------------------------------------------------------------------------
 LTRESULT CLTClientShell::JoinMultiplayerGame(char* ip)
 {
+    m_bFirstUpdate = true;
+    m_bHavePlayerStartInfo = false;
 
     LTRESULT result = this->InitGame(EGT_CONNECT, ip);
 
@@ -1494,6 +1518,9 @@ LTRESULT CLTClientShell::JoinMultiplayerGame(char* ip)
 //-----------------------------------------------------------------------------
 LTRESULT CLTClientShell::StartNormalGame()
 {
+    m_bFirstUpdate = true;
+    m_bHavePlayerStartInfo = false;
+
     LTRESULT result = this->InitGame(EGT_NORMAL);
 
     if(LT_OK == result)

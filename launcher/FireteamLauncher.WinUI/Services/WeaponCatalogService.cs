@@ -107,7 +107,7 @@ public sealed class WeaponCatalogService
         foreach(var weapon in all
             .Where(w =>
                 w.IsActiveSlot ||
-                (w.Supported && w.Enabled))
+                w.Enabled)
             .OrderByDescending(w =>
                 w.IsActiveSlot)
             .ThenBy(w =>
@@ -247,6 +247,9 @@ public sealed class WeaponCatalogService
             FireteamConfigDocument.Load(
                 sourcePath);
 
+        PreserveActiveDefinitions(
+            doc);
+
         for(var slot = 0;
             slot < 5;
             ++slot)
@@ -281,6 +284,109 @@ public sealed class WeaponCatalogService
             paths);
 
         Invalidate();
+    }
+
+    private static void PreserveActiveDefinitions(
+        FireteamConfigDocument doc)
+    {
+        var existingIds =
+            new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase);
+
+        foreach(var section in doc.Sections)
+        {
+            if(!section.StartsWith(
+                    "catalog.",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var id =
+                doc.GetValue(
+                    section,
+                    "id");
+
+            if(!string.IsNullOrWhiteSpace(
+                id))
+            {
+                existingIds.Add(
+                    id);
+            }
+        }
+
+        for(var slot = 1;
+            slot <= 5;
+            ++slot)
+        {
+            var source =
+                $"weapon{slot}";
+
+            var id =
+                doc.GetValue(
+                    source,
+                    "id");
+
+            if(string.IsNullOrWhiteSpace(
+                   id) ||
+               existingIds.Contains(
+                   id))
+            {
+                continue;
+            }
+
+            var safeId =
+                Regex.Replace(
+                    id,
+                    @"[^A-Za-z0-9_\-]+",
+                    "_")
+                .Trim('_');
+
+            if(string.IsNullOrWhiteSpace(
+                safeId))
+            {
+                safeId =
+                    $"slot_{slot}";
+            }
+
+            var destination =
+                $"catalog.stock_{safeId}";
+
+            foreach(var key in RuntimeKeys)
+            {
+                doc.SetValue(
+                    destination,
+                    key,
+                    doc.GetValue(
+                        source,
+                        key));
+            }
+
+            doc.SetValue(
+                destination,
+                "category",
+                doc.GetValue(
+                    source,
+                    "category"));
+
+            doc.SetValue(
+                destination,
+                "source",
+                "FIRETEAM PREVIOUS LOADOUT");
+
+            doc.SetValue(
+                destination,
+                "supported",
+                "1");
+
+            doc.SetValue(
+                destination,
+                "enabled",
+                "1");
+
+            existingIds.Add(
+                id);
+        }
     }
 
     public void Invalidate()
