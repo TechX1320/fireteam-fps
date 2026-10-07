@@ -1,5 +1,6 @@
 using FireteamLauncher.Infrastructure;
 using FireteamLauncher.Models;
+using FireteamLauncher.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Graphics;
