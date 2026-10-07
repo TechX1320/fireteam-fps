@@ -30,6 +30,7 @@
 #include "FireteamRoundHud.h"
 #include "FireteamCombatFeedback.h"
 #include "FireteamAmbientAudio.h"
+#include "FireteamController.h"
 #include "FireteamLoadingScreen.h"
 // Client-side helper functions
 #include "clienthelper.h"
@@ -136,6 +137,10 @@ m_bQaMenuKeyHeld(false),
 m_bQaZombiesEnabled(false),
 m_bQaZombieSettingSent(false),
 m_nQaMoveStepIndex(2),
+m_bControllerWasConnected(false),
+m_bControllerMenuDown(false),
+m_bControllerMenuHoldActivated(false),
+m_fControllerMenuDownAt(0.0f),
 m_vPlayerStartPos(0.0f, 160.0f, 0.0f),
 m_pWorldPropsClnt(NULL),
 m_pPlayer(NULL),
@@ -1056,6 +1061,9 @@ void CLTClientShell::OnEvent(uint32 dwEventID, uint32 dwParam)
     case LTEVENT_LOSTFOCUS:
         m_bRender = false;
         m_bQaControlDown = false;
+        m_bControllerMenuDown = false;
+        m_bControllerMenuHoldActivated = false;
+        FT_ControllerReset();
         break;
 
     case LTEVENT_RENDERTERM:
@@ -1131,21 +1139,7 @@ void CLTClientShell::OnCommandOn(int command)
             else
             if (command == COMMAND_SHOWSTATS)
             {
-                //g_pLTClient->CPrint("Client: showstats ON");
-                //Send stats show message
-	            ILTMessage_Write *pMessage;
-	            LTRESULT nResult = g_pLTCCommon->CreateMessage(pMessage);
-
-	            if( LT_OK == nResult)
-	            {
-		            pMessage->IncRef();
-		            pMessage->Writeuint8(MSG_CS_SCORE);
-		            pMessage->Writebool(true);
-		            g_pLTClient->SendToServer(pMessage->Read(), MESSAGE_GUARANTEED);
-		            pMessage->DecRef();
-	            }
-
-                m_bShowStats = true;
+                SetStatsVisible(true);
             }
         }
     }
@@ -1167,24 +1161,41 @@ void CLTClientShell::OnCommandOff(int command)
     //
     if (command == COMMAND_SHOWSTATS)
     {
-        //g_pLTClient->CPrint("Client: showstats OFF");
-        //Send stats kill message
-	    ILTMessage_Write *pMessage;
-	    LTRESULT nResult = g_pLTCCommon->CreateMessage(pMessage);
-
-	    if( LT_OK == nResult)
-	    {
-		    pMessage->IncRef();
-		    pMessage->Writeuint8(MSG_CS_SCORE);
-		    pMessage->Writebool(false);
-		    g_pLTClient->SendToServer(pMessage->Read(), MESSAGE_GUARANTEED);
-		    pMessage->DecRef();
-	    }
-
-        m_bShowStats = false;
+        SetStatsVisible(false);
     }
 }
 
+
+
+//---------------------------------------------------------------------------
+void CLTClientShell::SetStatsVisible(
+    bool bVisible)
+{
+    if(m_bShowStats == bVisible)
+    {
+        return;
+    }
+
+    ILTMessage_Write *pMessage = LTNULL;
+
+    if(g_pLTCCommon->CreateMessage(
+           pMessage) == LT_OK &&
+       pMessage)
+    {
+        pMessage->IncRef();
+        pMessage->Writeuint8(
+            MSG_CS_SCORE);
+        pMessage->Writebool(
+            bVisible);
+        g_pLTClient->SendToServer(
+            pMessage->Read(),
+            MESSAGE_GUARANTEED);
+        pMessage->DecRef();
+    }
+
+    m_bShowStats =
+        bVisible;
+}
 
 
 //---------------------------------------------------------------------------
@@ -1200,13 +1211,113 @@ LTRESULT CLTClientShell::PollInput()
 	bool bMoved = false;
 	bool bRotated = false;
 
+    FTControllerState controller;
+    FT_ControllerPoll(
+        controller);
+
+    if(controller.bConnected !=
+       m_bControllerWasConnected)
+    {
+        m_bControllerWasConnected =
+            controller.bConnected;
+
+        g_pLTClient->CPrint(
+            controller.bConnected
+                ? "Fireteam controller: Xbox/XInput pad connected."
+                : "Fireteam controller: pad disconnected.");
+    }
+
+    const float fControllerNow =
+        g_pLTClient->GetTime();
+    const bool bMenuButtonDown =
+        controller.bConnected &&
+        (controller.nButtons &
+         FT_PAD_MENU) != 0;
+
+    if(bMenuButtonDown &&
+       !m_bControllerMenuDown)
+    {
+        m_bControllerMenuDown = true;
+        m_bControllerMenuHoldActivated = false;
+        m_fControllerMenuDownAt =
+            fControllerNow;
+    }
+
+    if(bMenuButtonDown &&
+       m_bControllerMenuDown &&
+       !m_bControllerMenuHoldActivated &&
+       !FT_SettingsIsOpen() &&
+       !m_pChatGui->IsChatInputActive() &&
+       (fControllerNow -
+        m_fControllerMenuDownAt) >= 0.55f)
+    {
+        // Requested Xbox layout: hold Menu opens text chat.
+        m_pChatGui->SetActive(true);
+        m_bControllerMenuHoldActivated = true;
+        SetStatsVisible(false);
+    }
+
+    if(!bMenuButtonDown &&
+       m_bControllerMenuDown)
+    {
+        if(!m_bControllerMenuHoldActivated &&
+           !m_pChatGui->IsChatInputActive())
+        {
+            // Short Menu press opens/closes the existing in-game settings menu.
+            FT_SettingsToggle();
+        }
+
+        m_bControllerMenuDown = false;
+        m_bControllerMenuHoldActivated = false;
+    }
+
+    if(controller.nPressed &
+       FT_PAD_VIEW)
+    {
+        SetStatsVisible(true);
+    }
+
+    if(controller.nReleased &
+       FT_PAD_VIEW)
+    {
+        SetStatsVisible(false);
+    }
+
     if(FT_SettingsIsOpen())
     {
+        if(controller.nPressed & FT_PAD_DPAD_UP)
+            FT_SettingsHandleKey(VK_UP);
+        if(controller.nPressed & FT_PAD_DPAD_DOWN)
+            FT_SettingsHandleKey(VK_DOWN);
+        if(controller.nPressed & FT_PAD_DPAD_LEFT)
+            FT_SettingsHandleKey(VK_LEFT);
+        if(controller.nPressed & FT_PAD_DPAD_RIGHT)
+            FT_SettingsHandleKey(VK_RIGHT);
+        if(controller.nPressed & FT_PAD_A)
+            FT_SettingsHandleKey(VK_RETURN);
+        if(controller.nPressed & FT_PAD_B)
+            FT_SettingsHandleKey(VK_ESCAPE);
+
+        m_pPlayer->SetControllerMoveAxes(
+            0.0f,
+            0.0f);
         m_pPlayer->UpdateMoveFlags(0);
         return LT_OK;
     }
+
     if(m_pChatGui->IsChatInputActive())
     {
+        if(controller.nPressed &
+           FT_PAD_B)
+        {
+            m_pChatGui->HandleInputDown(
+                VK_ESCAPE,
+                0);
+        }
+
+        m_pPlayer->SetControllerMoveAxes(
+            0.0f,
+            0.0f);
         return LT_OK;
     }
 
@@ -1278,6 +1389,86 @@ LTRESULT CLTClientShell::PollInput()
 
 	fFrameTime = g_pLTClient->GetFrameTime();
 
+    if(controller.bConnected)
+    {
+        const float kControllerYawSpeed =
+            2.65f;
+        const float kControllerPitchSpeed =
+            2.10f;
+
+        if(controller.fLookX != 0.0f ||
+           controller.fLookY != 0.0f)
+        {
+            bRotated = true;
+
+            m_pPlayer->UpdateRotation(
+                controller.fLookX *
+                    fFrameTime *
+                    kControllerYawSpeed,
+                0.0f,
+                0.0f);
+
+            m_pCamera->UpdatePitch(
+                -controller.fLookY *
+                    fFrameTime *
+                    kControllerPitchSpeed);
+        }
+
+        if(controller.bLeftTriggerPressed)
+        {
+            const FTWeaponDef *pWeapon =
+                m_pPlayer->GetCurrentWeaponDef();
+
+            if(pWeapon &&
+               pWeapon->fZoomFovDegrees > 0.0f)
+            {
+                m_pCamera->ToggleWeaponZoom(
+                    pWeapon->fZoomFovDegrees);
+            }
+        }
+
+        if(controller.bLeftTriggerReleased &&
+           m_pCamera->IsWeaponZoomed())
+        {
+            m_pCamera->ClearWeaponZoom();
+        }
+
+        if(controller.nPressed &
+           FT_PAD_X)
+        {
+            m_pPlayer->ReloadWeapon();
+        }
+
+        if(controller.nPressed &
+           FT_PAD_Y)
+        {
+            m_pCamera->ClearWeaponZoom();
+            m_pPlayer->CycleWeapon(1);
+        }
+
+        if(controller.nPressed &
+           FT_PAD_RTHUMB)
+        {
+            // Current server protocol has a dedicated melee loadout slot.
+            // R3 equips it and starts the attack; quick-melee can later restore
+            // the prior weapon once that protocol exists.
+            m_pCamera->ClearWeaponZoom();
+
+            if(m_pPlayer->SelectWeaponSlot(3))
+            {
+                m_pPlayer->Attack();
+            }
+        }
+    }
+
+    m_pPlayer->SetControllerMoveAxes(
+        controller.bConnected
+            ? controller.fMoveY
+            : 0.0f,
+        controller.bConnected
+            ? controller.fMoveX
+            : 0.0f);
+
     HLOCALOBJ hPlayer = m_pPlayer->GetPlayerObject();
 
     g_pLTCPhysics->GetVelocity(hPlayer, &vVel);
@@ -1331,9 +1522,39 @@ LTRESULT CLTClientShell::PollInput()
         dwMoveFlags |= MOVE_BACKWARD;
     }
 
+    if(controller.bConnected)
+    {
+        if(controller.nButtons &
+           FT_PAD_B)
+        {
+            dwMoveFlags |=
+                MOVE_CROUCH;
+        }
+
+        if(controller.nButtons &
+           FT_PAD_LTHUMB)
+        {
+            dwMoveFlags |=
+                MOVE_SPRINT;
+        }
+
+        if(controller.nButtons &
+           FT_PAD_A)
+        {
+            dwMoveFlags |=
+                MOVE_JUMP;
+        }
+
+        // Reserved in the requested Xbox layout until the gameplay systems
+        // exist: LB grenade, RB equipment, D-pad Up mark/light,
+        // Left grenade switcher, Down AI scan, Right drop weapon.
+    }
+
 	// Fireteam weapon fire. The client only sends an action + view ray;
     // the server owns weapon type, ammo, fire timing and damage.
-    if (g_pLTClient->IsCommandOn(COMMAND_SHOOT))
+    if (g_pLTClient->IsCommandOn(COMMAND_SHOOT) ||
+        (controller.bConnected &&
+         controller.bRightTriggerDown))
     {
         const FTWeaponDef *pWeaponDef = m_pPlayer->GetCurrentWeaponDef();
 
