@@ -194,3 +194,6 @@ Combat Arms maps, models, textures, sounds, decrypted attributes, GMS files, and
 - The original CA `ROUNDSTART` texture is used with the existing Cabin Fever round-start sting.
 - Optional `ZombieAmbience.wav` plays as a low-volume local loop while in-world.
 - `SHADERS.zip` is staged for the upcoming render/effect integration pass; copying the FX files alone does not alter the scene.
+
+- Native Xbox/XInput controller support is now available: analog left-stick movement, right-stick look, LT zoom, RT fire, L3 sprint, A jump, B crouch, X reload, Y weapon cycle, R3 melee, View scoreboard, and Menu tap/hold behavior. Reserved grenade/equipment/D-pad bindings match the target layout for future systems; see `docs/CONTROLLER_LAYOUT.md`.
+- The launcher Loadout menu now separates Weapon Loadout, Player Gear, and Weapon Mods. Player Gear establishes backpack/armor/head/face slots; Weapon Mods establishes optic/muzzle/magazine/ammo-stash slots without mixing modification data into base weapon definitions.
