@@ -34,7 +34,8 @@ public sealed class WeaponCatalogService
             "source", "supported", "enabled", "category",
             "ca_name", "ca_pv_model", "ca_pv_skin", "ca_hh_model", "ca_hh_skin",
             "ca_weapon_section", "ca_ammo_name", "ca_guntype",
-            "ca_vectors_per_round", "ca_import_status",
+            "ca_vectors_per_round", "ca_hud_fire_mode",
+            "ca_rapid_fire_count", "ca_import_status",
             "ca_timing_verified"
         ]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
