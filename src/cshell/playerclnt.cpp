@@ -512,6 +512,7 @@ m_pDevWeaponDefs(NULL),
 m_nDevWeaponCount(0),
 m_nDevWeaponIndex(0),
 m_bDevWeaponQa(false),
+m_bDevWeaponViewDirty(false),
 m_bPlayerDefLoaded(false),
 m_bCrouching(false),
 m_bIsJumping(false),
@@ -1261,6 +1262,11 @@ void CPlayerClnt::CycleDevWeapon(int nDirection)
         return;
     }
 
+    if(m_bDevWeaponViewDirty)
+    {
+        SaveDevWeaponView();
+    }
+
     int nNext =
         (int)m_nDevWeaponIndex +
         (nDirection > 0
@@ -1402,6 +1408,9 @@ void CPlayerClnt::AdjustDevWeaponView(
     def.fViewZ +=
         fDeltaZ;
 
+    m_bDevWeaponViewDirty =
+        true;
+
     if(m_hViewWeaponObject)
     {
         LTVector vViewPos(
@@ -1454,6 +1463,9 @@ void CPlayerClnt::AdjustDevWeaponScale(
             4.0f;
     }
 
+    m_bDevWeaponViewDirty =
+        true;
+
     if(m_hViewWeaponObject)
     {
         LTVector vScale(
@@ -1487,6 +1499,11 @@ bool CPlayerClnt::SaveDevWeaponView()
         return false;
     }
 
+    if(!m_bDevWeaponViewDirty)
+    {
+        return true;
+    }
+
     FTWeaponDef &def =
         m_pDevWeaponDefs[
             m_nDevWeaponIndex];
@@ -1514,6 +1531,9 @@ bool CPlayerClnt::SaveDevWeaponView()
                 "../config/weapons.cfg",
                 &def);
     }
+
+    m_bDevWeaponViewDirty =
+        false;
 
     g_pLTClient->CPrint(
         "Fireteam weapon QA SAVE: %s X=%.2f Y=%.2f Z=%.2f SCALE=%.2f runtime=%s source=%s",

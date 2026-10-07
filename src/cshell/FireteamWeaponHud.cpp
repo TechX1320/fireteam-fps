@@ -473,7 +473,7 @@ void FT_RenderWeaponHud(
         const float fPanelX = 18.0f;
         const float fPanelY = 58.0f;
         const float fPanelW = 540.0f;
-        const float fPanelH = 330.0f;
+        const float fPanelH = 346.0f;
 
         LT_POLYF4 qaPanel[4];
 
@@ -544,7 +544,8 @@ void FT_RenderWeaponHud(
                 "CTRL + UP / DOWN   move Z\n"
                 "[ / ]              shrink / grow model (0.05)\n"
                 "+ / -              change move increment\n"
-                "CTRL + S           save position + scale\n"
+                "AUTO-SAVE          on weapon change / panel close\n"
+                "CTRL + S           save position + scale now\n"
                 "Q                  enable / disable weapon\n"
                 "Z                  toggle zombies\n"
                 "MOUSE WHEEL        previous / next weapon\n"

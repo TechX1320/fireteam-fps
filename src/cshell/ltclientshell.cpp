@@ -1219,8 +1219,17 @@ LTRESULT CLTClientShell::PollInput()
         if(bQaMenuKeyDown &&
            !m_bQaMenuKeyHeld)
         {
+            const bool bWasQaMenuOpen =
+                m_bQaMenuOpen;
+
             m_bQaMenuOpen =
                 !m_bQaMenuOpen;
+
+            if(bWasQaMenuOpen &&
+               !m_bQaMenuOpen)
+            {
+                m_pPlayer->SaveDevWeaponView();
+            }
 
             g_pLTClient->ClearInput();
 

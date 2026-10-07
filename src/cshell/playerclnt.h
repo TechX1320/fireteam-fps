@@ -128,6 +128,7 @@ private:
     uint32              m_nDevWeaponCount;
     uint32              m_nDevWeaponIndex;
     bool                m_bDevWeaponQa;
+    bool                m_bDevWeaponViewDirty;
     FTPlayerDef         m_PlayerDef;
     bool                m_bPlayerDefLoaded;
 
