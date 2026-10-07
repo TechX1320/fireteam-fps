@@ -36,6 +36,38 @@
 #define DEFAULT_LEASHTIME 2.0f
 #define FT_WEAPON_QA_QUARANTINE_FILE "config/weapon-quarantine.txt"
 
+static void FT_BuildWeaponQaQuarantineKey(
+    const FTWeaponDef *pDef,
+    char *pKey)
+{
+    if(!pKey)
+    {
+        return;
+    }
+
+    pKey[0] = '\0';
+
+    if(!pDef)
+    {
+        return;
+    }
+
+    if(pDef->sId[0])
+    {
+        sprintf(
+            pKey,
+            "id:%s",
+            pDef->sId);
+    }
+    else if(pDef->sSection[0])
+    {
+        sprintf(
+            pKey,
+            "section:%s",
+            sQaKey);
+    }
+}
+
 static bool FT_IsWeaponQaQuarantined(
     const char *pSection)
 {
@@ -92,10 +124,7 @@ static bool FT_SetWeaponQaQuarantined(
     bool bQuarantined)
 {
     if(!pSection ||
-       _strnicmp(
-           pSection,
-           "catalog.",
-           8) != 0)
+       !pSection[0])
     {
         return false;
     }
@@ -176,7 +205,7 @@ static bool FT_SetWeaponQaQuarantined(
     {
         fprintf(
             pOutput,
-            "# FIRETEAM Weapon QA quarantine. One catalog section per line.\n");
+            "# FIRETEAM Weapon QA quarantine. One weapon identity per line.\n");
     }
 
     fclose(pOutput);
@@ -1006,9 +1035,14 @@ void CPlayerClnt::CycleDevWeapon(int nDirection)
 
     if(pDef)
     {
+        char sQaKey[160];
+        FT_BuildWeaponQaQuarantineKey(
+            pDef,
+            sQaKey);
+
         const bool bQuarantined =
             FT_IsWeaponQaQuarantined(
-                pDef->sSection);
+                sQaKey);
 
         g_pLTClient->CPrint(
             "Fireteam weapon QA [%u/%u]: %s%s | section=%s | model=%s | texture=%s | view=<%.2f, %.2f, %.2f>",
@@ -1039,26 +1073,32 @@ void CPlayerClnt::ToggleDevWeaponQuarantine()
     const FTWeaponDef *pDef =
         GetCurrentWeaponDef();
 
-    if(!pDef ||
-       _strnicmp(
-           pDef->sSection,
-           "catalog.",
-           8) != 0)
+    if(!pDef)
+    {
+        return;
+    }
+
+    char sQaKey[160];
+    FT_BuildWeaponQaQuarantineKey(
+        pDef,
+        sQaKey);
+
+    if(!sQaKey[0])
     {
         g_pLTClient->CPrint(
-            "Fireteam weapon QA: active loadout entries cannot be quarantined here. Scroll to the catalog copy first.");
+            "Fireteam weapon QA: current weapon has no stable ID to quarantine.");
         return;
     }
 
     const bool bWasQuarantined =
         FT_IsWeaponQaQuarantined(
-            pDef->sSection);
+            sQaKey);
 
     const bool bQuarantined =
         !bWasQuarantined;
 
     if(!FT_SetWeaponQaQuarantined(
-           pDef->sSection,
+           sQaKey,
            bQuarantined))
     {
         g_pLTClient->CPrint(
@@ -1382,9 +1422,14 @@ void CPlayerClnt::CreateViewWeapon()
         FT_WeaponHudSetQaProgress(
             m_nDevWeaponIndex + 1,
             m_nDevWeaponCount);
+        char sQaKey[160];
+        FT_BuildWeaponQaQuarantineKey(
+            pDef,
+            sQaKey);
+
         FT_WeaponHudSetQaQuarantined(
             FT_IsWeaponQaQuarantined(
-                pDef->sSection));
+                sQaKey));
     }
     else
     {
