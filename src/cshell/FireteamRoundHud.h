@@ -17,6 +17,7 @@ void FT_RoundHudSetTimedPowerups(
     float fGodSeconds,
     float fWallhackSeconds);
 void FT_RoundHudSetRespawnCountdown(float fSeconds);
+void FT_RoundHudSetFirstRoundPreparation(float fSeconds);
 void FT_RoundHudSetLives(
     uint8 nLives,
     uint8 nMaxLives);
