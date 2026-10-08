@@ -222,9 +222,8 @@ static void FT_AuditZombieAnimationNames(
                 pName);
         }
 
-        g_pLTServer->CPrint(
-            "Fireteam infected animation: %s",
-            pName);
+        // Keep the exhaustive list in the local report; printing 1,400+
+        // names to the game console at spawn can flood input/diagnostic logs.
     }
 
     fclose(
