@@ -128,6 +128,10 @@ private:
     bool                m_bSemiAutoTriggerHeld;
     bool                m_bReloading;
     float               m_fReloadComplete;
+    // Suppress held-fire auto-reload reentry while authoritative ammo
+    // confirmation is still in flight after the local reload animation.
+    bool                m_bReloadAwaitingAmmo;
+    float               m_fReloadAckDeadline;
     uint16              m_nPrimaryAmmoInClip;
     uint16              m_nPrimaryAmmoReserve;
     bool                m_bPrimaryAmmoKnown;
