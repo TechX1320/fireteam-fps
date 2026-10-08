@@ -311,7 +311,7 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
 	case MSG_CS_VELOCITY:
 		{
             if(!pPlayerClass ||
-               !pPlayerClass->IsAlive())
+               !pPlayerClass->CanControlPlayer())
             {
                 break;
             }
@@ -330,7 +330,7 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
 	case MSG_CS_ROTATION:
 		{
             if(!pPlayerClass ||
-               !pPlayerClass->IsAlive())
+               !pPlayerClass->CanControlPlayer())
             {
                 break;
             }
@@ -342,7 +342,7 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
 	case MSG_CS_VELANDROT:
 		{
             if(!pPlayerClass ||
-               !pPlayerClass->IsAlive())
+               !pPlayerClass->CanControlPlayer())
             {
                 break;
             }
@@ -444,6 +444,38 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
             {
                 FT_SetQaZombiesEnabled(
                     pMessage->Readbool());
+            }
+        }
+        break;
+    case MSG_CS_QA_SPECTATOR:
+        {
+            const bool bSpectating =
+                pMessage->Readbool();
+
+            // QA freecam can only alter targetability in a single-player
+            // developer session. Normal dead-player spectating needs no
+            // client authority because lives are server-owned.
+            if(pPlayerClass &&
+               g_pStatsManager &&
+               g_pStatsManager->GetNumPlayers() <= 1)
+            {
+                pPlayerClass->SetQaSpectating(
+                    bSpectating);
+            }
+        }
+        break;
+    case MSG_CS_SPECTATOR_POS:
+        {
+            const LTVector vViewPos =
+                pMessage->ReadLTVector();
+
+            if(pPlayerClass &&
+               (pPlayerClass->GetLives() == 0 ||
+                pPlayerClass->IsQaSpectating()))
+            {
+                g_pLTServer->SetClientViewPos(
+                    hSender,
+                    &vViewPos);
             }
         }
         break;
