@@ -124,7 +124,7 @@ public static class LauncherPaths
             return null;
         }
 
-        var candidates =
+        var searchRoots =
             new List<string>();
 
         var repo =
@@ -132,22 +132,19 @@ public static class LauncherPaths
 
         if(repo is not null)
         {
-            candidates.Add(
+            searchRoots.Add(
                 Path.Combine(
                     repo,
-                    "modTools",
-                    fileName));
-            candidates.Add(
+                    "modTools"));
+            searchRoots.Add(
                 Path.Combine(
                     repo,
-                    "Tools",
-                    fileName));
-            candidates.Add(
+                    "Tools"));
+            searchRoots.Add(
                 Path.Combine(
                     repo,
                     "assets-local",
-                    "Tools",
-                    fileName));
+                    "Tools"));
         }
 
         var game =
@@ -155,20 +152,55 @@ public static class LauncherPaths
 
         if(game is not null)
         {
-            candidates.Add(
+            searchRoots.Add(
                 Path.Combine(
                     game,
-                    "modTools",
-                    fileName));
-            candidates.Add(
+                    "modTools"));
+            searchRoots.Add(
                 Path.Combine(
                     game,
-                    "Tools",
-                    fileName));
+                    "Tools"));
         }
 
-        return candidates.FirstOrDefault(
-            File.Exists);
+        foreach(var root in searchRoots)
+        {
+            if(!Directory.Exists(root))
+            {
+                continue;
+            }
+
+            var direct =
+                Path.Combine(
+                    root,
+                    fileName);
+
+            if(File.Exists(direct))
+            {
+                return direct;
+            }
+
+            try
+            {
+                var nested =
+                    Directory
+                        .EnumerateFiles(
+                            root,
+                            fileName,
+                            SearchOption.AllDirectories)
+                        .FirstOrDefault();
+
+                if(nested is not null)
+                {
+                    return nested;
+                }
+            }
+            catch
+            {
+                // Keep looking in the remaining local tool roots.
+            }
+        }
+
+        return null;
     }
 
     public static bool LaunchMiniTool(
@@ -188,7 +220,8 @@ public static class LauncherPaths
                 path)
             {
                 WorkingDirectory =
-                    Path.GetDirectoryName(path),
+                    Path.GetDirectoryName(path) ??
+                    AppContext.BaseDirectory,
                 UseShellExecute = true
             });
 
