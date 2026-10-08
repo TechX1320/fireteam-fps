@@ -1628,6 +1628,9 @@ void CPlayerSrvr::GrantBottomless(
 
     m_bBottomlessWasActive =
         true;
+    // Cancel an in-progress reload; bottomless ammo is available now.
+    m_bReloading = false;
+    m_nReloadSlot = 0;
 
     g_pLTServer->CPrint(
         "Fireteam powerup: %s BOTTOMLESS stack %u +%.1fs.",
@@ -2281,6 +2284,8 @@ void CPlayerSrvr::SyncPrimaryAmmo()
 
 void CPlayerSrvr::ReloadWeapon()
 {
+    if(g_pLTServer->GetTime() < m_fBottomlessUntil)
+        return;
     if(!m_bAlive ||
        m_bQaSpectating)
     {
