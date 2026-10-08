@@ -39,6 +39,7 @@ FireteamZombie::FireteamZombie() :
     m_fForcePathTime(0.0f),
     m_fNoProgressTime(0.0f),
     m_fBestProgressDistance(FLT_MAX),
+    m_fStragglerIdleSeconds(0.0f),
     m_fTargetMemory(0.0f),
     m_fVoiceCooldown(0.0f),
     m_bHasLastKnownTarget(false),
@@ -54,6 +55,7 @@ FireteamZombie::FireteamZombie() :
     m_vLastPos.Init(0.0f, 0.0f, 0.0f);
     m_vLastKnownTargetPos.Init(0.0f, 0.0f, 0.0f);
     m_vProgressTarget.Init(0.0f, 0.0f, 0.0f);
+    m_vStragglerProgressPos.Init(0.0f, 0.0f, 0.0f);
     m_vCollisionDims.Init(24.0f, 53.0f, 24.0f);
     m_sCurrentAnimation[0] = '\0';
 
@@ -1366,6 +1368,7 @@ void FireteamZombie::UpdateZombie()
         m_fNoProgressTime = 0.0f;
         m_fBestProgressDistance =
             FLT_MAX;
+        m_fStragglerIdleSeconds = 0.0f;
 
         return;
     }
@@ -1574,6 +1577,8 @@ void FireteamZombie::UpdateZombie()
         m_fBestProgressDistance =
             FLT_MAX;
         m_vLastPos = vPos;
+        m_vStragglerProgressPos = vPos;
+        m_fStragglerIdleSeconds = 0.0f;
         return;
     }
 
@@ -2166,6 +2171,55 @@ void FireteamZombie::UpdateZombie()
             FLT_MAX;
     }
 
+    // Genuine last-straggler rescue. Check NET movement, not lifetime:
+    // active infected that advance 96 units, or engage a nearby survivor,
+    // never get repositioned merely because the clock has elapsed.
+    if(FT_IsFinalLivingInfected(m_hObject) &&
+       fPlayerDistance > 250.0f)
+    {
+        LTVector vSinceProgress =
+            vNewPos - m_vStragglerProgressPos;
+        vSinceProgress.y = 0.0f;
+
+        if(vSinceProgress.MagSqr() >= 96.0f * 96.0f)
+        {
+            m_vStragglerProgressPos = vNewPos;
+            m_fStragglerIdleSeconds = 0.0f;
+        }
+        else
+        {
+            m_fStragglerIdleSeconds += kUpdate;
+            if(m_fStragglerIdleSeconds >= 18.0f)
+            {
+                LTVector vRecovered;
+                if(FT_TryRecoverFinalInfected(
+                    m_hObject, hTarget, vRecovered))
+                {
+                    m_vLastPos = vRecovered;
+                    m_vStragglerProgressPos = vRecovered;
+                    m_aPath.clear();
+                    m_nWaypoint = 0;
+                    ++m_nPathLane;
+                    m_fRepathCooldown = 0.0f;
+                    m_fStuckTime = 0.0f;
+                    m_fNoProgressTime = 0.0f;
+                    m_fForcePathTime = 0.0f;
+                    m_fBestProgressDistance = FLT_MAX;
+                    m_fStragglerIdleSeconds = 0.0f;
+                    return;
+                }
+                // No valid authored position: keep enemy alive, retry only
+                // after a further 6 seconds, and emit useful coordinates.
+                m_fStragglerIdleSeconds = 12.0f;
+            }
+        }
+    }
+    else
+    {
+        m_vStragglerProgressPos = vNewPos;
+        m_fStragglerIdleSeconds = 0.0f;
+    }
+
     m_vLastPos =
         vNewPos;
 }
@@ -2486,6 +2540,7 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
             }
 
             g_pLTServer->GetObjectPos(m_hObject, &m_vLastPos);
+            m_vStragglerProgressPos = m_vLastPos;
             g_pLTServer->SetNextUpdate(
                 m_hObject,
                 m_Def.fUpdateSeconds > 0.0f
