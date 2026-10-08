@@ -19,6 +19,10 @@
 #include <time.h>
 #include <stdio.h>
 #include <windows.h>
+// Windows GDI maps GetObject to GetObjectA, which breaks LithTech ObjArray::GetObject.
+#ifdef GetObject
+#undef GetObject
+#endif
 
 BEGIN_CLASS(Spawner)
     ADD_STRINGPROP(DefaultSpawn, "")
