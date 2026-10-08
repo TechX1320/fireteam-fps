@@ -461,6 +461,11 @@ void FT_RoundHudSetFirstRoundPreparation(float fSeconds, uint32 nRevision)
         s_nFirstRoundPrepDeadlineTick = nProposed;
 }
 
+bool FT_RoundHudIsBottomlessActive()
+{
+    return s_fBottomlessUntil > g_pLTClient->GetTime();
+}
+
 void FT_RoundHudSetRespawnCountdown(float fSeconds)
 {
     s_fRespawnUntil = fSeconds > 0.0f
