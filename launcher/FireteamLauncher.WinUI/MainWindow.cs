@@ -297,7 +297,12 @@ public sealed partial class MainWindow : Window
                                 Path
                                     .GetFileNameWithoutExtension(
                                         path)
-                                    .ToUpperInvariant()));
+                                    .ToUpperInvariant())
+                        .Where(
+                            name =>
+                                !name.Equals(
+                                    "WORLD",
+                                    StringComparison.OrdinalIgnoreCase)));
             }
         }
 
