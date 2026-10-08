@@ -39,6 +39,7 @@ public:
           m_nLives(3),
           m_nMaxLives(3),
           m_bAlive(true),
+          m_bQaSpectating(false),
           m_fRespawnTimer(0.0f),
           m_fNextPositionTrace(0.0f),
           m_fPoisonCarry(0.0f),
@@ -107,6 +108,10 @@ public:
     char*               GetName(){ return m_sName; }
     void                ApplyDamage(uint8 nDamage);
     bool                IsAlive() const { return m_bAlive; }
+    bool                IsTargetable() const { return m_bAlive && !m_bQaSpectating; }
+    bool                CanControlPlayer() const { return m_bAlive && !m_bQaSpectating; }
+    bool                IsQaSpectating() const { return m_bQaSpectating; }
+    void                SetQaSpectating(bool bSpectating);
     uint8               GetLives() const { return m_nLives; }
     uint8               GetMaxLives() const { return m_nMaxLives; }
 
@@ -195,6 +200,7 @@ private:
     uint8               m_nLives;
     uint8               m_nMaxLives;
     bool                m_bAlive;
+    bool                m_bQaSpectating;
     float               m_fRespawnTimer;
     float               m_fNextPositionTrace;
     float               m_fPoisonCarry;
