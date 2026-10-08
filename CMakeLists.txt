@@ -71,6 +71,20 @@ target_include_directories(object_module PRIVATE "${SSHELL_ROOT}" "${GAME_SHARED
 target_link_libraries(object_module PRIVATE odbc32 odbccp32)
 set_target_properties(object_module PROPERTIES OUTPUT_NAME "object" PREFIX "" SUFFIX ".lto")
 
+# Experimental headless host using Jupiter's ServerInterface from server.dll.
+# Kept out of ALL until the Windows SDK/API is validated on the host machine;
+# building FIRETEAM normally must never depend on this optional tool.
+if(EXISTS "${SDK_DIR}/server_interface.h")
+    add_executable(fireteam_dedicated EXCLUDE_FROM_ALL
+        "src/dedicated/FireteamDedicatedServer.cpp"
+    )
+    target_include_directories(fireteam_dedicated PRIVATE "${SDK_DIR}" "${GAME_SHARED_DIR}")
+    target_link_libraries(fireteam_dedicated PRIVATE user32)
+    set_target_properties(fireteam_dedicated PROPERTIES
+        OUTPUT_NAME "FireteamDedicatedServer"
+    )
+endif()
+
 # The original resource scripts contain no game resources but include old MFC headers.
 # Minimal DLL stubs avoid requiring the MFC workload for the first build gate.
 add_library(cres SHARED "${CRES_ROOT}/main.cpp")
