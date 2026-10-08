@@ -421,6 +421,14 @@ void FT_RoundHudSetTimedPowerups(
 
 void FT_RoundHudResetFirstRoundPreparation()
 {
+    // The client shell can enter a second world without a DLL reload.
+    // Drop the previous world's round number before accepting its new
+    // preparation countdown (which only displays while s_nRound == 0).
+    s_nRound = 0;
+    s_nTarget = 0;
+    s_nKilled = 0;
+    s_nAlive = 0;
+    s_bGameOver = false;
     s_nFirstRoundPrepRevision = 0;
     s_nFirstRoundPrepDeadlineTick = 0;
     s_bFirstRoundPrepClosed = false;
