@@ -394,6 +394,35 @@ function Extract-ZipEntry([string]$ZipName, [string]$EntryName, [string]$Destina
         return $false
     }
 
+    $zipInfo = Get-Item -LiteralPath $zipPath
+    $dest = Join-Path $rezRoot $DestinationRelative
+
+    # Never reopen and traverse a huge CA character ZIP simply to confirm
+    # ANI_VI_TANKER_SH.LTB (or another entry) was already staged.
+    # A per-entry stamp is valid only for the exact archive path, byte size,
+    # UTC write time, destination size AND destination write time.
+    $idBytes = [System.Text.Encoding]::UTF8.GetBytes(
+        "$ZipName|$EntryName|$DestinationRelative")
+    $hashAlgorithm = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $id = [System.BitConverter]::ToString(
+            $hashAlgorithm.ComputeHash($idBytes)).Replace("-", "")
+    }
+    finally {
+        $hashAlgorithm.Dispose()
+    }
+    $stampPath = Join-Path $stampRoot ("zip-entry-" + $id + ".stamp")
+    $archiveSignature = "$($zipInfo.FullName)|$($zipInfo.Length)|$($zipInfo.LastWriteTimeUtc.Ticks)"
+    if ((Test-Path -LiteralPath $dest -PathType Leaf) -and
+        (Test-Path -LiteralPath $stampPath -PathType Leaf)) {
+        $destInfo = Get-Item -LiteralPath $dest
+        $signature = "$archiveSignature|$($destInfo.Length)|$($destInfo.LastWriteTimeUtc.Ticks)"
+        if ([System.IO.File]::ReadAllText($stampPath).Trim() -ceq $signature) {
+            Write-Host "[FAST] $DestinationRelative already staged"
+            return $true
+        }
+    }
+
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
     try {
@@ -402,17 +431,20 @@ function Extract-ZipEntry([string]$ZipName, [string]$EntryName, [string]$Destina
             throw "Missing $EntryName inside $ZipName"
         }
 
-        $dest = Join-Path $rezRoot $DestinationRelative
         $destDir = Split-Path -Parent $dest
         New-Item -ItemType Directory -Force -Path $destDir | Out-Null
 
         if ((-not (Test-Path -LiteralPath $dest)) -or
-            ((Get-Item -LiteralPath $dest).LastWriteTimeUtc -lt (Get-Item -LiteralPath $zipPath).LastWriteTimeUtc)) {
+            ((Get-Item -LiteralPath $dest).LastWriteTimeUtc -lt $zipInfo.LastWriteTimeUtc)) {
             [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $dest, $true)
             Write-Host "[OK] $ZipName::$EntryName"
         } else {
-            Write-Host "[OK] Bowie asset unchanged: $DestinationRelative"
+            Write-Host "[OK] Optional asset unchanged: $DestinationRelative"
         }
+
+        $destInfo = Get-Item -LiteralPath $dest
+        $signature = "$archiveSignature|$($destInfo.Length)|$($destInfo.LastWriteTimeUtc.Ticks)"
+        [System.IO.File]::WriteAllText($stampPath, $signature)
     }
     finally {
         $zip.Dispose()
