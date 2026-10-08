@@ -11,6 +11,7 @@
 //------------------------------------------------------------------------------//
 
 #include "playersrvr.h"
+#include "FireteamSpawnSafety.h"
 
 #include <ltobjectcreate.h>
 #include <iltmodel.h>
@@ -1338,8 +1339,20 @@ void CPlayerSrvr::Respawn()
         m_fNextWeaponShot[nSlot] = 0.0f;
     }
 
-    g_pLTServer->TeleportObject(m_hObject, &m_vSpawnPos);
+    // The player's saved point can be next to a pole or low ceiling. Check
+    // the complete collider against the compiled DAT geometry on EVERY
+    // respawn, not only when initially entering the map.
+    LTVector vSafeSpawn = m_vSpawnPos;
+    LTVector vDims(16.0f, 38.0f, 16.0f);
+    g_pLTSPhysics->GetObjectDims(m_hObject, &vDims);
+    LTVector vResolvedSpawn;
+    if(FT_ResolveSafePlayerSpawn(m_vSpawnPos, vDims, vResolvedSpawn))
+        vSafeSpawn = vResolvedSpawn;
+
+    g_pLTServer->TeleportObject(m_hObject, &vSafeSpawn);
     g_pLTServer->SetObjectRotation(m_hObject, &m_rSpawnRot);
+    g_pLTServer->GetObjectPos(m_hObject, &vSafeSpawn);
+    m_vSpawnPos = vSafeSpawn;
 
     LTVector vZero(0.0f, 0.0f, 0.0f);
     g_pLTSPhysics->SetVelocity(m_hObject, &vZero);
@@ -1351,7 +1364,7 @@ void CPlayerSrvr::Respawn()
         {
             pMsg->IncRef();
             pMsg->Writeuint8(MSG_SC_RESPAWN);
-            pMsg->WriteLTVector(m_vSpawnPos);
+            pMsg->WriteLTVector(vSafeSpawn);
             pMsg->WriteLTRotation(m_rSpawnRot);
             g_pLTServer->SendToClient(pMsg->Read(), m_hClient, MESSAGE_GUARANTEED);
             pMsg->DecRef();
