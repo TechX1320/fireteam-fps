@@ -995,7 +995,8 @@ HOBJECT FireteamZombie::FindNearestPlayer()
         }
 
         CPlayerSrvr *pPlayer = (CPlayerSrvr*)g_pLTServer->HandleToObject(hObj);
-        if(!pPlayer || !pPlayer->IsAlive())
+        if(!pPlayer ||
+           !pPlayer->IsTargetable())
         {
             continue;
         }
