@@ -21,6 +21,9 @@ void FT_RoundHudSetLives(
     uint8 nMaxLives);
 bool FT_RoundHudIsPlayerEliminated();
 bool FT_RoundHudIsGameOver();
+void FT_RoundHudSetSpectator(
+    bool bSpectating,
+    bool bQaMode);
 void FT_RenderRoundHud();
 
 #endif
