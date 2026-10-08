@@ -14,6 +14,10 @@ public:
     void ApplyWallhackRenderStyle(
         bool bEnabled);
 
+    // Dead corpses remain in the world for their animation; do not
+    // count them as living enemies when repairing a stalled round.
+    bool IsAliveForRound() const { return !m_bDying && m_nHealth > 0; }
+
 protected:
     uint32 EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData);
     uint32 ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg);
@@ -62,6 +66,7 @@ private:
     float m_fForcePathTime;
     float m_fNoProgressTime;
     float m_fBestProgressDistance;
+    float m_fStragglerIdleSeconds;
     float m_fTargetMemory;
     float m_fVoiceCooldown;
     bool m_bHasLastKnownTarget;
@@ -73,6 +78,7 @@ private:
     LTVector m_vLastPos;
     LTVector m_vLastKnownTargetPos;
     LTVector m_vProgressTarget;
+    LTVector m_vStragglerProgressPos;
     LTVector m_vCollisionDims;
     std::vector<LTVector> m_aPath;
 
