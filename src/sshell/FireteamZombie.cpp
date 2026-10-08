@@ -22,6 +22,7 @@ END_CLASS_DEFAULT_FLAGS(FireteamZombie, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD
 
 static uint32 s_nZombieSerial = 0;
 static bool s_bDifficultyLoaded = false;
+static bool s_bAnimationAuditComplete = false;
 static FTDifficultyDef s_ZombieDifficulty;
 
 static float s_fZombieWallhackUntil = 0.0f;
@@ -143,6 +144,103 @@ static bool FT_ZombieAssetExists(const char *pPath)
     fclose(pFile);
     return true;
 }
+
+static void FT_AuditZombieAnimationNames(
+    HOBJECT hZombie)
+{
+    if(s_bAnimationAuditComplete ||
+       !hZombie)
+    {
+        return;
+    }
+
+    s_bAnimationAuditComplete =
+        true;
+
+    FILE *pCandidates =
+        fopen(
+            "rez/Fireteam/ST_M_CHILD-strings.txt",
+            "rt");
+
+    if(!pCandidates)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam infected animation audit: no local ST_M_CHILD candidate report.");
+        return;
+    }
+
+    FILE *pValid =
+        fopen(
+            "config/infected-animation-valid.txt",
+            "wt");
+
+    if(pValid)
+    {
+        fprintf(
+            pValid,
+            "# Valid animation names exposed by the composed normal infected model.\n");
+        fprintf(
+            pValid,
+            "# Generated locally from ST_M_CHILD.LTB; safe to delete/regenerate.\n\n");
+    }
+
+    char sLine[128];
+    uint32 nValid = 0;
+
+    while(fgets(
+        sLine,
+        sizeof(sLine),
+        pCandidates))
+    {
+        char *pName =
+            FT_TrimInfectedLine(
+                sLine);
+
+        if(!pName[0])
+        {
+            continue;
+        }
+
+        HMODELANIM hAnim =
+            g_pLTServer->GetAnimIndex(
+                hZombie,
+                pName);
+
+        if(hAnim ==
+           INVALID_MODEL_ANIM)
+        {
+            continue;
+        }
+
+        ++nValid;
+
+        if(pValid)
+        {
+            fprintf(
+                pValid,
+                "%s\n",
+                pName);
+        }
+
+        g_pLTServer->CPrint(
+            "Fireteam infected animation: %s",
+            pName);
+    }
+
+    fclose(
+        pCandidates);
+
+    if(pValid)
+    {
+        fclose(
+            pValid);
+    }
+
+    g_pLTServer->CPrint(
+        "Fireteam infected animation audit: %u valid animation name(s); report=config/infected-animation-valid.txt.",
+        nValid);
+}
+
 
 static float FT_ZombieWallhackStackSeconds(
     float fBaseSeconds,
@@ -2322,6 +2420,9 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                     m_Def.sBodyModel,
                     (uint32)m_Def.nHealth,
                     m_Def.fRunSpeed);
+
+                FT_AuditZombieAnimationNames(
+                    m_hObject);
 
                 SetZombieAnimation(
                     m_Def.sIdleAnim,
