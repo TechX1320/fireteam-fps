@@ -772,12 +772,14 @@ void FT_EnsureFireteamRoundController()
     ocs.m_ObjectType =
         OT_NORMAL;
 
-    HOBJECT hController =
+    // CreateObject returns an ILTBaseClass*, not an HOBJECT.
+    // The Spawner's MID_INITIALUPDATE registers its own m_hObject.
+    ILTBaseClass *pController =
         g_pLTServer->CreateObject(
             hSpawnerClass,
             &ocs);
 
-    if(!hController)
+    if(!pController)
     {
         g_pLTServer->CPrint(
             "Fireteam: failed to create generic round controller.");
