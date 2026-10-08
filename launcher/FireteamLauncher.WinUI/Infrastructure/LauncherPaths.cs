@@ -116,6 +116,85 @@ public static class LauncherPaths
         }
     }
 
+    public static string? FindMiniTool(
+        string fileName)
+    {
+        if(string.IsNullOrWhiteSpace(fileName))
+        {
+            return null;
+        }
+
+        var candidates =
+            new List<string>();
+
+        var repo =
+            FindRepositoryDirectory();
+
+        if(repo is not null)
+        {
+            candidates.Add(
+                Path.Combine(
+                    repo,
+                    "modTools",
+                    fileName));
+            candidates.Add(
+                Path.Combine(
+                    repo,
+                    "Tools",
+                    fileName));
+            candidates.Add(
+                Path.Combine(
+                    repo,
+                    "assets-local",
+                    "Tools",
+                    fileName));
+        }
+
+        var game =
+            FindGameDirectory();
+
+        if(game is not null)
+        {
+            candidates.Add(
+                Path.Combine(
+                    game,
+                    "modTools",
+                    fileName));
+            candidates.Add(
+                Path.Combine(
+                    game,
+                    "Tools",
+                    fileName));
+        }
+
+        return candidates.FirstOrDefault(
+            File.Exists);
+    }
+
+    public static bool LaunchMiniTool(
+        string fileName)
+    {
+        var path =
+            FindMiniTool(
+                fileName);
+
+        if(path is null)
+        {
+            return false;
+        }
+
+        Process.Start(
+            new ProcessStartInfo(
+                path)
+            {
+                WorkingDirectory =
+                    Path.GetDirectoryName(path),
+                UseShellExecute = true
+            });
+
+        return true;
+    }
+
     public static void EnsureLayout()
     {
         Directory.CreateDirectory(
