@@ -218,6 +218,15 @@ int main(int argc, char **argv)
             break;
         }
 
+        // Jupiter requires game-info bytes before loading the server shell.
+        // FIRETEAM currently has no separate dedicated-game-info payload.
+        uint32 nGameInfoVersion = 1;
+        if(!pServer->SetGameInfo(&nGameInfoVersion, sizeof(nGameInfoVersion)))
+        {
+            fputs("SetGameInfo failed.\n", stderr);
+            break;
+        }
+
         if(!pServer->LoadBinaries())
         {
             fputs("LoadBinaries failed (object.lto / game resources).\n", stderr);
