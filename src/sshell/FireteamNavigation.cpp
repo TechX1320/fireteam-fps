@@ -269,16 +269,18 @@ static int FTFindVolume(
                 0.0f,
                 (float)fabs(vPos.z - c.z) -
                 d.z);
+        // Preserve floor identity when an actor is just outside a volume
+        // edge. The old 96-unit grace could make an overlapping upstairs
+        // volume win on a tiny horizontal difference.
         const float dy =
-            FTMax(
-                0.0f,
-                (float)fabs(vPos.y - c.y) -
-                (d.y + 96.0f));
+            (float)fabs(
+                vPos.y -
+                c.y);
 
         const float fScore =
             (dx * dx) +
             (dz * dz) +
-            (dy * dy * 0.25f);
+            (dy * dy * 0.75f);
 
         if(fScore < fBest)
         {
