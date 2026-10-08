@@ -689,28 +689,53 @@ void Spawner::UpdateRoundController()
         }
     }
 
-    HOBJECT hSpawnObject = s_hPerimeterSpawners[nChoice];
-    Spawner *pSpawn = hSpawnObject ?
-        (Spawner*)g_pLTServer->HandleToObject(hSpawnObject) :
-        LTNULL;
+    HOBJECT hSpawnObject =
+        s_hPerimeterSpawners[
+            nChoice];
 
-    if(pSpawn && pSpawn->SpawnZombie())
+    if(FT_SpawnZombieAt(
+           hSpawnObject))
     {
         ++s_nRoundSpawned;
         ++s_nRoundAlive;
         s_nLastSpawner = nChoice;
 
         g_pLTServer->CPrint(
-            "Fireteam: round %u spawn %u/%u from %s (%u alive).",
+            "Fireteam: round %u spawn %u/%u from anchor %d/%u (%u alive).",
             s_nRound,
             s_nRoundSpawned,
             s_nRoundTarget,
-            pSpawn->m_sName,
+            nChoice + 1,
+            s_nPerimeterSpawnerCount,
             s_nRoundAlive);
 
-        if((rand() % 100) < (int)kSealCrawlerChancePercent)
+        HCLASS hSpawnerClass =
+            g_pLTServer->GetClass(
+                "Spawner");
+
+        HCLASS hSpawnClass =
+            hSpawnObject
+            ? g_pLTServer->GetObjectClass(
+                hSpawnObject)
+            : LTNULL;
+
+        if(hSpawnerClass &&
+           hSpawnClass &&
+           g_pLTServer->IsKindOf(
+               hSpawnClass,
+               hSpawnerClass) &&
+           (rand() % 100) <
+               (int)kSealCrawlerChancePercent)
         {
-            pSpawn->SpawnCrawlerSeal();
+            Spawner *pSpawn =
+                (Spawner*)
+                g_pLTServer->HandleToObject(
+                    hSpawnObject);
+
+            if(pSpawn)
+            {
+                pSpawn->SpawnCrawlerSeal();
+            }
         }
 
         FT_BroadcastRoundState(0);
@@ -719,6 +744,50 @@ void Spawner::UpdateRoundController()
     float fJitter = ((float)(rand() % 51) / 100.0f);
     s_fNextSpawnTime = fNow + s_fSpawnInterval + fJitter;
 }
+
+void FT_EnsureFireteamRoundController()
+{
+    // Use one tiny runtime Spawner as the map-independent round clock.
+    // Authored Spawner/ObjectSpawnPoint objects remain spawn anchors only.
+    s_hController =
+        LTNULL;
+    s_nPerimeterSpawnerCount =
+        0;
+    s_nLastSpawner =
+        -1;
+
+    HCLASS hSpawnerClass =
+        g_pLTServer->GetClass(
+            "Spawner");
+
+    if(!hSpawnerClass)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam: round controller class unavailable.");
+        return;
+    }
+
+    ObjectCreateStruct ocs;
+    ocs.Clear();
+    ocs.m_ObjectType =
+        OT_NORMAL;
+
+    HOBJECT hController =
+        g_pLTServer->CreateObject(
+            hSpawnerClass,
+            &ocs);
+
+    if(!hController)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam: failed to create generic round controller.");
+        return;
+    }
+
+    g_pLTServer->CPrint(
+        "Fireteam: generic round controller created.");
+}
+
 
 void FT_OnFireteamSquadGameOver()
 {
@@ -791,15 +860,16 @@ uint32 Spawner::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
 
         case MID_INITIALUPDATE:
         {
-            if(_stricmp(m_sName, "Spawner_01_01N") == 0)
+            if(!s_hController)
             {
                 ResetRoundController();
-                g_pLTServer->SetNextUpdate(m_hObject, 1.25f);
             }
-            else
-            {
-                g_pLTServer->SetNextUpdate(m_hObject, 0.0f);
-            }
+
+            g_pLTServer->SetNextUpdate(
+                m_hObject,
+                s_hController == m_hObject
+                    ? 0.20f
+                    : 0.0f);
         }
         break;
 
