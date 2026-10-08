@@ -240,37 +240,189 @@ void Spawner::CollectPerimeterSpawners()
 {
     s_nPerimeterSpawnerCount = 0;
 
-    HCLASS hSpawnerClass = g_pLTServer->GetClass("Spawner");
-    if(!hSpawnerClass)
+    const char *pSource =
+        "Spawner";
+
+    HCLASS hSpawnerClass =
+        g_pLTServer->GetClass(
+            "Spawner");
+
+    if(hSpawnerClass)
     {
-        return;
+        for(HOBJECT hObj =
+                g_pLTServer->GetNextObject(
+                    LTNULL);
+            hObj &&
+            s_nPerimeterSpawnerCount <
+                kMaxPerimeterSpawners;
+            hObj =
+                g_pLTServer->GetNextObject(
+                    hObj))
+        {
+            HCLASS hClass =
+                g_pLTServer->GetObjectClass(
+                    hObj);
+
+            if(!hClass ||
+               !g_pLTServer->IsKindOf(
+                   hClass,
+                   hSpawnerClass))
+            {
+                continue;
+            }
+
+            Spawner *pSpawner =
+                (Spawner*)
+                g_pLTServer->HandleToObject(
+                    hObj);
+
+            if(pSpawner &&
+               pSpawner->IsPerimeterSpawner())
+            {
+                s_hPerimeterSpawners[
+                    s_nPerimeterSpawnerCount++] =
+                    hObj;
+            }
+        }
     }
 
-    for(HOBJECT hObj = g_pLTServer->GetNextObject(LTNULL);
-        hObj && s_nPerimeterSpawnerCount < kMaxPerimeterSpawners;
-        hObj = g_pLTServer->GetNextObject(hObj))
+    // Non-FireTeam CA maps frequently use ObjectSpawnPoint instead of the
+    // FireTeam Spawner objects. Keep those objects loadable and use them as a
+    // generic zombie-map fallback so maps like Junk Flea can run rounds.
+    if(s_nPerimeterSpawnerCount == 0)
     {
-        HCLASS hClass = g_pLTServer->GetObjectClass(hObj);
-        if(!hClass || !g_pLTServer->IsKindOf(hClass, hSpawnerClass))
-        {
-            continue;
-        }
+        HCLASS hObjectSpawnClass =
+            g_pLTServer->GetClass(
+                "ObjectSpawnPoint");
 
-        Spawner *pSpawner = (Spawner*)g_pLTServer->HandleToObject(hObj);
-        if(pSpawner && pSpawner->IsPerimeterSpawner())
+        if(hObjectSpawnClass)
         {
-            s_hPerimeterSpawners[s_nPerimeterSpawnerCount++] = hObj;
+            pSource =
+                "ObjectSpawnPoint";
+
+            for(HOBJECT hObj =
+                    g_pLTServer->GetNextObject(
+                        LTNULL);
+                hObj &&
+                s_nPerimeterSpawnerCount <
+                    kMaxPerimeterSpawners;
+                hObj =
+                    g_pLTServer->GetNextObject(
+                        hObj))
+            {
+                HCLASS hClass =
+                    g_pLTServer->GetObjectClass(
+                        hObj);
+
+                if(hClass &&
+                   g_pLTServer->IsKindOf(
+                       hClass,
+                       hObjectSpawnClass))
+                {
+                    s_hPerimeterSpawners[
+                        s_nPerimeterSpawnerCount++] =
+                        hObj;
+                }
+            }
+        }
+    }
+
+    // A few maps have AI patrol nodes but no explicit object spawns.
+    if(s_nPerimeterSpawnerCount == 0)
+    {
+        HCLASS hPatrolClass =
+            g_pLTServer->GetClass(
+                "AINodePatrol");
+
+        if(hPatrolClass)
+        {
+            pSource =
+                "AINodePatrol";
+
+            for(HOBJECT hObj =
+                    g_pLTServer->GetNextObject(
+                        LTNULL);
+                hObj &&
+                s_nPerimeterSpawnerCount <
+                    kMaxPerimeterSpawners;
+                hObj =
+                    g_pLTServer->GetNextObject(
+                        hObj))
+            {
+                HCLASS hClass =
+                    g_pLTServer->GetObjectClass(
+                        hObj);
+
+                if(hClass &&
+                   g_pLTServer->IsKindOf(
+                       hClass,
+                       hPatrolClass))
+                {
+                    s_hPerimeterSpawners[
+                        s_nPerimeterSpawnerCount++] =
+                        hObj;
+                }
+            }
+        }
+    }
+
+    // Last-resort compatibility for simple custom maps.
+    if(s_nPerimeterSpawnerCount == 0)
+    {
+        HCLASS hStartClass =
+            g_pLTServer->GetClass(
+                "GameStartPoint");
+
+        if(hStartClass)
+        {
+            pSource =
+                "GameStartPoint";
+
+            for(HOBJECT hObj =
+                    g_pLTServer->GetNextObject(
+                        LTNULL);
+                hObj &&
+                s_nPerimeterSpawnerCount <
+                    kMaxPerimeterSpawners;
+                hObj =
+                    g_pLTServer->GetNextObject(
+                        hObj))
+            {
+                HCLASS hClass =
+                    g_pLTServer->GetObjectClass(
+                        hObj);
+
+                if(hClass &&
+                   g_pLTServer->IsKindOf(
+                       hClass,
+                       hStartClass))
+                {
+                    s_hPerimeterSpawners[
+                        s_nPerimeterSpawnerCount++] =
+                        hObj;
+                }
+            }
         }
     }
 
     g_pLTServer->CPrint(
-        "Fireteam: registered %u Cabin Fever perimeter spawners.",
-        s_nPerimeterSpawnerCount);
+        "Fireteam: registered %u round spawn anchors from %s.",
+        s_nPerimeterSpawnerCount,
+        pSource);
 }
 
-bool Spawner::SpawnZombie()
+static bool FT_SpawnZombieAt(
+    HOBJECT hSpawnObject)
 {
-    HCLASS hZombieClass = g_pLTServer->GetClass("FireteamZombie");
+    if(!hSpawnObject)
+    {
+        return false;
+    }
+
+    HCLASS hZombieClass =
+        g_pLTServer->GetClass(
+            "FireteamZombie");
+
     if(!hZombieClass)
     {
         return false;
@@ -278,19 +430,36 @@ bool Spawner::SpawnZombie()
 
     LTVector vBasePos;
     LTRotation rBaseRot;
-    g_pLTServer->GetObjectPos(m_hObject, &vBasePos);
-    g_pLTServer->GetObjectRotation(m_hObject, &rBaseRot);
+
+    g_pLTServer->GetObjectPos(
+        hSpawnObject,
+        &vBasePos);
+    g_pLTServer->GetObjectRotation(
+        hSpawnObject,
+        &rBaseRot);
 
     ObjectCreateStruct ocs;
     ocs.Clear();
     ocs.m_ObjectType = OT_MODEL;
     ocs.m_Pos = vBasePos;
-    ocs.m_Pos.x += (float)((rand() % 29) - 14);
-    ocs.m_Pos.z += (float)((rand() % 29) - 14);
-    ocs.m_Pos.y += 100.0f;
-    ocs.m_Rotation = rBaseRot;
+    ocs.m_Pos.x +=
+        (float)((rand() % 29) - 14);
+    ocs.m_Pos.z +=
+        (float)((rand() % 29) - 14);
+    ocs.m_Pos.y +=
+        100.0f;
+    ocs.m_Rotation =
+        rBaseRot;
 
-    return g_pLTServer->CreateObject(hZombieClass, &ocs) != LTNULL;
+    return g_pLTServer->CreateObject(
+        hZombieClass,
+        &ocs) != LTNULL;
+}
+
+bool Spawner::SpawnZombie()
+{
+    return FT_SpawnZombieAt(
+        m_hObject);
 }
 
 bool Spawner::SpawnCrawlerSeal()
