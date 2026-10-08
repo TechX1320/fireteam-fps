@@ -1725,11 +1725,27 @@ void CPlayerSrvr::UpdatePowerups()
     if(m_bBottomlessWasActive &&
        fNow >= m_fBottomlessUntil)
     {
-        m_bBottomlessWasActive =
-            false;
-        m_nBottomlessStacks =
-            0;
+        m_bBottomlessWasActive = false;
+        m_nBottomlessStacks = 0;
         bChanged = true;
+
+        // If an Ammo Resupply arrived while Bottomless was active on an
+        // empty weapon, load from ACTUAL reserve once the effect ends.
+        // No bonus bullets are fabricated, and no reload loop is started.
+        const FTWeaponDef *pDef =
+            FT_GetWeaponDef(m_WeaponDefs, m_nWeaponSlot);
+        if(pDef && pDef->eType != FT_WEAPON_MELEE &&
+           pDef->nClipSize > 0 &&
+           m_nWeaponAmmoInClip[m_nWeaponSlot] == 0 &&
+           m_nWeaponAmmoReserve[m_nWeaponSlot] > 0)
+        {
+            const uint16 nTake =
+                m_nWeaponAmmoReserve[m_nWeaponSlot] < pDef->nClipSize
+                ? m_nWeaponAmmoReserve[m_nWeaponSlot] : pDef->nClipSize;
+            m_nWeaponAmmoReserve[m_nWeaponSlot] -= nTake;
+            m_nWeaponAmmoInClip[m_nWeaponSlot] = nTake;
+            SendPrimaryAmmo();
+        }
     }
 
     if(m_bOneHitWasActive &&
