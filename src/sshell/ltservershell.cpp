@@ -34,6 +34,7 @@
 #include "FireteamPlayerDefs.h"
 #include "FireteamSpawner.h"
 #include "FireteamNavigation.h"
+#include "FireteamZombie.h"
 #include "projectile.h"
 #include "statsmanager.h"
 
