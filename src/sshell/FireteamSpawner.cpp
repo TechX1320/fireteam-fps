@@ -1,4 +1,6 @@
 #include "FireteamSpawner.h"
+#include "FireteamZombie.h"
+#include "FireteamNavigation.h"
 #include "serverinterfaces.h"
 #include "msgids.h"
 #include "FireteamDifficultyDefs.h"
@@ -9,6 +11,8 @@
 #include <iltmessage.h>
 #include <ltobjectcreate.h>
 #include <stdlib.h>
+#include <math.h>
+#include <float.h>
 #include <string.h>
 #include <time.h>
 
@@ -591,6 +595,98 @@ static bool FT_SpawnAnchorNearLivingPlayer(HOBJECT hAnchor)
     }
 
     return false;
+}
+
+
+bool FT_IsFinalLivingInfected(HOBJECT hZombie)
+{
+    if(!hZombie || !s_bRoundActive || s_nRoundAlive != 1 ||
+       s_nRoundTarget == 0 || s_nRoundSpawned != s_nRoundTarget)
+        return false;
+    HCLASS hClass = g_pLTServer->GetClass("FireteamZombie");
+    if(!hClass) return false;
+    uint32 nAlive = 0;
+    bool bFound = false;
+    for(HOBJECT h = g_pLTServer->GetNextObject(LTNULL); h;
+        h = g_pLTServer->GetNextObject(h))
+    {
+        HCLASS hType = g_pLTServer->GetObjectClass(h);
+        if(!hType || !g_pLTServer->IsKindOf(hType, hClass)) continue;
+        FireteamZombie *pZombie =
+            (FireteamZombie*)g_pLTServer->HandleToObject(h);
+        if(!pZombie || !pZombie->IsAliveForRound()) continue;
+        ++nAlive;
+        if(h == hZombie) bFound = true;
+        if(nAlive > 1) return false;
+    }
+    return bFound && nAlive == 1;
+}
+
+bool FT_TryRecoverFinalInfected(HOBJECT hZombie, HOBJECT hTarget,
+                               LTVector &vResult)
+{
+    if(!hTarget || !FT_IsFinalLivingInfected(hZombie) ||
+       s_nPerimeterSpawnerCount == 0) return false;
+
+    LTVector vPlayer, vOld;
+    g_pLTServer->GetObjectPos(hTarget, &vPlayer);
+    g_pLTServer->GetObjectPos(hZombie, &vOld);
+
+    const bool bHasNav = FT_GetNavigationVolumeCount() != 0;
+    float fBest = FLT_MAX;
+    int nBest = -1;
+    LTVector vBest;
+    bool bVerified = false;
+    for(uint32 i = 0; i < s_nPerimeterSpawnerCount; ++i)
+    {
+        if(!s_hPerimeterSpawners[i]) continue;
+        LTVector vPos;
+        g_pLTServer->GetObjectPos(s_hPerimeterSpawners[i], &vPos);
+        vPos.y += 100.0f; // Same height used by ordinary zombie spawns.
+        if(fabs(vPos.y - vPlayer.y) > 260.0f) continue;
+        LTVector vDelta = vPos - vPlayer;
+        vDelta.y = 0.0f;
+        const float fDistSq = vDelta.MagSqr();
+        if(fDistSq < 450.0f * 450.0f ||
+           fDistSq > 1850.0f * 1850.0f) continue;
+        vDelta = vPos - vOld;
+        vDelta.y = 0.0f;
+        if(vDelta.MagSqr() < 300.0f * 300.0f) continue;
+        std::vector<LTVector> waypoints;
+        const bool bRoute = !bHasNav ||
+            FT_BuildNavigationPath(vPos, vPlayer, 15.0f, 0, waypoints);
+        const float fScore =
+            (float)fabs(sqrt(fDistSq) - 850.0f) +
+            (bRoute ? 0.0f : 2000.0f) +
+            (float)waypoints.size() * 15.0f;
+        if(fScore < fBest)
+        {
+            fBest = fScore;
+            nBest = (int)i;
+            vBest = vPos;
+            bVerified = bRoute;
+        }
+    }
+    if(nBest < 0)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam straggler: no nearby same-floor map spawner; zombie still alive at %.1f %.1f %.1f.",
+            vOld.x, vOld.y, vOld.z);
+        return false;
+    }
+
+    // Only reposition the same living object. No kill, bonus or free round.
+    LTVector vZero(0.0f, 0.0f, 0.0f);
+    g_pLTSPhysics->SetVelocity(hZombie, &vZero);
+    g_pLTServer->SetObjectPos(hZombie, &vBest);
+    g_pLTServer->GetObjectPos(hZombie, &vResult);
+    g_pLTServer->CPrint(
+        "Fireteam straggler: recovered final infected from %.1f %.1f %.1f to %.1f %.1f %.1f via anchor %d/%u route=%s kills=%u/%u.",
+        vOld.x, vOld.y, vOld.z, vResult.x, vResult.y, vResult.z,
+        nBest + 1, s_nPerimeterSpawnerCount,
+        bVerified ? "verified" : "fallback",
+        s_nRoundKilled, s_nRoundTarget);
+    return true;
 }
 
 bool Spawner::SpawnZombie()
