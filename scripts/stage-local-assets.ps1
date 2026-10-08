@@ -80,21 +80,50 @@ function Expand-OptionalZip([string]$ZipName, [string]$RezSubdir) {
     Write-Host "[OK] $actualZipName -> rez\$RezSubdir"
 }
 
-$mapPath = Join-Path $assetRoot "CABINFEVER.DAT"
-if (Test-Path -LiteralPath $mapPath) {
+function Stage-WorldDat([string]$SourcePath) {
+    if (-not (Test-Path -LiteralPath $SourcePath)) {
+        return
+    }
+
     $worlds = Join-Path $rezRoot "Worlds"
-    $destMap = Join-Path $worlds "CABINFEVER.DAT"
     New-Item -ItemType Directory -Force -Path $worlds | Out-Null
 
+    $leaf = [System.IO.Path]::GetFileName($SourcePath).ToUpperInvariant()
+    $destMap = Join-Path $worlds $leaf
+
     if ((-not (Test-Path -LiteralPath $destMap)) -or
-        ((Get-Item -LiteralPath $destMap).LastWriteTimeUtc -lt (Get-Item -LiteralPath $mapPath).LastWriteTimeUtc)) {
-        Copy-Item -LiteralPath $mapPath -Destination $destMap -Force
-        Write-Host "[OK] CABINFEVER.DAT refreshed"
-    } else {
-        Write-Host "[OK] CABINFEVER.DAT unchanged"
+        ((Get-Item -LiteralPath $destMap).LastWriteTimeUtc -lt
+         (Get-Item -LiteralPath $SourcePath).LastWriteTimeUtc)) {
+        Copy-Item -LiteralPath $SourcePath -Destination $destMap -Force
+        Write-Host "[OK] $leaf refreshed"
     }
-} else {
+    else {
+        Write-Host "[OK] $leaf unchanged"
+    }
+}
+
+$mapPath = Join-Path $assetRoot "CABINFEVER.DAT"
+if (Test-Path -LiteralPath $mapPath) {
+    Stage-WorldDat $mapPath
+}
+else {
     Write-Host "[SKIP] CABINFEVER.DAT not present"
+}
+
+# Any additional .DAT at assets-local root is treated as a local world import.
+Get-ChildItem -LiteralPath $assetRoot -Filter "*.DAT" -File |
+    Where-Object { $_.Name -ine "CABINFEVER.DAT" } |
+    ForEach-Object {
+        Stage-WorldDat $_.FullName
+    }
+
+# The launcher Map Importer persists worlds here so they survive rebuilds.
+$mapImportRoot = Join-Path $assetRoot "MapImports"
+if (Test-Path -LiteralPath $mapImportRoot) {
+    Get-ChildItem -LiteralPath $mapImportRoot -Filter "*.DAT" -File |
+        ForEach-Object {
+            Stage-WorldDat $_.FullName
+        }
 }
 
 Expand-OptionalZip "TEXTURES.zip" "Textures"
@@ -175,7 +204,7 @@ if(Test-Path -LiteralPath $zombieAmbience) {
 
 
 
-function Map-CabinFeverTextureReferences([string]$DatPath) {
+function Map-WorldTextureReferences([string]$DatPath) {
     if (-not (Test-Path -LiteralPath $DatPath)) {
         return
     }
@@ -185,7 +214,7 @@ function Map-CabinFeverTextureReferences([string]$DatPath) {
         return
     }
 
-    Write-Host "[UPDATE] Mapping Cabin Fever texture references from DAT..."
+    Write-Host "[UPDATE] Mapping world texture references from $([System.IO.Path]::GetFileName($DatPath))..."
 
     $bytes = [System.IO.File]::ReadAllBytes($DatPath)
     $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
@@ -269,10 +298,25 @@ function Map-CabinFeverTextureReferences([string]$DatPath) {
         $mapped++
     }
 
-    Write-Host "[OK] Cabin Fever texture map: $mapped aliases created, $ambiguous ambiguous"
+    Write-Host "[OK] World texture map: $mapped aliases created, $ambiguous ambiguous"
 }
 
-Map-CabinFeverTextureReferences $mapPath
+if(Test-Path -LiteralPath $mapPath) {
+    Map-WorldTextureReferences $mapPath
+}
+
+Get-ChildItem -LiteralPath $assetRoot -Filter "*.DAT" -File |
+    Where-Object { $_.Name -ine "CABINFEVER.DAT" } |
+    ForEach-Object {
+        Map-WorldTextureReferences $_.FullName
+    }
+
+if(Test-Path -LiteralPath $mapImportRoot) {
+    Get-ChildItem -LiteralPath $mapImportRoot -Filter "*.DAT" -File |
+        ForEach-Object {
+            Map-WorldTextureReferences $_.FullName
+        }
+}
 
 function Extract-ZipEntry([string]$ZipName, [string]$EntryName, [string]$DestinationRelative) {
     $zipPath = Join-Path $assetRoot $ZipName
@@ -387,6 +431,48 @@ if($charZipName) {
     Extract-OptionalZipEntry $charZipName "CHARS_M_BODY/ANI_VI_TANKER_SH.LTB" "Characters\infected\body\ANI_VI_TANKER_SH.LTB" | Out-Null
 } else {
     Write-Host "[SKIP] No supported Combat Arms character archive found."
+}
+
+# ST_M_CHILD.LTB stores useful model/animation identifiers as printable text.
+# Keep a local report so attack/jump animation names can be verified without
+# guessing or committing commercial model bytes.
+$infectedAnimModel = Join-Path $rezRoot "Characters\infected\body\ST_M_CHILD.LTB"
+if(Test-Path -LiteralPath $infectedAnimModel) {
+    $reports = Join-Path $assetRoot "Reports"
+    New-Item -ItemType Directory -Force -Path $reports | Out-Null
+    $reportPath = Join-Path $reports "ST_M_CHILD-strings.txt"
+
+    $bytes = [System.IO.File]::ReadAllBytes($infectedAnimModel)
+    $builder = New-Object System.Text.StringBuilder
+    $tokens = New-Object System.Collections.Generic.List[string]
+
+    foreach($byte in $bytes) {
+        if($byte -ge 32 -and $byte -le 126) {
+            [void]$builder.Append([char]$byte)
+        }
+        else {
+            if($builder.Length -ge 2) {
+                $token = $builder.ToString()
+                if($token -match '^[A-Za-z][A-Za-z0-9_\-]{1,47}$') {
+                    $tokens.Add($token)
+                }
+            }
+            [void]$builder.Clear()
+        }
+    }
+
+    if($builder.Length -ge 2) {
+        $token = $builder.ToString()
+        if($token -match '^[A-Za-z][A-Za-z0-9_\-]{1,47}$') {
+            $tokens.Add($token)
+        }
+    }
+
+    $tokens |
+        Sort-Object -Unique |
+        Set-Content -LiteralPath $reportPath
+
+    Write-Host "[OK] ST_M_CHILD string report -> assets-local\Reports\ST_M_CHILD-strings.txt"
 }
 
 $gunsZip = Join-Path $assetRoot "Guns.zip"
