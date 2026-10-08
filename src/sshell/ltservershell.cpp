@@ -166,7 +166,7 @@ LPBASECLASS CLTServerShell::OnClientEnterWorld(HCLIENT hClient)
 
 	objCreateStruct.Clear();
 	objCreateStruct.m_ObjectType = OT_MODEL;
-    objCreateStruct.m_Flags = FLAG_SOLID | FLAG_FORCECLIENTUPDATE | FLAG_YROTATION | FLAG_VISIBLE | FLAG_SHADOW;
+    objCreateStruct.m_Flags = FLAG_SOLID | FLAG_CLIENTNONSOLID | FLAG_FORCECLIENTUPDATE | FLAG_YROTATION | FLAG_VISIBLE | FLAG_SHADOW;
 
     objCreateStruct.m_Flags2 |= FLAG2_PLAYERCOLLIDE;
 
@@ -355,11 +355,14 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
 			LTVector vZero(0.0f, 0.0f, 0.0f);
 			g_pLTSPhysics->SetAcceleration(hPlayer, &vZero);
 
-            g_pLTServer->SetObjectPos(hPlayer, &vPos);
-            //g_pLTServer->MoveObject(hPlayer, &vPos);
+            // Resolve movement through collision instead of teleporting each
+            // multiplayer packet directly into world geometry.
+            g_pLTServer->MoveObject(hPlayer, &vPos);
             g_pLTServer->SetObjectRotation(hPlayer, &rRot);
 
-			g_pLTServer->SetClientViewPos(hSender, &vPos);
+            LTVector vResolvedPos;
+            g_pLTServer->GetObjectPos(hPlayer, &vResolvedPos);
+			g_pLTServer->SetClientViewPos(hSender, &vResolvedPos);
 		}
 		break;
     case MSG_CS_SHOOT:
