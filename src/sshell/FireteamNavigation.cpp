@@ -351,7 +351,35 @@ static bool FTGetConnection(
         return false;
     }
 
-    if(gapX <= kSlack && overlapZ >= kMinOpening)
+    const float fCenterDeltaY =
+        (float)fabs(
+            a.vCenter.y -
+            b.vCenter.y);
+
+    // Separate floors in CA maps often have AIVolumes with nearly identical
+    // X/Z footprints. They are not neighbors just because the boxes overlap.
+    // Real stair/ramp transitions use smaller vertical steps between volumes.
+    if(overlapX >= kMinOpening &&
+       overlapZ >= kMinOpening &&
+       fCenterDeltaY > 56.0f)
+    {
+        return false;
+    }
+
+    const bool bAdjacentOnX =
+        gapX <= kSlack &&
+        (overlapX <= (kSlack * 2.0f) ||
+         (float)fabs(aMaxX - bMinX) <= kSlack ||
+         (float)fabs(bMaxX - aMinX) <= kSlack);
+
+    const bool bAdjacentOnZ =
+        gapZ <= kSlack &&
+        (overlapZ <= (kSlack * 2.0f) ||
+         (float)fabs(aMaxZ - bMinZ) <= kSlack ||
+         (float)fabs(bMaxZ - aMinZ) <= kSlack);
+
+    if(bAdjacentOnX &&
+       overlapZ >= kMinOpening)
     {
         if(overlapX >= 0.0f)
             pOut->x = (overlapXMin + overlapXMax) * 0.5f;
@@ -375,7 +403,8 @@ static bool FTGetConnection(
         return true;
     }
 
-    if(gapZ <= kSlack && overlapX >= kMinOpening)
+    if(bAdjacentOnZ &&
+       overlapX >= kMinOpening)
     {
         if(overlapZ >= 0.0f)
             pOut->z = (overlapZMin + overlapZMax) * 0.5f;
@@ -574,6 +603,18 @@ bool FT_BuildNavigationPath(
 
             float fCost = (float)sqrt(
                 aVolumes[nCurrent].vCenter.DistSqr(aVolumes[i].vCenter));
+
+            const float fVerticalTravel =
+                (float)fabs(
+                    aVolumes[nCurrent].vCenter.y -
+                    aVolumes[i].vCenter.y);
+
+            // Prefer same-floor routes unless a stair/ramp transition is
+            // actually required. This prevents downstairs players from
+            // attracting infected onto an upstairs detour through stacked
+            // navigation volumes.
+            fCost +=
+                fVerticalTravel * 3.0f;
 
             if(aVolumes[i].pVolume->IsPreferredPath())
             {
