@@ -492,8 +492,9 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
             {
                 if(m_nLives > 0)
                 {
-                    m_fRespawnTimer -= 0.25f;
-                    if(m_fRespawnTimer <= 0.0f)
+                    // Use an absolute server deadline instead of assuming
+                    // every object update runs at exactly 250 ms.
+                    if(g_pLTServer->GetTime() >= m_fRespawnTimer)
                     {
                         Respawn();
                     }
@@ -1268,7 +1269,7 @@ void CPlayerSrvr::ApplyDamage(uint8 nDamage)
 
         if(m_nLives > 0)
         {
-            m_fRespawnTimer = 5.0f;
+            m_fRespawnTimer = g_pLTServer->GetTime() + 5.0f;
 
             g_pLTServer->CPrint(
                 "Fireteam: %s died. %u/%u lives remain; respawning in 5 seconds.",
