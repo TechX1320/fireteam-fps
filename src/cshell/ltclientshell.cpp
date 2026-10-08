@@ -1040,16 +1040,28 @@ LTRESULT CLTClientShell::Render()
 
     if(IsInWorld())
     {
-        if(m_pPlayer)
+        const bool bFreecam =
+            m_pCamera &&
+            m_pCamera->IsFreecam();
+
+        if(m_pPlayer &&
+           !bFreecam)
         {
-            FT_RenderPoisonOverlay(m_pPlayer->GetPlayerObject());
+            FT_RenderPoisonOverlay(
+                m_pPlayer->GetPlayerObject());
         }
-        FT_RenderHealthHud();
+
+        if(!bFreecam)
+        {
+            FT_RenderHealthHud();
+            FT_RenderCombatFeedback();
+        }
+
         FT_RenderRoundHud();
-        FT_RenderCombatFeedback();
 
         if(m_pPlayer &&
            m_pCamera &&
+           !bFreecam &&
            !FT_SettingsIsOpen())
         {
             const FTWeaponDef *pHudWeapon =
@@ -1415,6 +1427,7 @@ LTRESULT CLTClientShell::PollInput()
             0.0f);
         m_pPlayer->UpdateMoveFlags(
             0);
+        m_pPlayer->ReleaseAttackTrigger();
 
         HLOCALOBJ hPlayer =
             m_pPlayer->GetPlayerObject();
