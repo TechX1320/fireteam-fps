@@ -46,6 +46,10 @@ FireteamZombie::FireteamZombie() :
     m_eBehaviorState(kBehaviorSearch),
     m_bDying(false),
     m_fDeathTimeRemaining(0.0f),
+    m_fLastServerTick(0.0f),
+    m_fDecisionElapsed(0.0f),
+    m_nTicksUntilDecision(0),
+    m_nMotionStepsRemaining(0),
     m_nPathLane((s_nZombieSerial++) % 5),
     m_nWaypoint(0),
     m_hFace(LTNULL),
@@ -56,6 +60,7 @@ FireteamZombie::FireteamZombie() :
     m_vLastKnownTargetPos.Init(0.0f, 0.0f, 0.0f);
     m_vProgressTarget.Init(0.0f, 0.0f, 0.0f);
     m_vStragglerProgressPos.Init(0.0f, 0.0f, 0.0f);
+    m_vMotionGoal.Init(0.0f, 0.0f, 0.0f);
     m_vCollisionDims.Init(24.0f, 53.0f, 24.0f);
     m_sCurrentAnimation[0] = '\0';
 
@@ -1300,14 +1305,32 @@ void FireteamZombie::RebuildPath(const LTVector &vTarget)
     m_fRepathCooldown = 1.50f;
 }
 
-void FireteamZombie::UpdateZombie()
+void FireteamZombie::AdvanceSmoothMotion()
+{
+    if(m_nMotionStepsRemaining == 0)
+        return;
+
+    // Step toward the NEXT AI destination, not an extrapolated player
+    // position. Every substep uses Jupiter collision resolution; geometry
+    // cannot be bypassed by a client-only cosmetic interpolation.
+    LTVector vCurrent;
+    g_pLTServer->GetObjectPos(m_hObject, &vCurrent);
+    const float fPart =
+        1.0f / (float)m_nMotionStepsRemaining;
+    const LTVector vNext =
+        vCurrent + (m_vMotionGoal - vCurrent) * fPart;
+    g_pLTServer->MoveObject(m_hObject, &vNext);
+    --m_nMotionStepsRemaining;
+}
+
+void FireteamZombie::UpdateZombie(float fDeltaSeconds)
 {
     FT_UpdateZombieWallhackState();
 
+    // The real measured time between AI decisions, capped to avoid moving
+    // through a wall after a hitch. Repath/attack timers share this clock.
     const float kUpdate =
-        (m_Def.fUpdateSeconds > 0.0f)
-        ? m_Def.fUpdateSeconds
-        : 0.10f;
+        fDeltaSeconds > 0.0f ? fDeltaSeconds : 0.10f;
 
     const float kAttackRange =
         m_Def.fAttackRange;
@@ -1369,6 +1392,7 @@ void FireteamZombie::UpdateZombie()
         m_fBestProgressDistance =
             FLT_MAX;
         m_fStragglerIdleSeconds = 0.0f;
+        m_nMotionStepsRemaining = 0;
 
         return;
     }
@@ -1579,6 +1603,7 @@ void FireteamZombie::UpdateZombie()
         m_vLastPos = vPos;
         m_vStragglerProgressPos = vPos;
         m_fStragglerIdleSeconds = 0.0f;
+        m_nMotionStepsRemaining = 0;
         return;
     }
 
@@ -2022,9 +2047,19 @@ void FireteamZombie::UpdateZombie()
                 m_hObject,
                 &vZero);
 
-            g_pLTServer->MoveObject(
-                m_hObject,
-                &vDesired);
+            if(m_Def.nMotionSubsteps > 1)
+            {
+                // AI decisions stay at 10 Hz; only cheap collision movement
+                // runs at 30 Hz (or configurable 2-4 substeps per decision).
+                m_vMotionGoal = vDesired;
+                m_nMotionStepsRemaining = m_Def.nMotionSubsteps;
+            }
+            else
+            {
+                g_pLTServer->MoveObject(
+                    m_hObject,
+                    &vDesired);
+            }
         }
     }
     else
@@ -2209,6 +2244,8 @@ void FireteamZombie::UpdateZombie()
                     m_fForcePathTime = 0.0f;
                     m_fBestProgressDistance = FLT_MAX;
                     m_fStragglerIdleSeconds = 0.0f;
+                    m_nMotionStepsRemaining = 0;
+                    m_vMotionGoal = vRecovered;
                     return;
                 }
                 // No valid authored position: keep enemy alive, retry only
@@ -2544,41 +2581,74 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
 
             g_pLTServer->GetObjectPos(m_hObject, &m_vLastPos);
             m_vStragglerProgressPos = m_vLastPos;
-            g_pLTServer->SetNextUpdate(
-                m_hObject,
+            m_vMotionGoal = m_vLastPos;
+
+            const float fAIStep =
                 m_Def.fUpdateSeconds > 0.0f
-                    ? m_Def.fUpdateSeconds
-                    : 0.10f);
+                ? m_Def.fUpdateSeconds : 0.10f;
+            const uint8 nSubsteps =
+                m_Def.nMotionSubsteps > 1
+                ? (m_Def.nMotionSubsteps > 4 ? 4 : m_Def.nMotionSubsteps)
+                : 1;
+            m_fLastServerTick = g_pLTServer->GetTime();
+            m_fDecisionElapsed =
+                fAIStep - (fAIStep / (float)nSubsteps);
+            m_nTicksUntilDecision = 0;
+            m_nMotionStepsRemaining = 0;
+            g_pLTServer->SetNextUpdate(
+                m_hObject, fAIStep / (float)nSubsteps);
         }
         break;
 
         case MID_UPDATE:
         {
-            const float fUpdate =
+            const float fAIStep =
                 m_Def.fUpdateSeconds > 0.0f
-                ? m_Def.fUpdateSeconds
-                : 0.10f;
+                ? m_Def.fUpdateSeconds : 0.10f;
+            const uint8 nSubsteps =
+                m_Def.nMotionSubsteps > 1
+                ? (m_Def.nMotionSubsteps > 4 ? 4 : m_Def.nMotionSubsteps)
+                : 1;
+            const float fMotionStep =
+                fAIStep / (float)nSubsteps;
+
+            const float fNow = g_pLTServer->GetTime();
+            float fElapsed = fNow - m_fLastServerTick;
+            m_fLastServerTick = fNow;
+            if(fElapsed < 0.0f) fElapsed = 0.0f;
+            // Clamp hitches: collision moves must never leap far ahead.
+            if(fElapsed > 0.15f) fElapsed = 0.15f;
 
             if(m_bDying)
             {
-                m_fDeathTimeRemaining -=
-                    fUpdate;
-
+                m_nMotionStepsRemaining = 0;
+                m_fDeathTimeRemaining -= fElapsed;
                 if(m_fDeathTimeRemaining <= 0.0f)
                 {
-                    g_pLTServer->RemoveObject(
-                        m_hObject);
+                    g_pLTServer->RemoveObject(m_hObject);
                     return 1;
                 }
             }
             else
             {
-                UpdateZombie();
+                m_fDecisionElapsed += fElapsed;
+                if(m_nTicksUntilDecision == 0)
+                {
+                    float fDecisionDelta = m_fDecisionElapsed;
+                    if(fDecisionDelta > fAIStep * 2.0f)
+                        fDecisionDelta = fAIStep * 2.0f;
+                    UpdateZombie(fDecisionDelta);
+                    m_fDecisionElapsed = 0.0f;
+                    m_nTicksUntilDecision = nSubsteps;
+                }
+
+                if(nSubsteps > 1)
+                    AdvanceSmoothMotion();
+                if(m_nTicksUntilDecision > 0)
+                    --m_nTicksUntilDecision;
             }
 
-            g_pLTServer->SetNextUpdate(
-                m_hObject,
-                fUpdate);
+            g_pLTServer->SetNextUpdate(m_hObject, fMotionStep);
         }
         break;
 
