@@ -258,7 +258,14 @@ void FireteamZombie::ApplyWallhackRenderStyle(
         MAX_CS_FILENAME_LEN,
         pBodyStyle);
 
-    if(m_Def.sBodyRenderStyle1[0])
+    if(bEnabled)
+    {
+        FT_CopyInfectedString(
+            bodyOCS.m_RenderStyleNames[1],
+            MAX_CS_FILENAME_LEN,
+            "RenderStyles/ZombieThroughWall.ltb");
+    }
+    else if(m_Def.sBodyRenderStyle1[0])
     {
         FT_CopyInfectedString(
             bodyOCS.m_RenderStyleNames[1],
@@ -296,7 +303,14 @@ void FireteamZombie::ApplyWallhackRenderStyle(
             MAX_CS_FILENAME_LEN,
             pFaceStyle);
 
-        if(m_Def.sFaceRenderStyle1[0])
+        if(bEnabled)
+        {
+            FT_CopyInfectedString(
+                faceOCS.m_RenderStyleNames[1],
+                MAX_CS_FILENAME_LEN,
+                "RenderStyles/ZombieThroughWall.ltb");
+        }
+        else if(m_Def.sFaceRenderStyle1[0])
         {
             FT_CopyInfectedString(
                 faceOCS.m_RenderStyleNames[1],
