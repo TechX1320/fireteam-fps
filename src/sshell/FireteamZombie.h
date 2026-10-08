@@ -55,6 +55,8 @@ private:
 
     uint16 m_nHealth;
     float m_fAttackCooldown;
+    float m_fAttackAnimationTime;
+    float m_fJumpAnimationTime;
     float m_fRepathCooldown;
     float m_fStuckTime;
     float m_fForcePathTime;
