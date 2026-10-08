@@ -36,8 +36,11 @@ public:
           m_iSendStatsCounter(0),
           m_nHealth(100),
           m_nMaxHealth(100),
+          m_nLives(3),
+          m_nMaxLives(3),
           m_bAlive(true),
           m_fRespawnTimer(0.0f),
+          m_fNextPositionTrace(0.0f),
           m_fPoisonCarry(0.0f),
           m_nWeaponSlot(1),
           m_bReloading(false),
@@ -83,7 +86,7 @@ public:
     char*   			GetPlayerName();
 
     void    			PlayAnimation(const char* sAnimName, uint8 nTracker, bool bLooping);
-    void                SetClient(HCLIENT hClient){ m_hClient = hClient; SendHealth(); SendPrimaryAmmo(); SendPowerupState(); }
+    void                SetClient(HCLIENT hClient){ m_hClient = hClient; SendHealth(); SendLives(); SendPrimaryAmmo(); SendPowerupState(); }
     void    			SetClubID();
     void                SetWeaponSlot(uint8 nSlot);
     void                FirePrimary(
@@ -104,6 +107,8 @@ public:
     char*               GetName(){ return m_sName; }
     void                ApplyDamage(uint8 nDamage);
     bool                IsAlive() const { return m_bAlive; }
+    uint8               GetLives() const { return m_nLives; }
+    uint8               GetMaxLives() const { return m_nMaxLives; }
 
     // Fireteam Mutation Box rewards.
     void                GrantAmmoMagazines(uint32 nMagazines);
@@ -124,6 +129,7 @@ private:
     void 				CheckForHit();
     void 				PlaySound(int i);
     void                SendHealth();
+    void                SendLives();
     void                SendPrimaryAmmo();
     void                CompleteReloadIfReady();
     void                SpawnExplosiveProjectile(
@@ -186,8 +192,11 @@ private:
     // Fireteam health/death
     uint8               m_nHealth;
     uint8               m_nMaxHealth;
+    uint8               m_nLives;
+    uint8               m_nMaxLives;
     bool                m_bAlive;
     float               m_fRespawnTimer;
+    float               m_fNextPositionTrace;
     float               m_fPoisonCarry;
     LTVector            m_vSpawnPos;
     LTRotation          m_rSpawnRot;
