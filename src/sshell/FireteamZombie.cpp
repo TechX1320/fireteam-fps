@@ -861,6 +861,28 @@ void FireteamZombie::SetZombieAnimation(
         return;
     }
 
+    // Preserve stride phase when switching between validated WALK and RUN
+    // banks. This avoids an obvious foot-pop at chase transitions without
+    // altering death, jump, attack or one-shot animation timing.
+    const bool bOldLocomotion =
+        m_sCurrentAnimation[0] &&
+        (strcmp(m_sCurrentAnimation, m_Def.sWalkAnim) == 0 ||
+         strcmp(m_sCurrentAnimation, m_Def.sRunAnim) == 0);
+    const bool bNewLocomotion =
+        bLooping &&
+        (strcmp(pAnimation, m_Def.sWalkAnim) == 0 ||
+         strcmp(pAnimation, m_Def.sRunAnim) == 0);
+
+    uint32 nOldTime = 0;
+    uint32 nOldLength = 0;
+    const bool bKeepStridePhase =
+        bOldLocomotion && bNewLocomotion &&
+        g_pLTSModel->GetCurAnimTime(
+            m_hObject, MAIN_TRACKER, nOldTime) == LT_OK &&
+        g_pLTSModel->GetCurAnimLength(
+            m_hObject, MAIN_TRACKER, nOldLength) == LT_OK &&
+        nOldLength > 0;
+
     g_pLTSModel->SetCurAnim(
         m_hObject,
         MAIN_TRACKER,
@@ -869,6 +891,21 @@ void FireteamZombie::SetZombieAnimation(
         m_hObject,
         MAIN_TRACKER,
         bLooping ? LTTRUE : LTFALSE);
+
+    if(bKeepStridePhase)
+    {
+        uint32 nNewLength = 0;
+        if(g_pLTSModel->GetCurAnimLength(
+               m_hObject, MAIN_TRACKER, nNewLength) == LT_OK &&
+           nNewLength > 1)
+        {
+            const uint32 nPhaseTime =
+                (uint32)(((double)(nOldTime % nOldLength) *
+                    (double)nNewLength) / (double)nOldLength);
+            g_pLTSModel->SetCurAnimTime(
+                m_hObject, MAIN_TRACKER, nPhaseTime);
+        }
+    }
 
     FT_CopyInfectedString(
         m_sCurrentAnimation,
