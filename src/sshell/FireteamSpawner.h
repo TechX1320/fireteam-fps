@@ -25,6 +25,14 @@ private:
 };
 
 void FT_OnFireteamPlayerJoined(HCLIENT hClient);
+// Restage a genuinely stranded final infected without counting a kill.
+// Keeps the same zombie object, health, and required number of kills.
+bool FT_IsFinalLivingInfected(HOBJECT hZombie);
+bool FT_TryRecoverFinalInfected(
+    HOBJECT hZombie,
+    HOBJECT hTarget,
+    LTVector &vResult);
+
 void FT_OnFireteamEnemyKilled();
 void FT_OnFireteamSquadGameOver();
 void FT_SetQaZombiesEnabled(
