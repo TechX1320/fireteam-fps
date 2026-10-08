@@ -606,7 +606,7 @@ void CLTServerShell::PreStartWorld(bool bSwitchingWorlds)
 //-----------------------------------------------------------------------------
 void CLTServerShell::PostStartWorld()
 {
-	//g_pLTServer->CPrint("PostStartWorld()");
+    FT_EnsureFireteamRoundController();
 }
 
 
