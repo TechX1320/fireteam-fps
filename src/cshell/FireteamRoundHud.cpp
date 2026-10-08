@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <float.h>
+#include <windows.h>
 
 static CUIFont *s_pRoundFont = LTNULL;
 static CUIFont *s_pBuffFont = LTNULL;
@@ -33,7 +34,9 @@ static bool s_bSpectating = false;
 static bool s_bQaSpectating = false;
 static float s_fAnnouncementUntil = 0.0f;
 static float s_fRespawnUntil = 0.0f;
-static float s_fFirstRoundPrepUntil = 0.0f;
+static ULONGLONG s_nFirstRoundPrepDeadlineTick = 0;
+static uint32 s_nFirstRoundPrepRevision = 0;
+static bool s_bFirstRoundPrepClosed = false;
 static float s_fBottomlessUntil = 0.0f;
 static float s_fOneHitUntil = 0.0f;
 static float s_fGodUntil = 0.0f;
@@ -274,7 +277,9 @@ void FT_RoundHudTerm()
     s_bQaSpectating = false;
     s_fAnnouncementUntil = 0.0f;
     s_fRespawnUntil = 0.0f;
-    s_fFirstRoundPrepUntil = 0.0f;
+    s_nFirstRoundPrepDeadlineTick = 0;
+    s_nFirstRoundPrepRevision = 0;
+    s_bFirstRoundPrepClosed = false;
     s_fBottomlessUntil = 0.0f;
     s_fOneHitUntil = 0.0f;
     s_fGodUntil = 0.0f;
@@ -310,7 +315,8 @@ void FT_RoundHudHandleMessage(
     if(nState == 1)
     {
         s_bGameOver = false;
-        s_fFirstRoundPrepUntil = 0.0f;
+        s_nFirstRoundPrepDeadlineTick = 0;
+        s_bFirstRoundPrepClosed = true;
 
         sprintf(
             szAnnouncement,
@@ -413,14 +419,46 @@ void FT_RoundHudSetTimedPowerups(
         : 0.0f;
 }
 
-void FT_RoundHudSetFirstRoundPreparation(float fSeconds)
+void FT_RoundHudResetFirstRoundPreparation()
+{
+    s_nFirstRoundPrepRevision = 0;
+    s_nFirstRoundPrepDeadlineTick = 0;
+    s_bFirstRoundPrepClosed = false;
+}
+
+void FT_RoundHudSetFirstRoundPreparation(float fSeconds, uint32 nRevision)
 {
     if(!s_pRoundFont)
         FT_RoundHudInit();
+    if(nRevision < s_nFirstRoundPrepRevision || s_nRound > 0)
+        return;
 
-    s_fFirstRoundPrepUntil = fSeconds > 0.0f
-        ? g_pLTClient->GetTime() + fSeconds
-        : 0.0f;
+    const ULONGLONG nNow = GetTickCount64();
+    if(nRevision > s_nFirstRoundPrepRevision)
+    {
+        s_nFirstRoundPrepRevision = nRevision;
+        s_bFirstRoundPrepClosed = false;
+        s_nFirstRoundPrepDeadlineTick = 0;
+    }
+
+    if(fSeconds <= 0.0f)
+    {
+        s_nFirstRoundPrepDeadlineTick = 0;
+        s_bFirstRoundPrepClosed = true;
+        return;
+    }
+    if(s_bFirstRoundPrepClosed ||
+       (s_nFirstRoundPrepDeadlineTick > 0 &&
+        nNow >= s_nFirstRoundPrepDeadlineTick))
+        return;
+
+    const ULONGLONG nProposed =
+        nNow + (ULONGLONG)(fSeconds * 1000.0f);
+    // Resends for one revision only count DOWN.
+    // Legitimate join extensions increment the revision.
+    if(s_nFirstRoundPrepDeadlineTick == 0 ||
+       nProposed < s_nFirstRoundPrepDeadlineTick)
+        s_nFirstRoundPrepDeadlineTick = nProposed;
 }
 
 void FT_RoundHudSetRespawnCountdown(float fSeconds)
@@ -534,14 +572,16 @@ void FT_RenderRoundHud()
         s_pRespawnStatus->Render();
     }
 
-    const float fPrepNow = g_pLTClient->GetTime();
+    const ULONGLONG nPrepNow = GetTickCount64();
     if(s_pFirstRoundPrep && s_nRound == 0 &&
-       fPrepNow < s_fFirstRoundPrepUntil && !s_bGameOver)
+       !s_bFirstRoundPrepClosed &&
+       nPrepNow < s_nFirstRoundPrepDeadlineTick && !s_bGameOver)
     {
-        const float fSeconds = s_fFirstRoundPrepUntil - fPrepNow;
+        const uint32 nSeconds =
+            (uint32)((s_nFirstRoundPrepDeadlineTick - nPrepNow + 999) / 1000);
         char szPrep[100];
         sprintf(szPrep, "GET READY!  ROUND 1 STARTS IN %u",
-            (uint32)(fSeconds + 0.999f));
+            nSeconds);
         s_pFirstRoundPrep->SetText(szPrep);
         s_pFirstRoundPrep->SetPosition(
             ((float)nScreenW - s_pFirstRoundPrep->GetWidth()) * 0.5f,
