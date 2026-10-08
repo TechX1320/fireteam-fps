@@ -14,14 +14,32 @@ if not exist ".local\imports\engine\sdk\inc\server_interface.h" (
   goto :fail
 )
 
+set "CMAKE_EXE="
+where cmake >nul 2>nul
+if not errorlevel 1 set "CMAKE_EXE=cmake"
+if not defined CMAKE_EXE (
+  for %%E in (
+    "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+    "C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+    "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+    "C:\Program Files\CMake\bin\cmake.exe"
+  ) do (
+    if exist %%E set "CMAKE_EXE=%%~E"
+  )
+)
+if not defined CMAKE_EXE (
+  echo [ERROR] CMake not found. Install the VS2022 CMake tools.
+  goto :fail
+)
+
 if not exist "out\build\CMakeCache.txt" (
   echo [CHECK] Configuring Win32 game workspace...
-  cmake -S . -B "out\build" -G "Visual Studio 17 2022" -A Win32
+  "%CMAKE_EXE%" -S . -B "out\build" -G "Visual Studio 17 2022" -A Win32
   if errorlevel 1 goto :fail
 )
 
 echo [BUILD] Compiling headless server...
-cmake --build "out\build" --config Release --target fireteam_dedicated --parallel
+"%CMAKE_EXE%" --build "out\build" --config Release --target fireteam_dedicated --parallel
 if errorlevel 1 goto :fail
 
 if not exist "out\build\bin\FireteamDedicatedServer.exe" (
