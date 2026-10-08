@@ -40,7 +40,7 @@ public sealed class GameLaunchService
 
         _settings.SaveSettings(settings);
         _settings.SaveProfile(profile);
-        WriteSession(gameDir, profile.Difficulty, profile.Mode);
+        WriteSession(gameDir, profile.Difficulty, profile.Mode, mapName);
 
         var exe = Path.Combine(gameDir, "Lithtech.exe");
         var start = new ProcessStartInfo(exe)
@@ -129,7 +129,7 @@ public sealed class GameLaunchService
             : safe.ToUpperInvariant();
     }
 
-    private static void WriteSession(string gameDir, string difficulty, string mode)
+    private static void WriteSession(string gameDir, string difficulty, string mode, string mapName)
     {
         var configDir = Path.Combine(gameDir, "config");
         Directory.CreateDirectory(configDir);
@@ -138,7 +138,13 @@ public sealed class GameLaunchService
             ? "normal"
             : difficulty.Trim().ToLowerInvariant();
 
-        File.WriteAllText(Path.Combine(configDir, "session.cfg"), $"difficulty={value}\nfirst_round_prep={(mode == "Single Player" ? 15 : 45)}\n");
+        // Guard the stock Cabin Fever safe area on early/easier rounds.
+        // The DAT remains untouched; its authored Spawner objects are preserved.
+        var cabinGuard = mapName.Equals(
+            "CABINFEVER", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        File.WriteAllText(
+            Path.Combine(configDir, "session.cfg"),
+            $"difficulty={value}\nfirst_round_prep={(mode == "Single Player" ? 15 : 45)}\ncabin_spawn_guard={cabinGuard}\n");
     }
 
     private static void AddArg(ProcessStartInfo start, string name, string value)
