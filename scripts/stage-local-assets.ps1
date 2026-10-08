@@ -15,6 +15,32 @@ $stampRoot = Join-Path $LocalRoot "gameassets\stamps"
 New-Item -ItemType Directory -Force -Path $rezRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $stampRoot | Out-Null
 
+# Printable strings reports are diagnostics, NOT runtime assets. Large CA
+# animation LTBs can take many seconds to scan. Rebuild the reports only
+# when the source identity/size/write time or report format changes.
+# Set FT_FORCE_ASSET_AUDIT=1 for a deliberate full rebuild of every report.
+function Get-AssetAuditSignature([string]$SourcePath, [string]$AuditName) {
+    $f = Get-Item -LiteralPath $SourcePath
+    return "$AuditName|$($f.FullName)|$($f.Length)|$($f.LastWriteTimeUtc.Ticks)"
+}
+
+function Test-AssetAuditCurrent([string]$SourcePath, [string]$ReportPath, [string]$RuntimePath, [string]$AuditName) {
+    if($env:FT_FORCE_ASSET_AUDIT -eq "1" -or
+       -not (Test-Path -LiteralPath $ReportPath) -or
+       -not (Test-Path -LiteralPath $RuntimePath)) { return $false }
+    $stampPath = Join-Path $stampRoot ($AuditName + ".stamp")
+    if(-not (Test-Path -LiteralPath $stampPath)) { return $false }
+    $signature = Get-AssetAuditSignature $SourcePath $AuditName
+    return ([System.IO.File]::ReadAllText($stampPath).Trim() -ceq $signature)
+}
+
+function Save-AssetAuditStamp([string]$SourcePath, [string]$AuditName) {
+    $stampPath = Join-Path $stampRoot ($AuditName + ".stamp")
+    [System.IO.File]::WriteAllText(
+        $stampPath,
+        (Get-AssetAuditSignature $SourcePath $AuditName))
+}
+
 function Expand-OptionalZip([string]$ZipName, [string]$RezSubdir) {
     $zipPath = Join-Path $assetRoot $ZipName
     $actualZipName = $ZipName
@@ -485,7 +511,12 @@ if(Test-Path -LiteralPath $infectedAnimModel) {
     $reports = Join-Path $assetRoot "Reports"
     New-Item -ItemType Directory -Force -Path $reports | Out-Null
     $reportPath = Join-Path $reports "ST_M_CHILD-strings.txt"
+    $runtimeCandidates = Join-Path $rezRoot "Fireteam\ST_M_CHILD-strings.txt"
 
+    if(Test-AssetAuditCurrent $infectedAnimModel $reportPath $runtimeCandidates "ST_M_CHILD-strings-v1") {
+        Write-Host "[FAST] ST_M_CHILD.LTB unchanged; using cached animation candidates."
+    }
+    else {
     $bytes = [System.IO.File]::ReadAllBytes($infectedAnimModel)
     $builder = New-Object System.Text.StringBuilder
     $tokens = New-Object System.Collections.Generic.List[string]
@@ -531,6 +562,8 @@ if(Test-Path -LiteralPath $infectedAnimModel) {
 
     Write-Host "[OK] ST_M_CHILD string report -> assets-local\Reports\ST_M_CHILD-strings.txt"
     Write-Host "[OK] ST_M_CHILD animation candidates -> rez\Fireteam\ST_M_CHILD-strings.txt"
+    Save-AssetAuditStamp $infectedAnimModel "ST_M_CHILD-strings-v1"
+    }
 }
 
 # The dedicated assassin/tanker animation databases are distinct from
@@ -547,6 +580,14 @@ foreach($animBase in @("ANI_VI_ASSASSIN_CH", "ANI_VI_TANKER_SH")) {
     $runtimeReports = Join-Path $rezRoot "Fireteam"
     New-Item -ItemType Directory -Force -Path $reports, $runtimeReports | Out-Null
 
+    $reportName = $animBase + "-strings.txt"
+    $reportPath = Join-Path $reports $reportName
+    $runtimeReportPath = Join-Path $runtimeReports $reportName
+    if(Test-AssetAuditCurrent $animModel $reportPath $runtimeReportPath ($animBase + "-strings-v1")) {
+        Write-Host "[FAST] $animBase.LTB unchanged; using cached animation candidates."
+        continue
+    }
+
     # Text fragments are CANDIDATES, not proof of a playable model animation.
     # Validate through GetAnimIndex on the target character before assigning.
     $animBytes = [System.IO.File]::ReadAllBytes($animModel)
@@ -560,6 +601,7 @@ foreach($animBase in @("ANI_VI_ASSASSIN_CH", "ANI_VI_TANKER_SH")) {
     $animTokens | Set-Content -LiteralPath (Join-Path $reports $reportName)
     $animTokens | Set-Content -LiteralPath (Join-Path $runtimeReports $reportName)
     Write-Host "[OK] $animBase printable candidates -> assets-local\Reports\$reportName"
+    Save-AssetAuditStamp $animModel ($animBase + "-strings-v1")
 }
 
 $gunsZip = Join-Path $assetRoot "Guns.zip"
