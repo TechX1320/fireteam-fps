@@ -123,12 +123,12 @@ int main(int argc, char **argv)
        GetFileAttributesA("rez") == INVALID_FILE_ATTRIBUTES ||
        GetFileAttributesA("rez\\object.lto") == INVALID_FILE_ATTRIBUTES)
     {
-        fputs("Missing Engine.REZ, rez directory, or rez\\\\object.lto. Run build.cmd first.\n", stderr);
+        fputs("Missing Engine.REZ, rez directory, or rez\\object.lto. Run build.cmd first.\n", stderr);
         return 2;
     }
 
     char sMapFile[MAX_PATH];
-    _snprintf(sMapFile, sizeof(sMapFile), "rez\\\\Worlds\\\\%s.DAT", sMap);
+    _snprintf(sMapFile, sizeof(sMapFile), "rez\\Worlds\\%s.DAT", sMap);
     sMapFile[sizeof(sMapFile) - 1] = '\0';
     if(GetFileAttributesA(sMapFile) == INVALID_FILE_ATTRIBUTES)
     {
