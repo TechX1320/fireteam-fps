@@ -834,7 +834,8 @@ bool FT_TryRecoverFinalInfected(HOBJECT hZombie, HOBJECT hTarget,
     bool bVerified = false;
     for(uint32 i = 0; i < s_nPerimeterSpawnerCount; ++i)
     {
-        if(!s_hPerimeterSpawners[i]) continue;
+        if(!s_hPerimeterSpawners[i] ||
+           !FT_CanUseCurrentRoundAnchor(s_hPerimeterSpawners[i])) continue;
         LTVector vPos;
         if(!FT_GroundInfectedAnchor(s_hPerimeterSpawners[i], vPos))
             continue;
@@ -1135,24 +1136,38 @@ void Spawner::UpdateRoundController()
     // Select from reachable-looking local floor anchors first. A zero-match
     // fallback retains compatibility with large authored FireTeam maps.
     uint32 aEligible[kMaxPerimeterSpawners];
+    uint32 aAllowed[kMaxPerimeterSpawners];
     uint32 nEligible = 0;
+    uint32 nAllowed = 0;
     for(uint32 i = 0; i < s_nPerimeterSpawnerCount; ++i)
     {
-        if(FT_SpawnAnchorNearLivingPlayer(s_hPerimeterSpawners[i]))
+        HOBJECT hAnchor = s_hPerimeterSpawners[i];
+        if(!FT_CanUseCurrentRoundAnchor(hAnchor))
+            continue;
+        aAllowed[nAllowed++] = i;
+        if(FT_SpawnAnchorNearLivingPlayer(hAnchor))
             aEligible[nEligible++] = i;
     }
 
-    int nChoice = 0;
-    const uint32 nPool = nEligible > 0
-        ? nEligible : s_nPerimeterSpawnerCount;
+    // Keep rounds playable on custom maps with no outside anchors.
+    if(nAllowed == 0)
+    {
+        if(s_nRoundSpawned == 0)
+            g_pLTServer->CPrint(
+                "Fireteam cabin guard: no exterior anchors; emergency fallback to original authored pool.");
+        for(uint32 i = 0; i < s_nPerimeterSpawnerCount; ++i)
+            aAllowed[nAllowed++] = i;
+    }
 
+    int nChoice = 0;
+    const uint32 nPool = nEligible > 0 ? nEligible : nAllowed;
     if(nPool > 0)
     {
         for(uint32 nTry = 0; nTry < 8; ++nTry)
         {
             const uint32 nCandidate = (uint32)(rand() % nPool);
             nChoice = (int)(nEligible > 0
-                ? aEligible[nCandidate] : nCandidate);
+                ? aEligible[nCandidate] : aAllowed[nCandidate]);
             if(nChoice != s_nLastSpawner || nPool == 1)
                 break;
         }
