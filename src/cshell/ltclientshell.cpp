@@ -1192,7 +1192,9 @@ void CLTClientShell::OnCommandOn(int command)
             {
                 m_pChatGui->SetActive(true);
             }
-            else if(command == COMMAND_ALT_ATTACK)
+            else if(command == COMMAND_ALT_ATTACK &&
+                    m_pCamera &&
+                    !m_pCamera->IsFreecam())
             {
                 const FTWeaponDef *pWeaponDef =
                     m_pPlayer
