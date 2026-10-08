@@ -6,6 +6,7 @@
 #include "FireteamDifficultyDefs.h"
 #include "FireteamMutationBox.h"
 #include "playersrvr.h"
+#include "FireteamSpawnSafety.h"
 
 #include <iltcommon.h>
 #include <iltmessage.h>
@@ -690,6 +691,25 @@ bool FT_IsFinalLivingInfected(HOBJECT hZombie)
     return bFound && nAlive == 1;
 }
 
+// Use the compiled DAT floor underneath each authored infected anchor to
+// compare ACTUAL standing levels. Earlier code compared marker Y+100 to
+// player center Y, admitting anchors on a different Black Lung floor.
+static bool FT_GroundInfectedAnchor(HOBJECT hAnchor, LTVector &vStanding)
+{
+    if(!hAnchor) return false;
+    LTVector vMarker;
+    g_pLTServer->GetObjectPos(hAnchor, &vMarker);
+    LTVector vFrom(vMarker.x, vMarker.y + 125.0f, vMarker.z);
+    LTVector vTo(vMarker.x, vMarker.y - 400.0f, vMarker.z);
+    IntersectInfo floor;
+    if(!FT_PlayerSpawnTrace(vFrom, vTo, floor) ||
+       floor.m_Plane.m_Normal.y < 0.60f)
+        return false;
+    vStanding = floor.m_Point;
+    vStanding.y += 50.0f; // Current normal infected half-height.
+    return fabs(vStanding.y - vMarker.y) <= 125.0f;
+}
+
 bool FT_TryRecoverFinalInfected(HOBJECT hZombie, HOBJECT hTarget,
                                LTVector &vResult)
 {
@@ -709,9 +729,11 @@ bool FT_TryRecoverFinalInfected(HOBJECT hZombie, HOBJECT hTarget,
     {
         if(!s_hPerimeterSpawners[i]) continue;
         LTVector vPos;
-        g_pLTServer->GetObjectPos(s_hPerimeterSpawners[i], &vPos);
-        vPos.y += 100.0f; // Same height used by ordinary zombie spawns.
-        if(fabs(vPos.y - vPlayer.y) > 260.0f) continue;
+        if(!FT_GroundInfectedAnchor(s_hPerimeterSpawners[i], vPos))
+            continue;
+        // Ground heights, not map object offsets. A different floor cannot
+        // count as "nearby" simply because an anchor starts 100 units high.
+        if(fabs(vPos.y - vPlayer.y) > 105.0f) continue;
         LTVector vDelta = vPos - vPlayer;
         vDelta.y = 0.0f;
         const float fDistSq = vDelta.MagSqr();
@@ -738,7 +760,7 @@ bool FT_TryRecoverFinalInfected(HOBJECT hZombie, HOBJECT hTarget,
     if(nBest < 0)
     {
         g_pLTServer->CPrint(
-            "Fireteam straggler: no nearby same-floor map spawner; zombie still alive at %.1f %.1f %.1f.",
+            "Fireteam straggler: no floor-validated same-level anchor near survivor; zombie still alive at %.1f %.1f %.1f.",
             vOld.x, vOld.y, vOld.z);
         return false;
     }
