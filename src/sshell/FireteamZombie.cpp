@@ -1404,9 +1404,24 @@ void FireteamZombie::AdvanceSmoothMotion()
     g_pLTServer->GetObjectPos(m_hObject, &vCurrent);
     const float fPart =
         1.0f / (float)m_nMotionStepsRemaining;
-    // Jupiter's movement API takes a writable LTVector*.
     LTVector vNext =
         vCurrent + (m_vMotionGoal - vCurrent) * fPart;
+
+    // Critical world-collision guard: MoveObject can resolve a small
+    // displacement into an unintended neighboring brush/room when a
+    // crowd keeps pushing an actor against a thin wall. Never advance
+    // an interpolated substep through a solid corridor probe.
+    LTVector vHorizontal = vNext - vCurrent;
+    vHorizontal.y = 0.0f;
+    const float fDistance = vHorizontal.Mag();
+    if(fDistance > 0.001f &&
+       !IsMovementStepClear(vCurrent, vHorizontal, fDistance))
+    {
+        m_nMotionStepsRemaining = 0;
+        m_fRepathCooldown = 0.0f;
+        return;
+    }
+
     g_pLTServer->MoveObject(m_hObject, &vNext);
     --m_nMotionStepsRemaining;
 }
