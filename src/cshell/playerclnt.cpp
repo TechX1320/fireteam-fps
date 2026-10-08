@@ -512,6 +512,8 @@ m_fNextPrimaryClientShot(0.0f),
 m_bSemiAutoTriggerHeld(false),
 m_bReloading(false),
 m_fReloadComplete(0.0f),
+m_bReloadAwaitingAmmo(false),
+m_fReloadAckDeadline(0.0f),
 m_nPrimaryAmmoInClip(0),
 m_nPrimaryAmmoReserve(0),
 m_bPrimaryAmmoKnown(false),
@@ -775,6 +777,8 @@ void CPlayerClnt::Update()
     {
         m_bReloading = false;
         m_fReloadComplete = 0.0f;
+        m_bReloadAwaitingAmmo = false;
+        m_fReloadAckDeadline = 0.0f;
         bReloadAnimationDone = true;
     }
 
@@ -784,6 +788,18 @@ void CPlayerClnt::Update()
         m_bReloading = false;
         m_fReloadComplete = 0.0f;
         bReloadAnimationDone = true;
+
+        // On a held fire trigger the client can see 0 rounds briefly while
+        // the completed server reload is still in transit, causing a second
+        // (purely cosmetic) reload. Wait briefly for the authoritative
+        // ammo sync requested below before permitting another reload.
+        m_bReloadAwaitingAmmo =
+            !FT_RoundHudIsBottomlessActive() &&
+            m_bPrimaryAmmoKnown &&
+            m_nPrimaryAmmoInClip == 0 &&
+            m_nPrimaryAmmoReserve > 0;
+        m_fReloadAckDeadline = m_bReloadAwaitingAmmo
+            ? g_pLTClient->GetTime() + 2.0f : 0.0f;
 
         // The server owns the actual ammo transfer. Ask it to reconcile the
         // HUD at the exact end of the local reload instead of waiting for the
@@ -1129,6 +1145,12 @@ void CPlayerClnt::SetPrimaryAmmo(
     m_nPrimaryAmmoInClip = nClip;
     m_nPrimaryAmmoReserve = nReserve;
     m_bPrimaryAmmoKnown = true;
+    if(nClip > 0 || nReserve == 0 ||
+       FT_RoundHudIsBottomlessActive())
+    {
+        m_bReloadAwaitingAmmo = false;
+        m_fReloadAckDeadline = 0.0f;
+    }
 }
 
 
@@ -1142,6 +1164,16 @@ bool CPlayerClnt::Attack()
     if(m_bReloading && !bBottomless)
     {
         return false;
+    }
+    if(m_bReloadAwaitingAmmo && !bBottomless &&
+       g_pLTClient->GetTime() < m_fReloadAckDeadline)
+    {
+        return false; // Pending server ammo result, not a second reload.
+    }
+    if(m_bReloadAwaitingAmmo)
+    {
+        m_bReloadAwaitingAmmo = false; // Timed-out sync may be retried.
+        m_fReloadAckDeadline = 0.0f;
     }
 
     const FTWeaponDef *pDef = GetCurrentWeaponDef();
@@ -1303,6 +1335,8 @@ bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
     m_nPrimaryAmmoReserve = 0;
     m_bPrimaryAmmoKnown = false;
     m_fReloadComplete = 0.0f;
+    m_bReloadAwaitingAmmo = false;
+    m_fReloadAckDeadline = 0.0f;
     m_fNextPrimaryClientShot = 0.0f;
 
     CreateViewWeapon();
@@ -1433,6 +1467,8 @@ void CPlayerClnt::CycleDevWeapon(int nDirection)
     m_bSemiAutoTriggerHeld = false;
     m_bReloading = false;
     m_fReloadComplete = 0.0f;
+    m_bReloadAwaitingAmmo = false;
+    m_fReloadAckDeadline = 0.0f;
     m_fNextPrimaryClientShot = 0.0f;
 
     CreateViewWeapon();
@@ -1703,6 +1739,14 @@ bool CPlayerClnt::ReloadWeapon()
     // Bottomless Magazine must never play reloads or send reload commands.
     if(FT_RoundHudIsBottomlessActive())
         return false;
+
+    if(m_bReloadAwaitingAmmo &&
+       g_pLTClient->GetTime() < m_fReloadAckDeadline)
+        return false;
+    // The server may have rejected an earlier request or disconnected:
+    // timeout rather than locking the weapon in "reloading" forever.
+    m_bReloadAwaitingAmmo = false;
+    m_fReloadAckDeadline = 0.0f;
 
     const FTWeaponDef *pDef = GetCurrentWeaponDef();
     if(!pDef ||
