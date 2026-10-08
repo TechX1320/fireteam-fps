@@ -152,8 +152,34 @@ void CWorldPropsClnt::ApplyWorldProps()
 		sprintf(buffer, "FogB %d", (uint8)m_vFogColor.z);
 		g_pLTClient->RunConsoleString(buffer);
 
-		sprintf(buffer, "FogNearZ %d; FogFarZ %d", m_nFogNearZ, m_nFogFarZ);
-		g_pLTClient->RunConsoleString(buffer);
+        // A lightmapped map can still "pop" its far geometry if the fog
+        // only reaches full opacity BEYOND the camera's render distance.
+        // Preserve authored values where they fit the view frustum.
+        int32 nNear = (int32)m_nFogNearZ;
+        int32 nFar = (int32)m_nFogFarZ;
+        HCONSOLEVAR hFogGuard =
+            g_pLTClient->GetConsoleVar("FTFogGuard");
+        const bool bGuardEnabled =
+            !hFogGuard || g_pLTClient->GetVarValueFloat(hFogGuard) != 0.0f;
+        if(bGuardEnabled && m_nFarZ > 512 && nFar > nNear && nFar > 0)
+        {
+            int32 nMargin = m_nFarZ / 20; // finish fading 5% before clipping
+            if(nMargin < 96) nMargin = 96;
+            if(nMargin > 512) nMargin = 512;
+            const int32 nVisibleFar = m_nFarZ - nMargin;
+            if(nFar > nVisibleFar)
+            {
+                nFar = nVisibleFar;
+                if(nNear >= nFar)
+                    nNear = nFar > 256 ? nFar - 256 : 0;
+                g_pLTClient->CPrint(
+                    "Fireteam fog: clamped fade to %d..%d before FarZ %d (original %u..%u). Override +FTFogGuard 0.",
+                    nNear, nFar, m_nFarZ, m_nFogNearZ, m_nFogFarZ);
+            }
+        }
+
+        sprintf(buffer, "FogNearZ %d; FogFarZ %d", nNear, nFar);
+        g_pLTClient->RunConsoleString(buffer);
 	}
 
 	sprintf(buffer, "SkyFogEnable %d", m_bSkyFogEnable ? 1 : 0);
