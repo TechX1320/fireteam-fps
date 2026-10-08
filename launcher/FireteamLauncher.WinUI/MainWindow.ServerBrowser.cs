@@ -84,6 +84,25 @@ public sealed partial class MainWindow
         remove.Click += (sender, args) => RemoveServerFavorite();
         actions.Children.Add(remove);
 
+        var submit = SecondaryButton("SUBMIT SERVER");
+        submit.Click += (sender, args) =>
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                    "https://github.com/TechX1320/fireteam-fps/issues/new?template=server_listing.md")
+                {
+                    UseShellExecute = true
+                });
+                ServerBrowserStatus.Text = "Submission form opened in your browser. Public listings are opt-in and reviewed before publication.";
+            }
+            catch(Exception ex)
+            {
+                ServerBrowserStatus.Text = "Could not open submission form: " + ex.Message;
+            }
+        };
+        actions.Children.Add(submit);
+
         page.Children.Add(actions);
 
         var dedicated = SecondaryButton("START DEDICATED SERVER");
