@@ -537,6 +537,23 @@ static bool FT_SpawnZombieAt(
 // Generic CA maps may have authored spawners on several disconnected floors.
 // Prefer a nearby, same-level anchor so infected do not spawn one kilometer
 // below the squad and endlessly report waypoint=0/0.
+static bool FT_HasAnyPlayerInWorld()
+{
+    HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
+    if(!hPlayerClass)
+        return false;
+
+    for(HOBJECT hObj = g_pLTServer->GetNextObject(LTNULL);
+        hObj;
+        hObj = g_pLTServer->GetNextObject(hObj))
+    {
+        HCLASS hClass = g_pLTServer->GetObjectClass(hObj);
+        if(hClass && g_pLTServer->IsKindOf(hClass, hPlayerClass))
+            return true;
+    }
+    return false;
+}
+
 static bool FT_SpawnAnchorNearLivingPlayer(HOBJECT hAnchor)
 {
     if(!hAnchor)
@@ -769,6 +786,19 @@ void Spawner::UpdateRoundController()
     if(!s_bQaZombiesEnabled ||
        s_bGameOver)
     {
+        return;
+    }
+
+    // Dedicated servers can be idle for hours. Reset preparation if the
+    // squad disconnects and never spawn zombies into an empty world.
+    if(!FT_HasAnyPlayerInWorld())
+    {
+        if(s_nRound == 0)
+        {
+            s_bFirstRoundPreparing = false;
+            s_fFirstRoundReadyAt = 0.0f;
+            s_nLastPreparationSecond = 0xFFFFFFFF;
+        }
         return;
     }
 
