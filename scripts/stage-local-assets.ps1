@@ -234,7 +234,7 @@ function Map-WorldTextureReferences([string]$DatPath) {
     $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
     $matches = [regex]::Matches(
         $ascii,
-        '(?i)textures[\/][A-Za-z0-9_ .\-\\\/]+?\.(?:dtx|spr)'
+        '(?i)textures[\\/][A-Za-z0-9_ .\-\\/]+?\.(?:dtx|spr)'
     )
 
     $refs = @(
