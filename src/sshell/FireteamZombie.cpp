@@ -2174,8 +2174,11 @@ void FireteamZombie::UpdateZombie()
     // Genuine last-straggler rescue. Check NET movement, not lifetime:
     // active infected that advance 96 units, or engage a nearby survivor,
     // never get repositioned merely because the clock has elapsed.
+    // A zombie directly above or below the player can have near-zero
+    // horizontal distance yet still be trapped on a different floor.
     if(FT_IsFinalLivingInfected(m_hObject) &&
-       fPlayerDistance > 250.0f)
+       (fPlayerDistance > 250.0f ||
+        (float)fabs(vTarget.y - vNewPos.y) > 160.0f))
     {
         LTVector vSinceProgress =
             vNewPos - m_vStragglerProgressPos;
