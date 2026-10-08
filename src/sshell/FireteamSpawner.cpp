@@ -53,7 +53,30 @@ static float s_fNextRoundTime = 0.0f;
 static float s_fSpawnInterval = 1.25f;
 static FTDifficultyDef s_Difficulty;
 
-static void FT_BroadcastRoundState(uint8 nState)
+// The first round must never begin during map load, before any player exists.
+// Late joins can extend preparation, but never indefinitely postpone a match.
+static const float kFirstRoundReadySeconds = 45.0f;
+static const float kLateJoinGraceSeconds = 15.0f;
+static const float kMaximumFirstRoundReadySeconds = 60.0f;
+static bool s_bFirstRoundPreparing = false;
+static float s_fFirstPlayerJoinedAt = 0.0f;
+static float s_fFirstRoundReadyAt = 0.0f;
+static uint32 s_nLastPreparationSecond = 0xFFFFFFFF;
+
+static void FT_SendFirstRoundPreparation(HCLIENT hClient, float fRemaining)
+{
+    ILTMessage_Write *pMsg = LTNULL;
+    if(g_pLTSCommon->CreateMessage(pMsg) != LT_OK || !pMsg)
+        return;
+
+    pMsg->IncRef();
+    pMsg->Writeuint8(MSG_SC_ROUND_PREP);
+    pMsg->Writefloat(fRemaining > 0.0f ? fRemaining : 0.0f);
+    g_pLTServer->SendToClient(pMsg->Read(), hClient, MESSAGE_GUARANTEED);
+    pMsg->DecRef();
+}
+
+static void FT_SendRoundState(uint8 nState, HCLIENT hClient)
 {
     ILTMessage_Write *pMsg = LTNULL;
     if(g_pLTSCommon->CreateMessage(pMsg) != LT_OK ||
@@ -72,10 +95,53 @@ static void FT_BroadcastRoundState(uint8 nState)
 
     g_pLTServer->SendToClient(
         pMsg->Read(),
-        LTNULL,
+        hClient,
         MESSAGE_GUARANTEED);
 
     pMsg->DecRef();
+}
+
+static void FT_BroadcastRoundState(uint8 nState)
+{
+    FT_SendRoundState(nState, LTNULL);
+}
+
+void FT_OnFireteamPlayerJoined(HCLIENT hClient)
+{
+    const float fNow = g_pLTServer->GetTime();
+    if(s_nRound == 0 && !s_bGameOver && s_bQaZombiesEnabled)
+    {
+        if(!s_bFirstRoundPreparing)
+        {
+            s_bFirstRoundPreparing = true;
+            s_fFirstPlayerJoinedAt = fNow;
+            s_fFirstRoundReadyAt = fNow + kFirstRoundReadySeconds;
+            g_pLTServer->CPrint(
+                "Fireteam: first player entered; Round 1 preparation %.0f seconds.",
+                kFirstRoundReadySeconds);
+        }
+        else
+        {
+            // Allow a joining teammate to get ready, but cap total waiting
+            // time to prevent join/disconnect spam from delaying rounds.
+            float fExtendUntil = fNow + kLateJoinGraceSeconds;
+            const float fHardCap =
+                s_fFirstPlayerJoinedAt + kMaximumFirstRoundReadySeconds;
+            if(fExtendUntil > fHardCap)
+                fExtendUntil = fHardCap;
+            if(fExtendUntil > s_fFirstRoundReadyAt)
+                s_fFirstRoundReadyAt = fExtendUntil;
+        }
+
+        s_nLastPreparationSecond = 0xFFFFFFFF;
+        FT_SendFirstRoundPreparation(
+            LTNULL,
+            s_fFirstRoundReadyAt - fNow);
+        return;
+    }
+
+    // Reconcile rounds for clients joining an already-running server.
+    FT_SendRoundState(s_bGameOver ? 3 : 0, hClient);
 }
 
 bool FT_AreQaZombiesEnabled()
@@ -106,6 +172,13 @@ void FT_SetQaZombiesEnabled(
     s_nMaxAlive = 0;
     s_fNextSpawnTime = 0.0f;
     s_fNextRoundTime = 0.0f;
+    s_bFirstRoundPreparing = bEnabled;
+    s_fFirstPlayerJoinedAt = g_pLTServer->GetTime();
+    s_fFirstRoundReadyAt =
+        bEnabled ? s_fFirstPlayerJoinedAt + 5.0f : 0.0f;
+    s_nLastPreparationSecond = 0xFFFFFFFF;
+    FT_SendFirstRoundPreparation(
+        LTNULL, bEnabled ? 5.0f : 0.0f);
 
     if(!bEnabled)
     {
@@ -216,6 +289,10 @@ void Spawner::ResetRoundController()
     s_fNextSpawnTime = 0.0f;
     s_fNextRoundTime = 0.0f;
     s_fSpawnInterval = 1.25f;
+    s_bFirstRoundPreparing = false;
+    s_fFirstPlayerJoinedAt = 0.0f;
+    s_fFirstRoundReadyAt = 0.0f;
+    s_nLastPreparationSecond = 0xFFFFFFFF;
 
     if(!FT_LoadActiveDifficulty(
         "config/difficulties.cfg",
@@ -658,9 +735,33 @@ void Spawner::UpdateRoundController()
         if(s_nPerimeterSpawnerCount == 0) return;
     }
 
-    float fNow = g_pLTServer->GetTime();
+    const float fNow = g_pLTServer->GetTime();
 
-    if(!s_bRoundActive && !s_bRoundIntermission)
+    if(s_nRound == 0)
+    {
+        // Without a player, the world may have loaded but gameplay cannot
+        // begin. In particular, do not send ROUND START before UI connection.
+        if(!s_bFirstRoundPreparing)
+            return;
+
+        if(fNow < s_fFirstRoundReadyAt)
+        {
+            const uint32 nSeconds =
+                (uint32)(s_fFirstRoundReadyAt - fNow + 0.999f);
+            if(nSeconds != s_nLastPreparationSecond)
+            {
+                s_nLastPreparationSecond = nSeconds;
+                FT_SendFirstRoundPreparation(
+                    LTNULL, s_fFirstRoundReadyAt - fNow);
+            }
+            return;
+        }
+
+        s_bFirstRoundPreparing = false;
+        FT_SendFirstRoundPreparation(LTNULL, 0.0f);
+        StartNextRound();
+    }
+    else if(!s_bRoundActive && !s_bRoundIntermission)
     {
         StartNextRound();
     }
@@ -755,6 +856,10 @@ void FT_EnsureFireteamRoundController()
         0;
     s_nLastSpawner =
         -1;
+    s_bFirstRoundPreparing = false;
+    s_fFirstRoundReadyAt = 0.0f;
+    s_fFirstPlayerJoinedAt = 0.0f;
+    s_nLastPreparationSecond = 0xFFFFFFFF;
 
     HCLASS hSpawnerClass =
         g_pLTServer->GetClass(
