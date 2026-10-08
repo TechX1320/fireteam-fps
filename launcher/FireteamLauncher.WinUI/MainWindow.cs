@@ -446,6 +446,9 @@ public sealed partial class MainWindow : Window
         LoadoutPresetNameBox.Text =
             preset.Name;
 
+        var used =
+            new List<WeaponDefinition>();
+
         for(var slot = 0;
             slot < _draftLoadout.Length;
             ++slot)
@@ -476,35 +479,66 @@ public sealed partial class MainWindow : Window
             }
 
             if(weapon is not null &&
-               !CategoryAllowedForSlot(
-                   weapon.LoadoutCategory,
-                   slot))
+               (!CategoryAllowedForSlot(
+                    weapon.LoadoutCategory,
+                    slot) ||
+                used.Any(
+                    existing =>
+                        SameWeapon(
+                            existing,
+                            weapon))))
             {
                 weapon = null;
             }
 
             if(weapon is null)
             {
-                // Old Gear Tabs can predate the slot rules. Prefer a usable
-                // active weapon for this role instead of preserving an
-                // impossible combination such as a Sickle in SIDEARM.
+                // Old Gear Tabs can predate the current role rules. Repair
+                // them in-memory instead of allowing impossible combinations
+                // such as a Sickle in SIDEARM or the same gun in two slots.
                 weapon =
-                    active.FirstOrDefault(
+                    _choices.FirstOrDefault(
                         candidate =>
                             CategoryAllowedForSlot(
                                 candidate.LoadoutCategory,
                                 slot) &&
                             HasUsablePlayerView(
-                                candidate)) ??
+                                candidate) &&
+                            !used.Any(
+                                existing =>
+                                    SameWeapon(
+                                        existing,
+                                        candidate))) ??
                     active.FirstOrDefault(
                         candidate =>
                             CategoryAllowedForSlot(
                                 candidate.LoadoutCategory,
-                                slot));
+                                slot) &&
+                            !used.Any(
+                                existing =>
+                                    SameWeapon(
+                                        existing,
+                                        candidate))) ??
+                    _choices.FirstOrDefault(
+                        candidate =>
+                            CategoryAllowedForSlot(
+                                candidate.LoadoutCategory,
+                                slot) &&
+                            !used.Any(
+                                existing =>
+                                    SameWeapon(
+                                        existing,
+                                        candidate)));
             }
 
             _draftLoadout[slot] =
                 weapon;
+
+            if(weapon is not null)
+            {
+                used.Add(
+                    weapon);
+            }
         }
 
         RefreshLoadoutSlotButtons();
