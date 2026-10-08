@@ -770,10 +770,12 @@ bool CPlayerClnt::IsMoving()
 //-----------------------------------------------------------------------------
 void CPlayerClnt::Update()
 {
+    bool bReloadAnimationDone = false;
     if(FT_RoundHudIsBottomlessActive() && m_bReloading)
     {
         m_bReloading = false;
         m_fReloadComplete = 0.0f;
+        bReloadAnimationDone = true;
     }
 
     if(m_bReloading &&
@@ -781,6 +783,7 @@ void CPlayerClnt::Update()
     {
         m_bReloading = false;
         m_fReloadComplete = 0.0f;
+        bReloadAnimationDone = true;
 
         // The server owns the actual ammo transfer. Ask it to reconcile the
         // HUD at the exact end of the local reload instead of waiting for the
@@ -796,6 +799,22 @@ void CPlayerClnt::Update()
                 MESSAGE_GUARANTEED);
             pAmmoSync->DecRef();
         }
+    }
+
+    if(bReloadAnimationDone && m_hViewWeaponObject)
+    {
+        // Certain imported LTB reload clips appear to loop even after the
+        // game considers the reload finished. Explicitly return to IDLE.
+        const FTWeaponDef *pDef = GetCurrentWeaponDef();
+        HMODELANIM hIdle = INVALID_MODEL_ANIM;
+        if((!pDef || !pDef->sAnimIdle[0]) && m_hViewWeaponObject)
+            hIdle = g_pLTClient->GetAnimIndex(
+                m_hViewWeaponObject, (char*)"idle_0");
+        PlayViewWeaponAnimation(
+            pDef && pDef->sAnimIdle[0] ? pDef->sAnimIdle :
+                (hIdle != INVALID_MODEL_ANIM ? "idle_0" : "idle"),
+            true);
+        m_bViewWeaponAction = false;
     }
 
     LTVector vZero(0.0f, 0.0f, 0.0f);
