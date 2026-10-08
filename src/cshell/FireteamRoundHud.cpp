@@ -42,6 +42,27 @@ static float s_fOneHitUntil = 0.0f;
 static float s_fGodUntil = 0.0f;
 static float s_fWallhackUntil = 0.0f;
 
+// The HUD advances timed buff displays on exactly the same rule as the
+// authoritative server: combat seconds, not preparation/intermission time.
+static bool s_bCombatTimerActive = false;
+static float s_fCombatHudSeconds = 0.0f;
+static float s_fLastCombatHudSample = -1.0f;
+
+static float FT_HudCombatTime()
+{
+    const float fNow = g_pLTClient->GetTime();
+    if(s_fLastCombatHudSample < 0.0f || fNow < s_fLastCombatHudSample)
+    {
+        s_fLastCombatHudSample = fNow;
+        return s_fCombatHudSeconds;
+    }
+    if(s_bCombatTimerActive)
+        s_fCombatHudSeconds += fNow - s_fLastCombatHudSample;
+    s_fLastCombatHudSample = fNow;
+    return s_fCombatHudSeconds;
+}
+
+
 static void FT_PlayRoundCue(
     const char *pSound)
 {
@@ -284,6 +305,9 @@ void FT_RoundHudTerm()
     s_fOneHitUntil = 0.0f;
     s_fGodUntil = 0.0f;
     s_fWallhackUntil = 0.0f;
+    s_bCombatTimerActive = false;
+    s_fCombatHudSeconds = 0.0f;
+    s_fLastCombatHudSample = -1.0f;
 }
 
 void FT_RoundHudHandleMessage(
@@ -299,6 +323,9 @@ void FT_RoundHudHandleMessage(
     s_nTarget = pMessage->Readuint16();
     s_nKilled = pMessage->Readuint16();
     s_nAlive = pMessage->Readuint16();
+    const bool bCombatActive = pMessage->Readbool();
+    FT_HudCombatTime(); // Account for the old state BEFORE switching.
+    s_bCombatTimerActive = bCombatActive;
 
     if(!s_pRoundFont)
     {
@@ -396,7 +423,7 @@ void FT_RoundHudSetTimedPowerups(
     }
 
     const float fNow =
-        g_pLTClient->GetTime();
+        FT_HudCombatTime();
 
     s_fBottomlessUntil =
         fBottomlessSeconds > 0.0f
@@ -429,6 +456,9 @@ void FT_RoundHudResetFirstRoundPreparation()
     s_nKilled = 0;
     s_nAlive = 0;
     s_bGameOver = false;
+    s_bCombatTimerActive = false;
+    s_fCombatHudSeconds = 0.0f;
+    s_fLastCombatHudSample = -1.0f;
     s_nFirstRoundPrepRevision = 0;
     s_nFirstRoundPrepDeadlineTick = 0;
     s_bFirstRoundPrepClosed = false;
@@ -471,7 +501,7 @@ void FT_RoundHudSetFirstRoundPreparation(float fSeconds, uint32 nRevision)
 
 bool FT_RoundHudIsBottomlessActive()
 {
-    return s_fBottomlessUntil > g_pLTClient->GetTime();
+    return s_fBottomlessUntil > FT_HudCombatTime();
 }
 
 void FT_RoundHudSetRespawnCountdown(float fSeconds)
@@ -621,7 +651,7 @@ void FT_RenderRoundHud()
     }
 
     const float fNow =
-        g_pLTClient->GetTime();
+        FT_HudCombatTime();
 
     float fBuffY =
         (float)nScreenH - 136.0f;
