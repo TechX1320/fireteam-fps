@@ -318,8 +318,7 @@ static void FT_GrantTeamWallhack(
             g_pLTServer->HandleToObject(
                 hObject);
 
-        if(!pPlayer ||
-           !pPlayer->IsAlive())
+        if(!pPlayer)
         {
             continue;
         }
