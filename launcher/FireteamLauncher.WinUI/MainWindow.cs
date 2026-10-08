@@ -196,6 +196,7 @@ public sealed partial class MainWindow : Window
     private void ShowView(string tag)
     {
         HomeView.Visibility = tag == "home" ? Visibility.Visible : Visibility.Collapsed;
+        ServerBrowserView.Visibility = tag == "servers" ? Visibility.Visible : Visibility.Collapsed;
         LoadoutView.Visibility = tag == "loadout" ? Visibility.Visible : Visibility.Collapsed;
         PlayerGearView.Visibility = tag == "player-gear" ? Visibility.Visible : Visibility.Collapsed;
         WeaponModsView.Visibility = tag == "weapon-mods" ? Visibility.Visible : Visibility.Collapsed;
@@ -215,6 +216,7 @@ public sealed partial class MainWindow : Window
             "mini-tools" => "MINI TOOLS",
             "tools" => "MODS & CONTENT TOOLS",
             "settings" => "SETTINGS",
+            "servers" => "SERVER BROWSER",
             _ => "READY ROOM"
         };
     }
