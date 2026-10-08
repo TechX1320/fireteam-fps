@@ -52,4 +52,7 @@ bool FT_IsPositionInNavigationVolume(
 
 uint32 FT_GetNavigationVolumeCount();
 
+// Call before switching/loading worlds; authored volume handles are map-local.
+void FT_ResetNavigationCache();
+
 #endif
