@@ -2375,18 +2375,24 @@ void CLTClientShell::OnKeyDown(int key, int rep)
         if( VK_F9 == key &&
             rep == 0 )
         {
-            HLOCALOBJ hPlayer =
-                m_pPlayer->GetPlayerObject();
+            HLOCALOBJ hPositionObject =
+                (m_pCamera &&
+                 m_pCamera->IsFreecam())
+                ? m_pCamera->GetCamera()
+                : m_pPlayer->GetPlayerObject();
 
-            if(hPlayer)
+            if(hPositionObject)
             {
                 LTVector vPos;
                 g_pLTClient->GetObjectPos(
-                    hPlayer,
+                    hPositionObject,
                     &vPos);
 
                 g_pLTClient->CPrint(
-                    "Fireteam position: X=%.1f Y=%.1f Z=%.1f",
+                    m_pCamera &&
+                    m_pCamera->IsFreecam()
+                        ? "Fireteam spectator position: X=%.1f Y=%.1f Z=%.1f"
+                        : "Fireteam position: X=%.1f Y=%.1f Z=%.1f",
                     vPos.x,
                     vPos.y,
                     vPos.z);
