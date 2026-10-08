@@ -214,18 +214,38 @@ function Map-WorldTextureReferences([string]$DatPath) {
         return
     }
 
-    Write-Host "[UPDATE] Mapping world texture references from $([System.IO.Path]::GetFileName($DatPath))..."
+    $mapName = [System.IO.Path]::GetFileNameWithoutExtension($DatPath)
+    Write-Host "[UPDATE] Mapping world texture/sprite references from $([System.IO.Path]::GetFileName($DatPath))..."
+
+    $textureFiles = @(
+        Get-ChildItem -LiteralPath $texturesRoot -Recurse -File
+    )
+
+    $byLeaf = @{}
+    foreach($file in $textureFiles) {
+        $key = $file.Name.ToLowerInvariant()
+        if(-not $byLeaf.ContainsKey($key)) {
+            $byLeaf[$key] = @()
+        }
+        $byLeaf[$key] += $file
+    }
 
     $bytes = [System.IO.File]::ReadAllBytes($DatPath)
     $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
     $matches = [regex]::Matches(
         $ascii,
-        '(?i)textures[\\/][A-Za-z0-9_ .\-\\\/]+?\.dtx'
+        '(?i)textures[\/][A-Za-z0-9_ .\-\\\/]+?\.(?:dtx|spr)'
     )
 
-    $refs = @($matches | ForEach-Object { $_.Value } | Sort-Object -Unique)
+    $refs = @(
+        $matches |
+            ForEach-Object { $_.Value } |
+            Sort-Object -Unique
+    )
+
     $mapped = 0
     $ambiguous = 0
+    $missing = New-Object System.Collections.Generic.List[string]
 
     foreach($ref in $refs) {
         $normalized = $ref.Replace("/", "\")
@@ -237,12 +257,19 @@ function Map-WorldTextureReferences([string]$DatPath) {
         }
 
         $leaf = [System.IO.Path]::GetFileName($relative)
-        $candidates = @(
-            Get-ChildItem -LiteralPath $texturesRoot -Recurse -File |
-                Where-Object { $_.Name -ieq $leaf }
-        )
+        $leafKey = $leaf.ToLowerInvariant()
+
+        $candidates =
+            if($byLeaf.ContainsKey($leafKey)) {
+                @($byLeaf[$leafKey])
+            }
+            else {
+                @()
+            }
 
         if ($candidates.Count -eq 0) {
+            Write-Host "[MISSING] $normalized"
+            $missing.Add($normalized)
             continue
         }
 
@@ -253,7 +280,8 @@ function Map-WorldTextureReferences([string]$DatPath) {
             $candidates | Where-Object {
                 $candidateRelative = $_.FullName.Substring($texturesRoot.Length).TrimStart('\')
                 $candidateSegments = $candidateRelative -split '\\'
-                $candidateSegments.Count -gt 1 -and $candidateSegments[0] -ieq $targetTop
+                $candidateSegments.Count -gt 1 -and
+                    $candidateSegments[0] -ieq $targetTop
             }
         )
 
@@ -288,6 +316,7 @@ function Map-WorldTextureReferences([string]$DatPath) {
                 Write-Host "            $($candidate.FullName)"
             }
             $ambiguous++
+            $missing.Add($normalized)
             continue
         }
 
@@ -298,7 +327,22 @@ function Map-WorldTextureReferences([string]$DatPath) {
         $mapped++
     }
 
-    Write-Host "[OK] World texture map: $mapped aliases created, $ambiguous ambiguous"
+    $reports = Join-Path $assetRoot "Reports"
+    New-Item -ItemType Directory -Force -Path $reports | Out-Null
+    $reportPath = Join-Path $reports ($mapName + "-missing-map-resources.txt")
+
+    @(
+        "# FIRETEAM map dependency audit"
+        "map=$([System.IO.Path]::GetFileName($DatPath))"
+        "referenced_textures_or_sprites=$($refs.Count)"
+        "mapped_aliases=$mapped"
+        "ambiguous_or_missing=$($missing.Count)"
+        ""
+        $missing
+    ) | Set-Content -LiteralPath $reportPath
+
+    Write-Host "[OK] World texture/sprite map: $mapped aliases created, $ambiguous ambiguous, $($missing.Count) unresolved"
+    Write-Host "[OK] Map dependency report -> assets-local\Reports\$mapName-missing-map-resources.txt"
 }
 
 if(Test-Path -LiteralPath $mapPath) {
