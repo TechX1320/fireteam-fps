@@ -16,6 +16,8 @@
 #include <float.h>
 #include <string.h>
 #include <time.h>
+#include <stdio.h>
+#include <windows.h>
 
 BEGIN_CLASS(Spawner)
     ADD_STRINGPROP(DefaultSpawn, "")
@@ -63,13 +65,44 @@ static FTDifficultyDef s_Difficulty;
 
 // The first round must never begin during map load, before any player exists.
 // Late joins can extend preparation, but never indefinitely postpone a match.
-static const float kFirstRoundReadySeconds = 45.0f;
-static const float kLateJoinGraceSeconds = 15.0f;
-static const float kMaximumFirstRoundReadySeconds = 60.0f;
+static const uint32 kDefaultFirstRoundReadySeconds = 45;
+static const uint32 kLateJoinGraceSeconds = 15;
+static const uint32 kMaximumFirstRoundReadySeconds = 60;
 static bool s_bFirstRoundPreparing = false;
-static float s_fFirstPlayerJoinedAt = 0.0f;
-static float s_fFirstRoundReadyAt = 0.0f;
+static ULONGLONG s_nFirstPlayerJoinedTick = 0;
+static ULONGLONG s_nFirstRoundReadyTick = 0;
 static uint32 s_nLastPreparationSecond = 0xFFFFFFFF;
+
+// The launcher's session file selects SP (15s) versus host/dedicated (45s).
+// GetTickCount64 runs while the player alt-tabs; engine GetTime can pause.
+static uint32 FT_FirstRoundSeconds()
+{
+    FILE *pFile = fopen("config/session.cfg", "r");
+    if(!pFile)
+        return kDefaultFirstRoundReadySeconds;
+    uint32 nDelay = kDefaultFirstRoundReadySeconds;
+    char sLine[160];
+    while(fgets(sLine, sizeof(sLine), pFile))
+    {
+        unsigned nRead = 0;
+        if(sscanf(sLine, "first_round_prep=%u", &nRead) == 1 &&
+           nRead >= 5 && nRead <= 60)
+        {
+            nDelay = nRead;
+            break;
+        }
+    }
+    fclose(pFile);
+    return nDelay;
+}
+
+static float FT_FirstRoundRemaining()
+{
+    const ULONGLONG nNow = GetTickCount64();
+    return s_nFirstRoundReadyTick > nNow
+        ? (float)(s_nFirstRoundReadyTick - nNow) / 1000.0f
+        : 0.0f;
+}
 
 static void FT_SendFirstRoundPreparation(HCLIENT hClient, float fRemaining)
 {
@@ -116,35 +149,34 @@ static void FT_BroadcastRoundState(uint8 nState)
 
 void FT_OnFireteamPlayerJoined(HCLIENT hClient)
 {
-    const float fNow = g_pLTServer->GetTime();
+    const ULONGLONG nNow = GetTickCount64();
     if(s_nRound == 0 && !s_bGameOver && s_bQaZombiesEnabled)
     {
         if(!s_bFirstRoundPreparing)
         {
+            const uint32 nDelay = FT_FirstRoundSeconds();
             s_bFirstRoundPreparing = true;
-            s_fFirstPlayerJoinedAt = fNow;
-            s_fFirstRoundReadyAt = fNow + kFirstRoundReadySeconds;
+            s_nFirstPlayerJoinedTick = nNow;
+            s_nFirstRoundReadyTick = nNow + (ULONGLONG)nDelay * 1000;
             g_pLTServer->CPrint(
-                "Fireteam: first player entered; Round 1 preparation %.0f seconds.",
-                kFirstRoundReadySeconds);
+                "Fireteam: first player entered; Round 1 preparation %u wall-clock seconds.",
+                nDelay);
         }
         else
         {
-            // Allow a joining teammate to get ready, but cap total waiting
-            // time to prevent join/disconnect spam from delaying rounds.
-            float fExtendUntil = fNow + kLateJoinGraceSeconds;
-            const float fHardCap =
-                s_fFirstPlayerJoinedAt + kMaximumFirstRoundReadySeconds;
-            if(fExtendUntil > fHardCap)
-                fExtendUntil = fHardCap;
-            if(fExtendUntil > s_fFirstRoundReadyAt)
-                s_fFirstRoundReadyAt = fExtendUntil;
+            // Let a late teammate get ready, but never wait beyond 60s.
+            ULONGLONG nExtendUntil =
+                nNow + (ULONGLONG)kLateJoinGraceSeconds * 1000;
+            const ULONGLONG nHardCap =
+                s_nFirstPlayerJoinedTick +
+                (ULONGLONG)kMaximumFirstRoundReadySeconds * 1000;
+            if(nExtendUntil > nHardCap)
+                nExtendUntil = nHardCap;
+            if(nExtendUntil > s_nFirstRoundReadyTick)
+                s_nFirstRoundReadyTick = nExtendUntil;
         }
-
         s_nLastPreparationSecond = 0xFFFFFFFF;
-        FT_SendFirstRoundPreparation(
-            LTNULL,
-            s_fFirstRoundReadyAt - fNow);
+        FT_SendFirstRoundPreparation(LTNULL, FT_FirstRoundRemaining());
         return;
     }
 
@@ -183,9 +215,9 @@ void FT_SetQaZombiesEnabled(
     s_fMissingInfectedSince = 0.0f;
     s_nMissingInfectedRestores = 0;
     s_bFirstRoundPreparing = bEnabled;
-    s_fFirstPlayerJoinedAt = g_pLTServer->GetTime();
-    s_fFirstRoundReadyAt =
-        bEnabled ? s_fFirstPlayerJoinedAt + 5.0f : 0.0f;
+    s_nFirstPlayerJoinedTick = GetTickCount64();
+    s_nFirstRoundReadyTick = bEnabled
+        ? s_nFirstPlayerJoinedTick + 5000 : 0;
     s_nLastPreparationSecond = 0xFFFFFFFF;
     FT_SendFirstRoundPreparation(
         LTNULL, bEnabled ? 5.0f : 0.0f);
@@ -302,8 +334,8 @@ void Spawner::ResetRoundController()
     s_fMissingInfectedSince = 0.0f;
     s_nMissingInfectedRestores = 0;
     s_bFirstRoundPreparing = false;
-    s_fFirstPlayerJoinedAt = 0.0f;
-    s_fFirstRoundReadyAt = 0.0f;
+    s_nFirstPlayerJoinedTick = 0;
+    s_nFirstRoundReadyTick = 0;
     s_nLastPreparationSecond = 0xFFFFFFFF;
 
     if(!FT_LoadActiveDifficulty(
@@ -866,7 +898,7 @@ void Spawner::UpdateRoundController()
         if(s_nRound == 0)
         {
             s_bFirstRoundPreparing = false;
-            s_fFirstRoundReadyAt = 0.0f;
+            s_nFirstRoundReadyTick = 0;
             s_nLastPreparationSecond = 0xFFFFFFFF;
         }
         return;
@@ -927,15 +959,14 @@ void Spawner::UpdateRoundController()
         if(!s_bFirstRoundPreparing)
             return;
 
-        if(fNow < s_fFirstRoundReadyAt)
+        const float fRemaining = FT_FirstRoundRemaining();
+        if(fRemaining > 0.0f)
         {
-            const uint32 nSeconds =
-                (uint32)(s_fFirstRoundReadyAt - fNow + 0.999f);
+            const uint32 nSeconds = (uint32)(fRemaining + 0.999f);
             if(nSeconds != s_nLastPreparationSecond)
             {
                 s_nLastPreparationSecond = nSeconds;
-                FT_SendFirstRoundPreparation(
-                    LTNULL, s_fFirstRoundReadyAt - fNow);
+                FT_SendFirstRoundPreparation(LTNULL, fRemaining);
             }
             return;
         }
@@ -1062,8 +1093,8 @@ void FT_EnsureFireteamRoundController()
     s_nLastSpawner =
         -1;
     s_bFirstRoundPreparing = false;
-    s_fFirstRoundReadyAt = 0.0f;
-    s_fFirstPlayerJoinedAt = 0.0f;
+    s_nFirstRoundReadyTick = 0;
+    s_nFirstPlayerJoinedTick = 0;
     s_nLastPreparationSecond = 0xFFFFFFFF;
 
     HCLASS hSpawnerClass =
