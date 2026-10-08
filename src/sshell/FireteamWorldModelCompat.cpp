@@ -20,10 +20,10 @@ protected:
 
             if(fData == PRECREATE_WORLDFILE)
             {
-                // Jupiter names compiled brush submodels using m_Name.
-                strncpy(pOCS->m_Filename, pOCS->m_Name,
-                    sizeof(pOCS->m_Filename) - 1);
-                pOCS->m_Filename[sizeof(pOCS->m_Filename) - 1] = '\0';
+                // Match the proven SealHunter TransWorldmodel loader:
+                // a compiled brush submodel is addressed by its Name prop.
+                g_pLTServer->GetPropString(
+                    "Name", pOCS->m_Filename, MAX_CS_FILENAME_LEN);
             }
 
             pOCS->m_ObjectType = OT_WORLDMODEL;
@@ -36,4 +36,4 @@ protected:
 };
 
 BEGIN_CLASS(WorldModel)
-END_CLASS_DEFAULT_FLAGS(WorldModel, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
+END_CLASS_DEFAULT_FLAGS(WorldModel, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD | CF_WORLDMODEL)
