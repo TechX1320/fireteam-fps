@@ -8,6 +8,7 @@
 #include <iltsoundmgr.h>
 #include <stdio.h>
 #include <string.h>
+#include <float.h>
 
 static CUIFont *s_pRoundFont = LTNULL;
 static CUIFont *s_pBuffFont = LTNULL;
@@ -22,6 +23,9 @@ static uint16 s_nRound = 0;
 static uint16 s_nTarget = 0;
 static uint16 s_nKilled = 0;
 static uint16 s_nAlive = 0;
+static uint8 s_nLives = 3;
+static uint8 s_nMaxLives = 3;
+static bool s_bGameOver = false;
 static float s_fAnnouncementUntil = 0.0f;
 static float s_fBottomlessUntil = 0.0f;
 static float s_fOneHitUntil = 0.0f;
@@ -213,6 +217,9 @@ void FT_RoundHudTerm()
     s_nTarget = 0;
     s_nKilled = 0;
     s_nAlive = 0;
+    s_nLives = 3;
+    s_nMaxLives = 3;
+    s_bGameOver = false;
     s_fAnnouncementUntil = 0.0f;
     s_fBottomlessUntil = 0.0f;
     s_fOneHitUntil = 0.0f;
@@ -248,6 +255,8 @@ void FT_RoundHudHandleMessage(
 
     if(nState == 1)
     {
+        s_bGameOver = false;
+
         sprintf(
             szAnnouncement,
             "ROUND %u  BEGIN",
@@ -274,6 +283,14 @@ void FT_RoundHudHandleMessage(
         // Companion Cabin Fever section sting for a cleared round.
         FT_PlayRoundCue(
             "Snd/CABINFEVER/SECTION2.WAV");
+    }
+    else if(nState == 3)
+    {
+        s_bGameOver = true;
+        s_pAnnouncement->SetText(
+            "GAME OVER");
+        s_fAnnouncementUntil =
+            FLT_MAX;
     }
 }
 
@@ -341,6 +358,47 @@ void FT_RoundHudSetTimedPowerups(
         : 0.0f;
 }
 
+void FT_RoundHudSetLives(
+    uint8 nLives,
+    uint8 nMaxLives)
+{
+    if(!s_pRoundFont)
+    {
+        FT_RoundHudInit();
+    }
+
+    const uint8 nPreviousLives =
+        s_nLives;
+
+    s_nLives = nLives;
+    s_nMaxLives =
+        nMaxLives > 0
+        ? nMaxLives
+        : 1;
+
+    if(nPreviousLives > 0 &&
+       s_nLives == 0 &&
+       !s_bGameOver &&
+       s_pAnnouncement)
+    {
+        s_pAnnouncement->SetText(
+            "OUT OF LIVES");
+        s_fAnnouncementUntil =
+            g_pLTClient->GetTime() +
+            4.0f;
+    }
+}
+
+bool FT_RoundHudIsPlayerEliminated()
+{
+    return s_nLives == 0;
+}
+
+bool FT_RoundHudIsGameOver()
+{
+    return s_bGameOver;
+}
+
 void FT_RenderRoundHud()
 {
     if(!s_pRoundFont || s_nRound == 0)
@@ -360,11 +418,13 @@ void FT_RenderRoundHud()
         char szStatus[96];
         sprintf(
             szStatus,
-            "ROUND %u     KILLS %u/%u     ALIVE %u",
+            "ROUND %u     KILLS %u/%u     ALIVE %u     LIVES %u/%u",
             (uint32)s_nRound,
             (uint32)s_nKilled,
             (uint32)s_nTarget,
-            (uint32)s_nAlive);
+            (uint32)s_nAlive,
+            (uint32)s_nLives,
+            (uint32)s_nMaxLives);
 
         s_pRoundStatus->SetText(szStatus);
 
