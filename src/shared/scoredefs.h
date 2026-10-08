@@ -8,6 +8,7 @@ typedef struct ScoreStruct
     uint32 iClientID;
     char   sPlayerName[32];
     uint32 iScore;
+    uint8  iLives;
     float  fMoney;
 }SCORESTRUCT;
 
