@@ -20,6 +20,7 @@ static CUIFormattedPolyString *s_pGodStatus = LTNULL;
 static CUIFormattedPolyString *s_pWallhackStatus = LTNULL;
 static CUIFormattedPolyString *s_pSpectatorStatus = LTNULL;
 static CUIFormattedPolyString *s_pRespawnStatus = LTNULL;
+static CUIFormattedPolyString *s_pFirstRoundPrep = LTNULL;
 
 static uint16 s_nRound = 0;
 static uint16 s_nTarget = 0;
@@ -32,6 +33,7 @@ static bool s_bSpectating = false;
 static bool s_bQaSpectating = false;
 static float s_fAnnouncementUntil = 0.0f;
 static float s_fRespawnUntil = 0.0f;
+static float s_fFirstRoundPrepUntil = 0.0f;
 static float s_fBottomlessUntil = 0.0f;
 static float s_fOneHitUntil = 0.0f;
 static float s_fGodUntil = 0.0f;
@@ -113,6 +115,11 @@ void FT_RoundHudInit()
             s_pRoundFont,
             "");
 
+    s_pFirstRoundPrep =
+        g_pLTCFontManager->CreateFormattedPolyString(
+            s_pRoundFont,
+            "");
+
     s_pRoundStatus =
         g_pLTCFontManager->CreateFormattedPolyString(
             s_pRoundFont,
@@ -154,6 +161,9 @@ void FT_RoundHudInit()
     if(s_pRespawnStatus)
         s_pRespawnStatus->SetColor(0xFFFFFFFF);
 
+    if(s_pFirstRoundPrep)
+        s_pFirstRoundPrep->SetColor(0xFFFFB000);
+
     if(s_pAnnouncement)
         s_pAnnouncement->SetColor(0xFFFFB000);
 
@@ -178,6 +188,12 @@ void FT_RoundHudInit()
 
 void FT_RoundHudTerm()
 {
+    if(s_pFirstRoundPrep)
+    {
+        g_pLTCFontManager->DestroyPolyString(s_pFirstRoundPrep);
+        s_pFirstRoundPrep = LTNULL;
+    }
+
     if(s_pRespawnStatus)
     {
         g_pLTCFontManager->DestroyPolyString(s_pRespawnStatus);
@@ -258,6 +274,7 @@ void FT_RoundHudTerm()
     s_bQaSpectating = false;
     s_fAnnouncementUntil = 0.0f;
     s_fRespawnUntil = 0.0f;
+    s_fFirstRoundPrepUntil = 0.0f;
     s_fBottomlessUntil = 0.0f;
     s_fOneHitUntil = 0.0f;
     s_fGodUntil = 0.0f;
@@ -293,6 +310,7 @@ void FT_RoundHudHandleMessage(
     if(nState == 1)
     {
         s_bGameOver = false;
+        s_fFirstRoundPrepUntil = 0.0f;
 
         sprintf(
             szAnnouncement,
@@ -392,6 +410,16 @@ void FT_RoundHudSetTimedPowerups(
     s_fWallhackUntil =
         fWallhackSeconds > 0.0f
         ? fNow + fWallhackSeconds
+        : 0.0f;
+}
+
+void FT_RoundHudSetFirstRoundPreparation(float fSeconds)
+{
+    if(!s_pRoundFont)
+        FT_RoundHudInit();
+
+    s_fFirstRoundPrepUntil = fSeconds > 0.0f
+        ? g_pLTClient->GetTime() + fSeconds
         : 0.0f;
 }
 
@@ -504,6 +532,20 @@ void FT_RenderRoundHud()
             ((float)nScreenW - s_pRespawnStatus->GetWidth()) * 0.5f,
             (float)nScreenH * 0.48f);
         s_pRespawnStatus->Render();
+    }
+
+    if(s_pFirstRoundPrep && s_nRound == 0 &&
+       fNow < s_fFirstRoundPrepUntil && !s_bGameOver)
+    {
+        const float fSeconds = s_fFirstRoundPrepUntil - fNow;
+        char szPrep[100];
+        sprintf(szPrep, "GET READY!  ROUND 1 STARTS IN %u",
+            (uint32)(fSeconds + 0.999f));
+        s_pFirstRoundPrep->SetText(szPrep);
+        s_pFirstRoundPrep->SetPosition(
+            ((float)nScreenW - s_pFirstRoundPrep->GetWidth()) * 0.5f,
+            (float)nScreenH * 0.38f);
+        s_pFirstRoundPrep->Render();
     }
 
     if(s_pSpectatorStatus &&
