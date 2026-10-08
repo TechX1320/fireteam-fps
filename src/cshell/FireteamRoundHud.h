@@ -25,6 +25,8 @@ void FT_RoundHudSetLives(
     uint8 nMaxLives);
 bool FT_RoundHudIsPlayerEliminated();
 bool FT_RoundHudIsGameOver();
+// Only local solo matches may restart themselves; network servers own maps.
+void FT_RoundHudSetSoloRetry(bool bAllowed);
 void FT_RoundHudSetSpectator(
     bool bSpectating,
     bool bQaMode);
