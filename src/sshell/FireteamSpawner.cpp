@@ -9,6 +9,7 @@
 
 #include <iltcommon.h>
 #include <iltmessage.h>
+#include <iltphysics.h>
 #include <ltobjectcreate.h>
 #include <stdlib.h>
 #include <math.h>
