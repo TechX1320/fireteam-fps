@@ -50,6 +50,7 @@ public:
           m_fBottomlessUntil(0.0f),
           m_fOneHitUntil(0.0f),
           m_fGodUntil(0.0f),
+          m_fRespawnInvulnerableUntil(0.0f),
           m_nBottomlessStacks(0),
           m_nOneHitStacks(0),
           m_nGodStacks(0),
@@ -176,6 +177,7 @@ private:
     float               m_fBottomlessUntil;
     float               m_fOneHitUntil;
     float               m_fGodUntil;
+    float               m_fRespawnInvulnerableUntil;
     uint8               m_nBottomlessStacks;
     uint8               m_nOneHitStacks;
     uint8               m_nGodStacks;
