@@ -589,8 +589,9 @@ void FT_RenderCombatFeedback()
             s_nActiveFeedback,
             nScreenW) *
         fScale;
+    // Keep kill confirmation above the aiming area.
     const float fCenterY =
-        (float)nScreenH * 0.39f;
+        (float)nScreenH * 0.22f;
 
     FTFeedbackImage *pImage =
         FT_ImageForFeedback(
