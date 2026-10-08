@@ -21,6 +21,8 @@ struct FTInfectedDef
     float fAttackRange;
     float fAttackCooldown;
     float fUpdateSeconds;
+    // Collision-aware movement substeps per AI decision. 1 = original 10 Hz.
+    uint8 nMotionSubsteps;
 
     // Optional data-driven infected voice bank. Paths are relative to REZ.
     char sVoiceDir[160];
@@ -124,6 +126,7 @@ inline char* FT_TrimInfectedLine(char *pText)
 inline void FT_InitInfectedDef(FTInfectedDef &def)
 {
     memset(&def, 0, sizeof(def));
+    def.nMotionSubsteps = 3;
 }
 
 inline void FT_ApplyInfectedValue(
@@ -153,6 +156,11 @@ inline void FT_ApplyInfectedValue(
         def.fAttackCooldown = (float)atof(pValue);
     else if(_stricmp(pKey, "update_seconds") == 0)
         def.fUpdateSeconds = (float)atof(pValue);
+    else if(_stricmp(pKey, "motion_substeps") == 0)
+    {
+        const int nSteps = atoi(pValue);
+        def.nMotionSubsteps = (uint8)(nSteps < 1 ? 1 : (nSteps > 4 ? 4 : nSteps));
+    }
     else if(_stricmp(pKey, "voice_dir") == 0)
         FT_CopyInfectedString(def.sVoiceDir, sizeof(def.sVoiceDir), pValue);
     else if(_stricmp(pKey, "voice_alert") == 0)
