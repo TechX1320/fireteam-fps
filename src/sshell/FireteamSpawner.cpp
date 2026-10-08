@@ -1186,6 +1186,33 @@ void FT_OnFireteamEnemyKilled()
     {
         ++s_nRoundKilled;
 
+        if(s_nRoundAlive == 1 &&
+           s_nRoundSpawned == s_nRoundTarget)
+        {
+            HCLASS hZombieClass =
+                g_pLTServer->GetClass("FireteamZombie");
+            for(HOBJECT h = g_pLTServer->GetNextObject(LTNULL); h;
+                h = g_pLTServer->GetNextObject(h))
+            {
+                HCLASS hType = g_pLTServer->GetObjectClass(h);
+                if(!hZombieClass || !hType ||
+                   !g_pLTServer->IsKindOf(hType, hZombieClass))
+                    continue;
+                FireteamZombie *pZombie =
+                    (FireteamZombie*)g_pLTServer->HandleToObject(h);
+                if(pZombie && pZombie->IsAliveForRound())
+                {
+                    LTVector vPos;
+                    g_pLTServer->GetObjectPos(h, &vPos);
+                    g_pLTServer->CPrint(
+                        "Fireteam final infected: last living zombie at %.1f %.1f %.1f; required kills %u/%u.",
+                        vPos.x, vPos.y, vPos.z,
+                        s_nRoundKilled, s_nRoundTarget);
+                    break;
+                }
+            }
+        }
+
         if(s_nRoundKilled >= s_nRoundTarget &&
            s_nRoundSpawned >= s_nRoundTarget)
         {
