@@ -1268,10 +1268,10 @@ void CPlayerSrvr::ApplyDamage(uint8 nDamage)
 
         if(m_nLives > 0)
         {
-            m_fRespawnTimer = 2.0f;
+            m_fRespawnTimer = 5.0f;
 
             g_pLTServer->CPrint(
-                "Fireteam: %s died. %u/%u lives remain; respawning in 2 seconds.",
+                "Fireteam: %s died. %u/%u lives remain; respawning in 5 seconds.",
                 m_sName,
                 (uint32)m_nLives,
                 (uint32)m_nMaxLives);
