@@ -40,6 +40,7 @@ enum EMessageID
         MSG_CS_AMMO_SYNC,           // client->server; authoritative HUD reconciliation
         MSG_CS_QA_ZOMBIES,           // client->server; local QA spawn toggle
         MSG_CS_QA_SPECTATOR,         // client->server; local QA freecam targetability toggle
+        MSG_CS_SPECTATOR_POS,        // client->server; freecam relevancy/view position
         MSG_CS_SCORE,
         MSG_SERVER_SCORES,          // server->client
         MSG_CS_CHAT,                // client->server
