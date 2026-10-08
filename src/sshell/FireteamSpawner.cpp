@@ -29,6 +29,7 @@ static int s_nLastSpawner = -1;
 
 static bool s_bRoundActive = false;
 static bool s_bRoundIntermission = false;
+static bool s_bGameOver = false;
 static bool s_bQaZombiesEnabled = true;
 static uint32 s_nRound = 0;
 static uint32 s_nRoundTarget = 0;
@@ -85,6 +86,7 @@ void FT_SetQaZombiesEnabled(
 
     s_bRoundActive = false;
     s_bRoundIntermission = false;
+    s_bGameOver = false;
     s_nRound = 0;
     s_nRoundTarget = 0;
     s_nRoundSpawned = 0;
@@ -190,6 +192,7 @@ void Spawner::ResetRoundController()
 
     s_bRoundActive = false;
     s_bRoundIntermission = false;
+    s_bGameOver = false;
     s_nRound = 0;
     s_nRoundTarget = 0;
     s_nRoundSpawned = 0;
@@ -387,6 +390,11 @@ bool Spawner::SpawnCrawlerSeal()
 
 void Spawner::StartNextRound()
 {
+    if(s_bGameOver)
+    {
+        return;
+    }
+
     ++s_nRound;
 
     s_nRoundTarget =
@@ -455,7 +463,8 @@ void Spawner::UpdateRoundController()
         return;
     }
 
-    if(!s_bQaZombiesEnabled)
+    if(!s_bQaZombiesEnabled ||
+       s_bGameOver)
     {
         return;
     }
@@ -526,6 +535,27 @@ void Spawner::UpdateRoundController()
 
     float fJitter = ((float)(rand() % 51) / 100.0f);
     s_fNextSpawnTime = fNow + s_fSpawnInterval + fJitter;
+}
+
+void FT_OnFireteamSquadGameOver()
+{
+    if(s_bGameOver)
+    {
+        return;
+    }
+
+    s_bGameOver = true;
+    s_bRoundActive = false;
+    s_bRoundIntermission = false;
+    s_fNextSpawnTime = 0.0f;
+    s_fNextRoundTime = 0.0f;
+
+    g_pLTServer->CPrint(
+        "Fireteam: GAME OVER on round %u - squad is out of lives.",
+        s_nRound);
+
+    FT_BroadcastRoundState(
+        3);
 }
 
 void FT_OnFireteamEnemyKilled()
