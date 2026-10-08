@@ -432,7 +432,7 @@ void FT_RoundHudSetSpectator(
 
 void FT_RenderRoundHud()
 {
-    if(!s_pRoundFont || s_nRound == 0)
+    if(!s_pRoundFont)
     {
         return;
     }
@@ -444,7 +444,8 @@ void FT_RenderRoundHud()
         &nScreenW,
         &nScreenH);
 
-    if(s_pRoundStatus)
+    if(s_pRoundStatus &&
+       s_nRound > 0)
     {
         char szStatus[96];
         sprintf(
