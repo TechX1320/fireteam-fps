@@ -310,6 +310,11 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
 	{
 	case MSG_CS_VELOCITY:
 		{
+            if(!pPlayerClass ||
+               !pPlayerClass->IsAlive())
+            {
+                break;
+            }
 			LTVector vVel, vPos;
 			vVel = pMessage->ReadLTVector();
 			vPos = pMessage->ReadLTVector();
@@ -324,6 +329,11 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
 		break;
 	case MSG_CS_ROTATION:
 		{
+            if(!pPlayerClass ||
+               !pPlayerClass->IsAlive())
+            {
+                break;
+            }
 			LTRotation rRot;
 			rRot = pMessage->ReadLTRotation();
 			g_pLTServer->SetObjectRotation(hPlayer, &rRot);
@@ -331,6 +341,11 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
 		break;
 	case MSG_CS_VELANDROT:
 		{
+            if(!pPlayerClass ||
+               !pPlayerClass->IsAlive())
+            {
+                break;
+            }
 			LTVector vVel, vPos;
 			LTRotation rRot;
 			vVel = pMessage->ReadLTVector();
