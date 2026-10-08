@@ -34,6 +34,7 @@
 #include "FireteamExplosiveProjectile.h"
 #include "FireteamDifficultyDefs.h"
 #include "FireteamZombie.h"
+#include "FireteamSpawner.h"
 
 
 //-----------------------------------------------------------------------------
