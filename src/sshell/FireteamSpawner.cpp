@@ -19,7 +19,18 @@ BEGIN_CLASS(Spawner)
     ADD_STRINGPROP(InitialCommand, "")
 END_CLASS_DEFAULT_FLAGS(Spawner, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
 
-static const uint32 kMaxPerimeterSpawners = 32;
+class ObjectSpawnPoint : public BaseClass
+{
+public:
+    ObjectSpawnPoint()
+    {
+    }
+};
+
+BEGIN_CLASS(ObjectSpawnPoint)
+END_CLASS_DEFAULT_FLAGS(ObjectSpawnPoint, BaseClass, LTNULL, LTNULL, CF_ALWAYSLOAD)
+
+static const uint32 kMaxPerimeterSpawners = 64;
 static const uint32 kSealCrawlerChancePercent = 2;
 
 static HOBJECT s_hController = LTNULL;
@@ -176,7 +187,10 @@ void Spawner::ReadProps(ObjectCreateStruct *pOCS)
 
 bool Spawner::IsPerimeterSpawner() const
 {
-    return (_strnicmp(m_sName, "Spawner_01_", 11) == 0);
+    return (_strnicmp(
+        m_sName,
+        "Spawner_",
+        8) == 0);
 }
 
 void Spawner::ResetRoundController()
