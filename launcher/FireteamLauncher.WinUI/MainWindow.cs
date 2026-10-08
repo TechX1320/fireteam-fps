@@ -304,6 +304,12 @@ public sealed partial class MainWindow : Window
                             name =>
                                 !name.Equals(
                                     "WORLD",
+                                    StringComparison.OrdinalIgnoreCase) &&
+                                !name.Equals(
+                                    "JUNK_FLEA",
+                                    StringComparison.OrdinalIgnoreCase) &&
+                                !name.Equals(
+                                    "JUNKFLEA",
                                     StringComparison.OrdinalIgnoreCase)));
             }
         }
