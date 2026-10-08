@@ -81,6 +81,7 @@ public sealed partial class MainWindow
         };
 
         BuildHomeView();
+        BuildServerBrowserView();
         BuildLoadoutView();
         BuildPlayerGearView();
         BuildWeaponModsView();
@@ -91,6 +92,7 @@ public sealed partial class MainWindow
         BuildSettingsView();
 
         content.Children.Add(HomeView);
+        content.Children.Add(ServerBrowserView);
         content.Children.Add(LoadoutView);
         content.Children.Add(PlayerGearView);
         content.Children.Add(WeaponModsView);
@@ -328,6 +330,11 @@ public sealed partial class MainWindow
             toolsMenu;
         bar.Children.Add(
             toolsButton);
+
+        bar.Children.Add(
+            NavButton(
+                "SERVERS",
+                "servers"));
 
         bar.Children.Add(
             NavButton(
