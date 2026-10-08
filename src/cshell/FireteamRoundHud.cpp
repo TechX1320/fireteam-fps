@@ -534,10 +534,11 @@ void FT_RenderRoundHud()
         s_pRespawnStatus->Render();
     }
 
+    const float fPrepNow = g_pLTClient->GetTime();
     if(s_pFirstRoundPrep && s_nRound == 0 &&
-       fNow < s_fFirstRoundPrepUntil && !s_bGameOver)
+       fPrepNow < s_fFirstRoundPrepUntil && !s_bGameOver)
     {
-        const float fSeconds = s_fFirstRoundPrepUntil - fNow;
+        const float fSeconds = s_fFirstRoundPrepUntil - fPrepNow;
         char szPrep[100];
         sprintf(szPrep, "GET READY!  ROUND 1 STARTS IN %u",
             (uint32)(fSeconds + 0.999f));
