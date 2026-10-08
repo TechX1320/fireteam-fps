@@ -774,6 +774,12 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             FT_RoundHudHandleMessage(pMessage);
         }
         break;
+    case MSG_SC_ROUND_PREP:
+        {
+            FT_RoundHudSetFirstRoundPreparation(
+                pMessage->Readfloat());
+        }
+        break;
     case MSG_SC_POWERUP:
         {
             char szReward[128];
