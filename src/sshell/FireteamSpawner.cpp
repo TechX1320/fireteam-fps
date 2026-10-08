@@ -56,6 +56,8 @@ static uint32 s_nMaxAlive = 0;
 static float s_fNextSpawnTime = 0.0f;
 static float s_fNextRoundTime = 0.0f;
 static float s_fSpawnInterval = 1.25f;
+static float s_fMissingInfectedSince = 0.0f;
+static uint32 s_nMissingInfectedRestores = 0;
 static FTDifficultyDef s_Difficulty;
 
 // The first round must never begin during map load, before any player exists.
@@ -177,6 +179,8 @@ void FT_SetQaZombiesEnabled(
     s_nMaxAlive = 0;
     s_fNextSpawnTime = 0.0f;
     s_fNextRoundTime = 0.0f;
+    s_fMissingInfectedSince = 0.0f;
+    s_nMissingInfectedRestores = 0;
     s_bFirstRoundPreparing = bEnabled;
     s_fFirstPlayerJoinedAt = g_pLTServer->GetTime();
     s_fFirstRoundReadyAt =
@@ -294,6 +298,8 @@ void Spawner::ResetRoundController()
     s_fNextSpawnTime = 0.0f;
     s_fNextRoundTime = 0.0f;
     s_fSpawnInterval = 1.25f;
+    s_fMissingInfectedSince = 0.0f;
+    s_nMissingInfectedRestores = 0;
     s_bFirstRoundPreparing = false;
     s_fFirstPlayerJoinedAt = 0.0f;
     s_fFirstRoundReadyAt = 0.0f;
@@ -598,6 +604,27 @@ static bool FT_SpawnAnchorNearLivingPlayer(HOBJECT hAnchor)
 }
 
 
+// Compare the authoritative living-object roster to the remaining count.
+// Lost/removed objects must be replaced, never treated as free kills.
+static uint32 FT_CountLivingInfectedObjects()
+{
+    HCLASS hClass = g_pLTServer->GetClass("FireteamZombie");
+    if(!hClass) return 0;
+    uint32 nLiving = 0;
+    for(HOBJECT h = g_pLTServer->GetNextObject(LTNULL); h;
+        h = g_pLTServer->GetNextObject(h))
+    {
+        HCLASS hType = g_pLTServer->GetObjectClass(h);
+        if(!hType || !g_pLTServer->IsKindOf(hType, hClass))
+            continue;
+        FireteamZombie *pZombie =
+            (FireteamZombie*)g_pLTServer->HandleToObject(h);
+        if(pZombie && pZombie->IsAliveForRound())
+            ++nLiving;
+    }
+    return nLiving;
+}
+
 bool FT_IsFinalLivingInfected(HOBJECT hZombie)
 {
     if(!hZombie || !s_bRoundActive || s_nRoundAlive != 1 ||
@@ -857,6 +884,8 @@ void Spawner::StartNextRound()
     s_nRoundSpawned = 0;
     s_nRoundAlive = 0;
     s_nRoundKilled = 0;
+    s_fMissingInfectedSince = 0.0f;
+    s_nMissingInfectedRestores = 0;
     s_bRoundActive = true;
     s_bRoundIntermission = false;
     s_fNextSpawnTime = g_pLTServer->GetTime() + 0.35f;
@@ -905,6 +934,46 @@ void Spawner::UpdateRoundController()
     }
 
     const float fNow = g_pLTServer->GetTime();
+
+    if(s_bRoundActive && s_nRoundAlive > 0 &&
+       s_nRoundSpawned > 0 &&
+       s_nMissingInfectedRestores < s_nRoundTarget)
+    {
+        const uint32 nPhysical = FT_CountLivingInfectedObjects();
+        if(nPhysical < s_nRoundAlive)
+        {
+            if(s_fMissingInfectedSince <= 0.0f)
+                s_fMissingInfectedSince = fNow;
+            if(fNow - s_fMissingInfectedSince >= 5.0f)
+            {
+                HOBJECT hAnchor = LTNULL;
+                for(uint32 i = 0; i < s_nPerimeterSpawnerCount; ++i)
+                {
+                    if(FT_SpawnAnchorNearLivingPlayer(s_hPerimeterSpawners[i]))
+                    {
+                        hAnchor = s_hPerimeterSpawners[i];
+                        break;
+                    }
+                }
+                if(!hAnchor)
+                    hAnchor = s_hPerimeterSpawners[
+                        (uint32)(rand() % s_nPerimeterSpawnerCount)];
+                if(FT_SpawnZombieAt(hAnchor))
+                {
+                    ++s_nMissingInfectedRestores;
+                    g_pLTServer->CPrint(
+                        "Fireteam: restored missing infected object (%u physical, %u expected, restores %u/%u). No kill credited.",
+                        nPhysical, s_nRoundAlive,
+                        s_nMissingInfectedRestores, s_nRoundTarget);
+                }
+                s_fMissingInfectedSince = fNow;
+            }
+        }
+        else
+        {
+            s_fMissingInfectedSince = 0.0f;
+        }
+    }
 
     if(s_nRound == 0)
     {
