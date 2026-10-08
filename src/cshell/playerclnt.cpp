@@ -27,6 +27,7 @@
 #include "msgids.h"
 #include "animids.h"
 #include "FireteamWeaponHud.h"
+#include "FireteamRoundHud.h"
 
 #define MOVEMENT_RATE 2000.0f
 #define WALK_MAX_SPEED 435.0f
@@ -769,6 +770,12 @@ bool CPlayerClnt::IsMoving()
 //-----------------------------------------------------------------------------
 void CPlayerClnt::Update()
 {
+    if(FT_RoundHudIsBottomlessActive() && m_bReloading)
+    {
+        m_bReloading = false;
+        m_fReloadComplete = 0.0f;
+    }
+
     if(m_bReloading &&
        g_pLTClient->GetTime() >= m_fReloadComplete)
     {
@@ -1112,7 +1119,8 @@ void CPlayerClnt::SetPrimaryAmmo(
 //-----------------------------------------------------------------------------
 bool CPlayerClnt::Attack()
 {
-    if(m_bReloading)
+    const bool bBottomless = FT_RoundHudIsBottomlessActive();
+    if(m_bReloading && !bBottomless)
     {
         return false;
     }
@@ -1129,7 +1137,7 @@ bool CPlayerClnt::Attack()
         // do not play a muzzle/fire animation or FIRE.WAV for a rejected shot.
         if(!m_bDevWeaponQa &&
            m_bPrimaryAmmoKnown &&
-           m_nPrimaryAmmoInClip == 0)
+           m_nPrimaryAmmoInClip == 0 && !bBottomless)
         {
             if(m_nPrimaryAmmoReserve > 0 &&
                pDef->bAutoReload)
@@ -1162,7 +1170,7 @@ bool CPlayerClnt::Attack()
         // server ammo message reconciles this after every authoritative shot.
         if(!m_bDevWeaponQa &&
            m_bPrimaryAmmoKnown &&
-           m_nPrimaryAmmoInClip > 0)
+           m_nPrimaryAmmoInClip > 0 && !bBottomless)
         {
             --m_nPrimaryAmmoInClip;
         }
@@ -1673,6 +1681,10 @@ bool CPlayerClnt::SaveDevWeaponView()
 //----------------------------------------------------------------------------
 bool CPlayerClnt::ReloadWeapon()
 {
+    // Bottomless Magazine must never play reloads or send reload commands.
+    if(FT_RoundHudIsBottomlessActive())
+        return false;
+
     const FTWeaponDef *pDef = GetCurrentWeaponDef();
     if(!pDef ||
        pDef->nClipSize == 0 ||
