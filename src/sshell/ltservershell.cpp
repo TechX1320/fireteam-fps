@@ -257,6 +257,7 @@ LPBASECLASS CLTServerShell::OnClientEnterWorld(HCLIENT hClient)
         pClientObj->SetClient(hClient);
 
         g_pStatsManager->RegisterPlayer(pClientObj);
+        FT_OnFireteamPlayerJoined(hClient);
 	}
 	else
 	{
