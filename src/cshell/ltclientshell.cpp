@@ -490,8 +490,12 @@ LTRESULT CLTClientShell::InitGame(EGameType eType, char* ip)
 	case EGT_CONNECT:
 		{
 			request.m_Type = STARTGAME_CLIENTTCP;
-			strncpy( request.m_TCPAddress, ip, MAX_SGR_STRINGLEN);
-            strncat( request.m_TCPAddress, ":27889", MAX_SGR_STRINGLEN);
+			// A server-browser favorite may specify a non-default port.
+            // Preserve it rather than appending :27889 twice.
+            const char *pAddress = (ip && ip[0]) ? ip : "127.0.0.1";
+            _snprintf(request.m_TCPAddress, sizeof(request.m_TCPAddress),
+                "%s%s", pAddress, strchr(pAddress, ':') ? "" : ":27889");
+            request.m_TCPAddress[sizeof(request.m_TCPAddress) - 1] = '\0';
 			g_pLTClient->InitNetworking(NULL, 0);
 			SetService();
 		}break;
