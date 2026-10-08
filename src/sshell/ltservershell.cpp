@@ -603,6 +603,7 @@ void CLTServerShell::PreStartWorld(bool bSwitchingWorlds)
 {
     // AIVolumes belong to the current world. Never reuse old map handles.
     FT_ResetNavigationCache();
+    FT_ResetZombieNeighborCache();
 }
 
 
