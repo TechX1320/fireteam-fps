@@ -99,6 +99,9 @@ private:
     char m_sCurrentAnimation[64];
 };
 
+// Clear per-map enemy steering snapshots before loading the next world.
+void FT_ResetZombieNeighborCache();
+
 // Team/global zombie-only visibility powerup. The custom RenderStyle is
 // staged from assets-local/RS/ZombieThroughWall.ltb.
 float FT_ExtendZombieWallhack(
