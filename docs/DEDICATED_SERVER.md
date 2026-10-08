@@ -1,62 +1,141 @@
-# FIRETEAM dedicated hosting (experimental)
+# FIRETEAM dedicated hosting — experimental Windows build
 
-FIRETEAM has a separate 32-bit, no-renderer Jupiter server host source under
-`src/dedicated/`. It uses Jupiter's `ServerInterface`, not the old NOLF2
-MFC server application, and remains isolated from the normal FIRETEAM build.
+FIRETEAM now has a **standalone 32-bit, console/headless Jupiter server**.
+It is implemented under `src/dedicated` and compiled separately from the
+normal gameplay/launcher build. It is not the old NOLF2 MFC ServerApp; it
+reuses the same `ServerInterface` initialization and TCP/IP hosting model.
 
-## Build and run on Windows
+The integration has been checked against the original Jupiter
+`sdk/inc/server_interface.h`, `sdk/inc/ltmodule.cpp` and the original
+`NOLF2/ServerApp/ServerDlg.cpp`. **Windows compilation, actual map startup
+and client joins are not yet validated.** Do not assume public hosting is ready
+until the local smoke test succeeds.
 
-1. Run `git pull --ff-only` and `build.cmd` from the repository root.
-2. Run `build-dedicated.cmd` (requires the local Jupiter SDK).
-3. From `BUILT`, run:
+## Setup and build
+
+From the repository directory:
+
+```bat
+git pull --ff-only
+build.cmd
+build-dedicated.cmd
+```
+
+Normal `build.cmd` does **not** build the dedicated executable. The extra
+command compiles the optional CMake target and stages:
+
+```text
+BUILT/
+  Lithtech.exe                 # playable client
+  config/session.cfg           # client/quick-play only
+  rez/                         # original staged assets and object.lto
+  Dedicated/
+    FireteamDedicatedServer.exe
+    server.dll
+    Engine.REZ
+    LTMsg.dll
+    SndDrv.dll
+    rez/                       # NTFS JUNCTION to BUILT/rez (no asset copy)
+    config/
+      session.cfg              # independent server difficulty / prep
+      ... other game configs
+```
+
+The staging script creates a directory junction. It expects an NTFS/local
+Windows filesystem and will **refuse to replace a pre-existing non-junction
+`Dedicated/rez` directory**. It does not delete/overwrite the game assets.
+
+Dedicated gameplay settings are separated so launching a normal client can't
+overwrite a running server's `session.cfg`. The server-side session file is
+preserved on rebuild; other copied game configs refresh from `BUILT/config`.
+If you rebuild while a server is running, **stop the server first**.
+
+## Test from command prompt
+
+The simplest first smoke test is:
+
+```bat
+run-dedicated.cmd
+```
+
+It starts **CABINFEVER, port 27889, 24 slots** and leaves the console visible.
+For a different staged map and port:
+
+```bat
+run-dedicated.cmd --map BLACKLUNG --port 27890 --max-players 16 --name "Test Server"
+```
+
+Or from `BUILT\Dedicated`:
 
 ```bat
 FireteamDedicatedServer.exe --map CABINFEVER --port 27889 --max-players 24 --name "My FIRETEAM Server"
 ```
 
-You can also use **SERVERS > START DEDICATED SERVER** in the launcher to
-start the default map/port with a separate server console.
+Expected successful output includes:
 
-This is an experimental adapter to the local Jupiter `server.dll`. It has
-**not yet been validated against the user's Windows server.dll and SDK**.
-If the dedicated build/host initialization fails, report its exact first
-error; the normal `build.cmd` and listen-server launch remain independent.
-
-The server reads its own `BUILT/config/session.cfg`, including difficulty,
-and loads staged `Worlds/<MAP>.DAT`. The current directory must contain
-`Engine.REZ`, `server.dll`, `rez` and the usual Fireteam config.
-Run another copy of BUILT for independent dedicated-server instances so a
-local launcher cannot overwrite their session settings.
-
-## Discovery / joining
-
-- The in-launcher **SERVERS** tab supports manually entered IP:port and
-  persisted local favorites, without accounts.
-- **REFRESH DIRECTORY** loads the curated
-  [public-servers.json](../config/public-servers.json) from GitHub.
-  These records are *not* automatic live player counts, pings or health checks.
-- The engine's current default port is **27889**; a custom port can be entered
-  after the address (`example.org:27900`).
-- Router/firewall/NAT setup is still the host's responsibility.
-
-## Publishing a server
-
-Submit a server listing through a GitHub issue using the Server Listing
-template or provide the information to a project moderator. An approved
-maintainer adds it to `config/public-servers.json` as an entry:
-
-```json
-{
-  "Name": "Example Community Server",
-  "Address": "server.example.org:27889",
-  "Map": "CABINFEVER"
-}
+```text
+[OK] Jupiter master interface database registered.
+FIRETEAM dedicated server running: CABINFEVER on port 27889 (max 24)
+Local client test: 127.0.0.1:27889
 ```
 
-The directory is an array of these records. Hosting does not automatically
-publish a home IP; listing is opt-in. Do not submit an IP address you are not
-authorized to make public. Removing the directory entry does not shut down
-the server and does not remove players' independently saved favorites.
+The dedicated process loads the game's `object.lto`, starts the DAT
+world, and updates the server shell without a renderer. Its wave controller
+waits for the first player to enter.
 
-LAN discovery, live ping/player counts, verification and a self-registration
-master server are later milestones.
+Open the ordinary FIRETEAM launcher while the server is running; in
+**SERVERS**, enter `127.0.0.1:27889` and select **JOIN SERVER**. Use the same
+map on the joining client. Watch the server console for the join and Round 1
+countdown. Then test a second computer on the LAN using the server's LAN IP.
+
+The launcher also has **SERVERS > START DEDICATED SERVER**, using the chosen
+Quick Play map and difficulty plus name/port fields. It starts the isolated
+server process rather than a full local player game.
+
+Use **Ctrl+C** in the server console to stop it gracefully.
+
+## Dedicated server settings
+
+`BUILT\Dedicated\config\session.cfg` supports:
+
+```ini
+difficulty=4
+first_round_prep=45
+cabin_spawn_guard=1
+```
+
+The launcher updates this independent file with the chosen difficulty/map
+when starting a server. You may also edit it manually before starting.
+
+## Server browser and networking
+
+- Direct IP:port and local favorites work without accounts.
+- Public directory comes from `config/public-servers.json` and is opt-in,
+  manually curated through a GitHub issue. It does not auto-publish home IPs.
+- Live status, ping, automatic port forwarding and NAT traversal are **not
+  implemented**.
+- For external players, allow the game's port through Windows Firewall and
+  configure router forwarding if required. LAN/loopback testing needs neither
+  a cloud relay nor port forwarding.
+- Hosting and playing on the **same PC** is supported in the directory layout.
+  Validate the actual simultaneous join before advertising it publicly.
+
+## Troubleshooting
+
+1. **Dedicated compile error:** send the **first** MSVC error from
+   `build-dedicated.cmd`. Game build is unaffected.
+2. **"Unable to load server.dll":** check `BUILT\Dedicated\server.dll`,
+   `LTMsg.dll`, and any missing DLL reported by Windows.
+3. **"CreateServer failed (X)":** send the numeric Jupiter initialization
+   code and the surrounding output.
+4. **"LoadBinaries failed":** verify the `rez` junction and
+   `BUILT\rez\object.lto`. The first server console error matters.
+5. **"StartWorld failed":** verify
+   `BUILT\Dedicated\rez\Worlds\<MAP>.DAT` and send the engine error string.
+6. **Join failed:** first test `127.0.0.1:27889` on the hosting PC, then
+   move to LAN IP, then external address; do not debug router settings before
+   local server/player compatibility is proven.
+
+Remaining milestones: validated Windows build, player joins, room stability,
+server lifecycle/admin controls, live server discovery and optional NAT
+handling. These are deliberately separate from current zombie/weapon changes.
