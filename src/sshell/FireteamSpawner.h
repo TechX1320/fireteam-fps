@@ -24,6 +24,9 @@ private:
     char m_sName[64];
 };
 
+// Server timer used by rewards; only increases during live zombie rounds.
+float FT_GetRoundCombatTime();
+
 void FT_OnFireteamPlayerJoined(HCLIENT hClient);
 // Restage a genuinely stranded final infected without counting a kill.
 // Keeps the same zombie object, health, and required number of kills.
