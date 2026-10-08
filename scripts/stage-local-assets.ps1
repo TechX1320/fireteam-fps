@@ -413,7 +413,8 @@ function Extract-ZipEntry([string]$ZipName, [string]$EntryName, [string]$Destina
     }
     $stampPath = Join-Path $stampRoot ("zip-entry-" + $id + ".stamp")
     $archiveSignature = "$($zipInfo.FullName)|$($zipInfo.Length)|$($zipInfo.LastWriteTimeUtc.Ticks)"
-    if ((Test-Path -LiteralPath $dest -PathType Leaf) -and
+    if ($env:FT_FORCE_ASSET_AUDIT -ne "1" -and
+        (Test-Path -LiteralPath $dest -PathType Leaf) -and
         (Test-Path -LiteralPath $stampPath -PathType Leaf)) {
         $destInfo = Get-Item -LiteralPath $dest
         $signature = "$archiveSignature|$($destInfo.Length)|$($destInfo.LastWriteTimeUtc.Ticks)"
