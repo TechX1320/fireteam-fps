@@ -614,6 +614,14 @@ void CLTServerShell::PreStartWorld(bool bSwitchingWorlds)
 //-----------------------------------------------------------------------------
 void CLTServerShell::PostStartWorld()
 {
+    // World objects have been created. Rebuild the map-local navigation
+    // snapshot here rather than accidentally caching an incomplete load.
+    FT_ResetNavigationCache();
+    const uint32 nNavVolumes = FT_GetNavigationVolumeCount();
+    g_pLTServer->CPrint(
+        "Fireteam navigation: cached %u authored AIVolumes for this world.",
+        nNavVolumes);
+
     FT_EnsureFireteamRoundController();
 }
 
