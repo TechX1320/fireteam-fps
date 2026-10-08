@@ -30,6 +30,7 @@ static uint16 s_nAlive = 0;
 static uint8 s_nLives = 3;
 static uint8 s_nMaxLives = 3;
 static bool s_bGameOver = false;
+static bool s_bSoloRetryAllowed = false;
 static bool s_bSpectating = false;
 static bool s_bQaSpectating = false;
 static float s_fAnnouncementUntil = 0.0f;
@@ -556,6 +557,11 @@ bool FT_RoundHudIsGameOver()
     return s_bGameOver;
 }
 
+void FT_RoundHudSetSoloRetry(bool bAllowed)
+{
+    s_bSoloRetryAllowed = bAllowed;
+}
+
 void FT_RoundHudSetSpectator(
     bool bSpectating,
     bool bQaMode)
@@ -605,6 +611,21 @@ void FT_RenderRoundHud()
             22.0f);
 
         s_pRoundStatus->Render();
+    }
+
+    // Game Over is a real results state, not a permanent dead-end.
+    // In multiplayer, the server owns world restarts/rotation; do not
+    // advertise a client-local retry that would disconnect teammates.
+    if(s_bGameOver && s_pRespawnStatus)
+    {
+        s_pRespawnStatus->SetText(
+            s_bSoloRetryAllowed
+                ? "R: PLAY AGAIN   TAB: SQUAD STATS   ESC: SETTINGS / QUIT"
+                : "TAB: SQUAD STATS   ESC: SETTINGS / QUIT   WAIT FOR SERVER");
+        s_pRespawnStatus->SetPosition(
+            ((float)nScreenW - s_pRespawnStatus->GetWidth()) * 0.5f,
+            (float)nScreenH * 0.62f);
+        s_pRespawnStatus->Render();
     }
 
     const float fRespawnRemaining = s_fRespawnUntil - g_pLTClient->GetTime();
