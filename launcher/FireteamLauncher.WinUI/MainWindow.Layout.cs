@@ -85,6 +85,7 @@ public sealed partial class MainWindow
         BuildPlayerGearView();
         BuildWeaponModsView();
         BuildCaImportView();
+        BuildMiniToolsView();
         BuildArsenalView();
         BuildModsView();
         BuildSettingsView();
@@ -94,6 +95,7 @@ public sealed partial class MainWindow
         content.Children.Add(PlayerGearView);
         content.Children.Add(WeaponModsView);
         content.Children.Add(CaImportView);
+        content.Children.Add(MiniToolsView);
         content.Children.Add(ArsenalView);
         content.Children.Add(ModsView);
         content.Children.Add(SettingsView);
@@ -251,6 +253,10 @@ public sealed partial class MainWindow
             MenuItem(
                 "Weapon QA (Local)",
                 LaunchWeaponQa));
+        playMenu.Items.Add(
+            MenuItem(
+                "Spectator QA (Local)",
+                LaunchSpectatorQa));
 
         playButton.Flyout =
             playMenu;
@@ -302,6 +308,11 @@ public sealed partial class MainWindow
                 "Combat Arms Importer",
                 () => NavigateTo(
                     "ca-importer")));
+        toolsMenu.Items.Add(
+            MenuItem(
+                "Mini Tools",
+                () => NavigateTo(
+                    "mini-tools")));
         toolsMenu.Items.Add(
             MenuItem(
                 "Open Mod Library",
@@ -1002,6 +1013,11 @@ public sealed partial class MainWindow
             {
                 Height = GridLength.Auto
             });
+        quickFields.RowDefinitions.Add(
+            new RowDefinition
+            {
+                Height = GridLength.Auto
+            });
 
         PlayerNameBox.MaxLength = 15;
         PlayerNameBox.MaxWidth = 320;
@@ -1036,6 +1052,15 @@ public sealed partial class MainWindow
             LabeledControl(
                 "MODE",
                 ModeCombo);
+
+        MapCombo.HorizontalAlignment =
+            HorizontalAlignment.Stretch;
+
+        var map =
+            LabeledControl(
+                "MAP",
+                MapCombo);
+
         DifficultySlider.Minimum = 0;
         DifficultySlider.Maximum = 10;
         DifficultySlider.StepFrequency = 1;
@@ -1106,12 +1131,16 @@ public sealed partial class MainWindow
         Grid.SetColumn(mode, 1);
         Grid.SetRow(difficulty, 1);
         Grid.SetColumn(difficulty, 0);
-        Grid.SetRow(join, 1);
-        Grid.SetColumn(join, 1);
+        Grid.SetRow(map, 1);
+        Grid.SetColumn(map, 1);
+        Grid.SetRow(join, 2);
+        Grid.SetColumn(join, 0);
+        Grid.SetColumnSpan(join, 2);
 
         quickFields.Children.Add(player);
         quickFields.Children.Add(mode);
         quickFields.Children.Add(difficulty);
+        quickFields.Children.Add(map);
         quickFields.Children.Add(join);
         quick.Children.Add(quickFields);
 
@@ -2050,6 +2079,12 @@ public sealed partial class MainWindow
                 Height =
                     GridLength.Auto
             });
+        tools.RowDefinitions.Add(
+            new RowDefinition
+            {
+                Height =
+                    GridLength.Auto
+            });
 
         var weapon =
             ToolCard(
@@ -2085,11 +2120,21 @@ public sealed partial class MainWindow
             ToolCard(
                 "MIGRATION TOOL",
                 "Combat Arms Importer",
-                "Audit WEAPONS.txt against the exact contents of Guns.zip, import only archive-backed weapons and write a full match/missing report.",
+                "Import Combat Arms weapons, attachments and map DAT files into ignored local content storage.",
                 AccentBrush,
                 "OPEN IMPORTER",
                 () => NavigateTo(
                     "ca-importer"));
+
+        var miniTools =
+            ToolCard(
+                "UTILITY TOOLS",
+                "Mini Tools",
+                "Small single-purpose utilities such as RezExtract that open, do one job, and return you to the launcher.",
+                CyanBrush,
+                "OPEN MINI TOOLS",
+                () => NavigateTo(
+                    "mini-tools"));
 
         Grid.SetRow(weapon, 0);
         Grid.SetColumn(weapon, 0);
@@ -2099,11 +2144,15 @@ public sealed partial class MainWindow
         Grid.SetColumn(content, 0);
         Grid.SetRow(importer, 1);
         Grid.SetColumn(importer, 1);
+        Grid.SetRow(miniTools, 2);
+        Grid.SetColumn(miniTools, 0);
+        Grid.SetColumnSpan(miniTools, 2);
 
         tools.Children.Add(weapon);
         tools.Children.Add(mods);
         tools.Children.Add(content);
         tools.Children.Add(importer);
+        tools.Children.Add(miniTools);
 
         page.Children.Add(tools);
 
@@ -2167,6 +2216,122 @@ public sealed partial class MainWindow
             panel,
             accent);
     }
+
+    private void BuildMiniToolsView()
+    {
+        MiniToolsView.Visibility =
+            Visibility.Collapsed;
+        MiniToolsView.HorizontalScrollBarVisibility =
+            ScrollBarVisibility.Disabled;
+        MiniToolsView.VerticalScrollBarVisibility =
+            ScrollBarVisibility.Auto;
+        MiniToolsView.HorizontalContentAlignment =
+            HorizontalAlignment.Center;
+
+        var page =
+            NewPagePanel(
+                "FIRETEAM / TOOLS",
+                "Mini Tools",
+                "Small focused utilities live here instead of cluttering the full LithTech content-tools workspace.");
+
+        var tools =
+            new Grid
+            {
+                ColumnSpacing = 16,
+                RowSpacing = 16
+            };
+
+        tools.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+        tools.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+
+        var rezExtract =
+            ToolCard(
+                "REZ UTILITY",
+                "RezExtract",
+                "Open RezExtract for unpacking LithTech REZ archives into ordinary folders.",
+                CyanBrush,
+                "OPEN REZEXTRACT",
+                LaunchRezExtract);
+
+        var folder =
+            ToolCard(
+                "UTILITY FOLDER",
+                "Mini Tool Files",
+                "Open the local tool workspace where standalone utilities can be placed without mixing them into the launcher runtime.",
+                AccentBrush,
+                "OPEN TOOL FOLDER",
+                () => LauncherPaths.OpenFolder(
+                    LauncherPaths.ModToolsDirectory));
+
+        Grid.SetColumn(
+            rezExtract,
+            0);
+        Grid.SetColumn(
+            folder,
+            1);
+
+        tools.Children.Add(
+            rezExtract);
+        tools.Children.Add(
+            folder);
+
+        page.Children.Add(
+            tools);
+
+        MiniToolsStatusText.Text =
+            LauncherPaths.FindMiniTool(
+                "RezExtract.exe") is null
+                ? "RezExtract.exe not found yet."
+                : "RezExtract.exe detected and ready.";
+        MiniToolsStatusText.Foreground =
+            SecondaryTextBrush;
+        MiniToolsStatusText.TextWrapping =
+            TextWrapping.Wrap;
+
+        var status =
+            CardHeading(
+                "STATUS",
+                "Utility Runtime",
+                "Mini tools launch as separate utility windows and return control to FIRETEAM when they close.",
+                AccentBrush);
+        status.Children.Add(
+            MiniToolsStatusText);
+
+        var back =
+            SecondaryButton(
+                "BACK TO TOOLS");
+        back.HorizontalAlignment =
+            HorizontalAlignment.Left;
+        back.Click +=
+            (sender, args) =>
+                NavigateTo(
+                    "tools");
+        status.Children.Add(
+            back);
+
+        page.Children.Add(
+            Card(
+                status,
+                AccentBrush));
+
+        MiniToolsView.Content =
+            page;
+    }
+
 
     private void BuildCaImportView()
     {
@@ -2398,6 +2563,103 @@ public sealed partial class MainWindow
                 sourcePanel,
                 AccentBrush));
 
+        var mapImport =
+            CardHeading(
+                "MAP IMPORTER",
+                "Combat Arms World DAT",
+                "Import a Combat Arms .DAT world into ignored local storage and stage it into rez/Worlds when the runtime is available.",
+                AccentRedBrush);
+
+        var mapRow =
+            new Grid
+            {
+                ColumnSpacing = 12,
+                Margin =
+                    new Thickness(
+                        0, 8, 0, 0)
+            };
+
+        mapRow.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    new GridLength(
+                        1,
+                        GridUnitType.Star)
+            });
+        mapRow.ColumnDefinitions.Add(
+            new ColumnDefinition
+            {
+                Width =
+                    GridLength.Auto
+            });
+
+        var mapSourceButton =
+            SecondaryButton(
+                "SELECT MAP .DAT");
+        mapSourceButton.HorizontalAlignment =
+            HorizontalAlignment.Stretch;
+        mapSourceButton.Click +=
+            SelectCaMapSourceButton_Click;
+
+        CaMapSourceText.Text =
+            "Not selected";
+        CaMapSourceText.Foreground =
+            SecondaryTextBrush;
+        CaMapSourceText.TextWrapping =
+            TextWrapping.Wrap;
+        CaMapSourceText.Margin =
+            new Thickness(
+                0, 6, 0, 0);
+
+        var mapSource =
+            new StackPanel
+            {
+                Spacing = 4
+            };
+        mapSource.Children.Add(
+            mapSourceButton);
+        mapSource.Children.Add(
+            CaMapSourceText);
+
+        CaMapImportButton.Content =
+            "IMPORT MAP";
+        CaMapImportButton.Background =
+            AccentRedBrush;
+        CaMapImportButton.Foreground =
+            PrimaryTextBrush;
+        CaMapImportButton.BorderBrush =
+            AccentRedBrush;
+        CaMapImportButton.Padding =
+            new Thickness(
+                18, 9, 18, 9);
+        CaMapImportButton.IsEnabled =
+            false;
+        CaMapImportButton.VerticalAlignment =
+            VerticalAlignment.Top;
+        CaMapImportButton.Click +=
+            ImportCombatArmsMapButton_Click;
+
+        Grid.SetColumn(
+            mapSource,
+            0);
+        Grid.SetColumn(
+            CaMapImportButton,
+            1);
+
+        mapRow.Children.Add(
+            mapSource);
+        mapRow.Children.Add(
+            CaMapImportButton);
+
+        mapImport.Children.Add(
+            mapRow);
+
+        page.Children.Add(
+            Card(
+                mapImport,
+                AccentRedBrush));
+
         var audit =
             CardHeading(
                 "LIVE AUDIT",
@@ -2467,6 +2729,25 @@ public sealed partial class MainWindow
                 }
             };
 
+        var openMaps =
+            SecondaryButton(
+                "OPEN MAP IMPORTS");
+        openMaps.Click +=
+            (sender, args) =>
+            {
+                var repo =
+                    LauncherPaths.FindRepositoryDirectory();
+
+                if(repo is not null)
+                {
+                    LauncherPaths.OpenFolder(
+                        Path.Combine(
+                            repo,
+                            "assets-local",
+                            "MapImports"));
+                }
+            };
+
         var back =
             SecondaryButton(
                 "BACK TO TOOLS");
@@ -2479,6 +2760,8 @@ public sealed partial class MainWindow
             openWeapons);
         actions.Children.Add(
             openAttachments);
+        actions.Children.Add(
+            openMaps);
         actions.Children.Add(
             back);
         audit.Children.Add(
@@ -3109,6 +3392,14 @@ public sealed partial class MainWindow
         else if(tag == "tools")
         {
             RefreshToolPaths();
+        }
+        else if(tag == "mini-tools")
+        {
+            MiniToolsStatusText.Text =
+                LauncherPaths.FindMiniTool(
+                    "RezExtract.exe") is null
+                    ? "RezExtract.exe not found yet."
+                    : "RezExtract.exe detected and ready.";
         }
         else if(tag == "settings")
         {
