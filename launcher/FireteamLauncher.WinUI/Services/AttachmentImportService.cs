@@ -433,7 +433,9 @@ public sealed class AttachmentImportService
 
         if(value.Contains("BACK") ||
            value.Contains("BAG") ||
-           value.Contains("PACK"))
+           value.Contains("PACK") ||
+           value.Contains("BGPK") ||
+           value.Contains("BKPK"))
         {
             return "Backpack";
         }
@@ -441,20 +443,26 @@ public sealed class AttachmentImportService
         if(value.Contains("VEST") ||
            value.Contains("ARMOR") ||
            value.Contains("ARMOUR") ||
-           value.Contains("BODY"))
+           value.Contains("BODY") ||
+           value.Contains("CBRN"))
         {
             return "Armor";
         }
 
         if(value.Contains("MASK") ||
+           value.Contains("MSK") ||
            value.Contains("GLASS") ||
            value.Contains("GOGGLE") ||
-           value.Contains("FACE"))
+           value.Contains("GOOGLE") ||
+           value.Contains("GGL") ||
+           value.Contains("FACE") ||
+           value.Contains("EYE"))
         {
             return "Face";
         }
 
         if(value.Contains("HELM") ||
+           value.Contains("HLMT") ||
            value.Contains("HEAD") ||
            value.Contains("HAT") ||
            value.Contains("CAP"))
@@ -475,7 +483,14 @@ public sealed class AttachmentImportService
         value =
             Regex.Replace(
                 value,
-                @"^(ATTACH[_-]?M[_-]?|ATTACH[_-]?T[_-]?|CM[_-]?|MT[_-]?)",
+                @"^(ATTACH[_-]?M[_-]?|ATTACH[_-]?T[_-]?|AM[_-]|AW[_-]|CM[_-]|CW[_-]|M[_-]|W[_-]|MT[_-])",
+                string.Empty,
+                RegexOptions.IgnoreCase);
+
+        value =
+            Regex.Replace(
+                value,
+                @"^(BGPK|BKPK|HLMT|GGL|MSK)[_-]+",
                 string.Empty,
                 RegexOptions.IgnoreCase);
 
