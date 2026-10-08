@@ -330,6 +330,7 @@ LTRESULT CStatsGui::HandleMessage(ILTMessage_Read* pMessage)
             m_pScores[i].iClientID = pMessage->Readuint32();
             pMessage->ReadString(m_pScores[i].sPlayerName , 32);
             m_pScores[i].iScore = pMessage->Readuint32();
+            m_pScores[i].iLives = pMessage->Readuint8();
             m_pScores[i].fMoney = pMessage->Readfloat();
             //g_pLTClient->CPrint("(%d) %d - %s - %d - $%.2f", i, iClientID, sName, iScore, fMoney);
         }
@@ -401,13 +402,16 @@ LTRESULT CStatsGui::RecalcStatsString()
 
     char sNames[1024];
     char sKills[512];
+    char sLives[512];
     sNames[0] = '\0';
     sKills[0] = '\0';
+    sLives[0] = '\0';
 
     for(int i = 0; i < m_iNumPlayers; ++i)
     {
         char sNameLine[80];
         char sKillLine[32];
+        char sLifeLine[32];
 
         sprintf(
             sNameLine,
@@ -426,6 +430,15 @@ LTRESULT CStatsGui::RecalcStatsString()
             sKills,
             sKillLine,
             sizeof(sKills) - strlen(sKills) - 1);
+
+        sprintf(
+            sLifeLine,
+            "%u\n",
+            (uint32)m_pScores[i].iLives);
+        strncat(
+            sLives,
+            sLifeLine,
+            sizeof(sLives) - strlen(sLives) - 1);
     }
 
     uint32 nWidth = 0;
@@ -436,7 +449,7 @@ LTRESULT CStatsGui::RecalcStatsString()
         &nHeight);
 
     m_pStatsString_Title->SetText(
-        "FIRETEAM SQUAD\n\nPLAYER                                      KILLS");
+        "FIRETEAM SQUAD\n\nPLAYER                              KILLS        LIVES");
     m_pStatsString_Title->SetColor(0xFFFFB000);
     m_pStatsString_Title->SetPosition(
         (float)nWidth * 0.5f - 245.0f,
@@ -451,11 +464,17 @@ LTRESULT CStatsGui::RecalcStatsString()
     m_pStatsString_Sealswhacked->SetText(sKills);
     m_pStatsString_Sealswhacked->SetColor(0xFFFFFFFF);
     m_pStatsString_Sealswhacked->SetPosition(
-        (float)nWidth * 0.5f + 180.0f,
+        (float)nWidth * 0.5f + 120.0f,
         (float)nHeight * 0.5f - 80.0f);
 
-    // Legacy third column is intentionally unused in Fireteam.
-    m_pStatsString_Moneyearned->SetText("");
+    // Reuse the legacy third column for remaining Fireteam lives.
+    m_pStatsString_Moneyearned->SetText(
+        sLives);
+    m_pStatsString_Moneyearned->SetColor(
+        0xFFFFFFFF);
+    m_pStatsString_Moneyearned->SetPosition(
+        (float)nWidth * 0.5f + 220.0f,
+        (float)nHeight * 0.5f - 80.0f);
 
     return LT_OK;
 }
