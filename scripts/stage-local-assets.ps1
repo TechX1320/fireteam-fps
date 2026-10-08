@@ -468,11 +468,25 @@ if(Test-Path -LiteralPath $infectedAnimModel) {
         }
     }
 
-    $tokens |
-        Sort-Object -Unique |
+    $uniqueTokens =
+        @($tokens |
+            Sort-Object -Unique)
+
+    $uniqueTokens |
         Set-Content -LiteralPath $reportPath
 
+    $runtimeReportDir =
+        Join-Path $rezRoot "Fireteam"
+    New-Item -ItemType Directory -Force -Path $runtimeReportDir | Out-Null
+
+    $runtimeCandidates =
+        Join-Path $runtimeReportDir "ST_M_CHILD-strings.txt"
+
+    $uniqueTokens |
+        Set-Content -LiteralPath $runtimeCandidates
+
     Write-Host "[OK] ST_M_CHILD string report -> assets-local\Reports\ST_M_CHILD-strings.txt"
+    Write-Host "[OK] ST_M_CHILD animation candidates -> rez\Fireteam\ST_M_CHILD-strings.txt"
 }
 
 $gunsZip = Join-Path $assetRoot "Guns.zip"
