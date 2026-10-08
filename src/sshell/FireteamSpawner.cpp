@@ -64,6 +64,28 @@ static float s_fMissingInfectedSince = 0.0f;
 static uint32 s_nMissingInfectedRestores = 0;
 static FTDifficultyDef s_Difficulty;
 
+// Combat-only clock for timed powerups. Pauses between waves, before
+// round one, and after game over; no free time is lost during preparation.
+static float s_fCombatTime = 0.0f;
+static float s_fLastCombatSample = 0.0f;
+static bool s_bCombatClockInitialized = false;
+
+float FT_GetRoundCombatTime()
+{
+    const float fNow = g_pLTServer->GetTime();
+    if(!s_bCombatClockInitialized || fNow < s_fLastCombatSample)
+    {
+        s_fLastCombatSample = fNow;
+        s_bCombatClockInitialized = true;
+        return s_fCombatTime;
+    }
+    if(s_bRoundActive)
+        s_fCombatTime += fNow - s_fLastCombatSample;
+    s_fLastCombatSample = fNow;
+    return s_fCombatTime;
+}
+
+
 // The first round must never begin during map load, before any player exists.
 // Late joins can extend preparation, but never indefinitely postpone a match.
 static const uint32 kDefaultFirstRoundReadySeconds = 45;
@@ -136,6 +158,7 @@ static void FT_SendRoundState(uint8 nState, HCLIENT hClient)
     pMsg->Writeuint16((uint16)s_nRoundTarget);
     pMsg->Writeuint16((uint16)s_nRoundKilled);
     pMsg->Writeuint16((uint16)s_nRoundAlive);
+    pMsg->Writebool(s_bRoundActive);
 
     g_pLTServer->SendToClient(
         pMsg->Read(),
@@ -208,6 +231,7 @@ void FT_SetQaZombiesEnabled(
     s_bQaZombiesEnabled =
         bEnabled;
 
+    FT_GetRoundCombatTime();
     s_bRoundActive = false;
     s_bRoundIntermission = false;
     s_bGameOver = false;
@@ -327,6 +351,7 @@ void Spawner::ResetRoundController()
         s_hPerimeterSpawners[i] = LTNULL;
     }
 
+    FT_GetRoundCombatTime();
     s_bRoundActive = false;
     s_bRoundIntermission = false;
     s_bGameOver = false;
@@ -893,6 +918,7 @@ void Spawner::StartNextRound()
     s_nRoundKilled = 0;
     s_fMissingInfectedSince = 0.0f;
     s_nMissingInfectedRestores = 0;
+    FT_GetRoundCombatTime(); // close paused interval first
     s_bRoundActive = true;
     s_bRoundIntermission = false;
     s_fNextSpawnTime = g_pLTServer->GetTime() + 0.35f;
@@ -1123,6 +1149,9 @@ void FT_EnsureFireteamRoundController()
     s_nLastSpawner =
         -1;
     s_bFirstRoundPreparing = false;
+    s_fCombatTime = 0.0f;
+    s_bCombatClockInitialized = false;
+    s_fLastCombatSample = 0.0f;
     s_nFirstRoundReadyTick = 0;
     s_nFirstPlayerJoinedTick = 0;
     s_nLastPreparationSecond = 0xFFFFFFFF;
@@ -1169,6 +1198,7 @@ void FT_OnFireteamSquadGameOver()
         return;
     }
 
+    FT_GetRoundCombatTime();
     s_bGameOver = true;
     s_bRoundActive = false;
     s_bRoundIntermission = false;
@@ -1221,6 +1251,7 @@ void FT_OnFireteamEnemyKilled()
         if(s_nRoundKilled >= s_nRoundTarget &&
            s_nRoundSpawned >= s_nRoundTarget)
         {
+            FT_GetRoundCombatTime();
             s_bRoundActive = false;
             s_bRoundIntermission = true;
             s_fNextRoundTime =
