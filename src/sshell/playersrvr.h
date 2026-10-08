@@ -97,6 +97,8 @@ public:
     void                ReloadWeapon();
     void                SyncPrimaryAmmo();
     void                SetClientID(uint32 id){ m_iClientID = id; }
+    void                SetRespawnAnchor(const LTVector &vPos, const LTRotation &rRot)
+                        { m_vSpawnPos = vPos; m_rSpawnRot = rRot; }
     uint32              GetClientID(){ return m_iClientID; }
     uint32              GetScore(){ return m_iScore; }
     void                SetSendStatsFlag(bool bSend)
