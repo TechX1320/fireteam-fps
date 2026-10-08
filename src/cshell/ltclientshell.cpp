@@ -725,6 +725,10 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             uint8 nHealth = pMessage->Readuint8();
             uint8 nMaxHealth = pMessage->Readuint8();
             FT_SetHealth(nHealth, nMaxHealth);
+            if(nHealth == 0)
+            {
+                FT_RoundHudSetRespawnCountdown(5.0f);
+            }
         }
         break;
     case MSG_SC_LIVES:
@@ -741,6 +745,7 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
         break;
     case MSG_SC_RESPAWN:
         {
+            FT_RoundHudSetRespawnCountdown(0.0f);
             LTVector vRespawn = pMessage->ReadLTVector();
             LTRotation rRespawn = pMessage->ReadLTRotation();
 
