@@ -28,6 +28,7 @@
 #include "FireteamHealthHud.h"
 #include "FireteamWeaponHud.h"
 #include "FireteamRoundHud.h"
+#include "FireteamGameGuid.h"
 #include "FireteamCombatFeedback.h"
 #include "FireteamAmbientAudio.h"
 #include "FireteamController.h"
@@ -173,6 +174,9 @@ CLTClientShell::~CLTClientShell()
 //------------------------------------------------------------------------------
 LTRESULT CLTClientShell::OnEngineInitialized(RMode *pMode, LTGUID *pAppGuid)
 {
+    if(pAppGuid)
+        *pAppGuid = FT_GetGameGuid();
+
     // FTDIAG OnEngineInitialized begin
     FTTraceReset();
     static LTCrashHandler s_FireteamCrashHandler(true);
