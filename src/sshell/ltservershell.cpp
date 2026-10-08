@@ -215,7 +215,36 @@ LPBASECLASS CLTServerShell::OnClientEnterWorld(HCLIENT hClient)
                        playerDef.fCollisionZ);
     LTVector vSafe;
     if(FT_ResolveSafePlayerSpawn(vStartPos, vHalfDims, vSafe))
+    {
         vStartPos = vSafe;
+    }
+    else
+    {
+        // If the named GameStartPoint is trapped in a beam/pole, try other
+        // authored PLAYER starts before ever accepting its unsafe center.
+        // Do not substitute zombie/AI spawn anchors.
+        HCLASS hStartClass = g_pLTServer->GetClass("GameStartPoint");
+        for(HOBJECT hStart = g_pLTServer->GetNextObject(LTNULL);
+            hStart; hStart = g_pLTServer->GetNextObject(hStart))
+        {
+            HCLASS hType = g_pLTServer->GetObjectClass(hStart);
+            if(!hStartClass || !hType ||
+               !g_pLTServer->IsKindOf(hType, hStartClass))
+                continue;
+            LTVector vAlternative;
+            g_pLTServer->GetObjectPos(hStart, &vAlternative);
+            if(FT_ResolveSafePlayerSpawn(vAlternative, vHalfDims, vSafe))
+            {
+                LTRotation rAlternative;
+                g_pLTServer->GetObjectRotation(hStart, &rAlternative);
+                vStartPos = vSafe;
+                rStartRot = rAlternative;
+                g_pLTServer->CPrint(
+                    "Fireteam spawn safety: substituted an alternate authored GameStartPoint.");
+                break;
+            }
+        }
+    }
     objCreateStruct.m_Pos = vStartPos;
 	objCreateStruct.m_Rotation = rStartRot;
 
