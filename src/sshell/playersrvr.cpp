@@ -836,6 +836,42 @@ char* CPlayerSrvr::GetPlayerName()
 }
 
 
+void CPlayerSrvr::SetQaSpectating(
+    bool bSpectating)
+{
+    if(m_bQaSpectating ==
+       bSpectating)
+    {
+        return;
+    }
+
+    m_bQaSpectating =
+        bSpectating;
+
+    if(m_bQaSpectating)
+    {
+        LTVector vZero(
+            0.0f,
+            0.0f,
+            0.0f);
+
+        g_pLTSPhysics->SetVelocity(
+            m_hObject,
+            &vZero);
+
+        m_bReloading = false;
+        m_nReloadSlot = 0;
+    }
+
+    g_pLTServer->CPrint(
+        "Fireteam QA spectator: %s %s.",
+        m_sName,
+        m_bQaSpectating
+            ? "ON"
+            : "OFF");
+}
+
+
 
 //-----------------------------------------------------------------------------
 //	CPlayerSrvr::PreCreate(void *pData, float fData)
@@ -1190,7 +1226,9 @@ void CPlayerSrvr::SetClubID()
 //-----------------------------------------------------------------------------
 void CPlayerSrvr::ApplyDamage(uint8 nDamage)
 {
-    if(!m_bAlive || nDamage == 0)
+    if(!m_bAlive ||
+       m_bQaSpectating ||
+       nDamage == 0)
     {
         return;
     }
@@ -1753,7 +1791,8 @@ void CPlayerSrvr::FirePrimary(
     const LTVector &vDirection,
     bool bZoomed)
 {
-    if(!m_bAlive)
+    if(!m_bAlive ||
+       m_bQaSpectating)
     {
         return;
     }
@@ -2240,7 +2279,8 @@ void CPlayerSrvr::SyncPrimaryAmmo()
 
 void CPlayerSrvr::ReloadWeapon()
 {
-    if(!m_bAlive)
+    if(!m_bAlive ||
+       m_bQaSpectating)
     {
         return;
     }
