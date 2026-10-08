@@ -438,13 +438,13 @@ static FTFireteamHitRegion FT_GetZombieHitRegion(
     }
 
     // Tighter kill regions: avoid awarding most upper-torso/pelvis hits.
-    if(fNormalizedY >= 0.80f)
+    if(fNormalizedY >= 0.91f)
     {
         return FT_HITREGION_HEAD;
     }
 
-    if(fNormalizedY >= 0.455f &&
-       fNormalizedY <= 0.505f)
+    if(fNormalizedY >= 0.465f &&
+       fNormalizedY <= 0.485f)
     {
         return FT_HITREGION_GROIN;
     }
@@ -712,7 +712,7 @@ uint32 CPlayerSrvr::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
                         g_pLTServer->GetTime();
 
                     if(m_fLastKillFeedbackTime > 0.0f &&
-                       (fNow - m_fLastKillFeedbackTime) <= 4.0f)
+                       (fNow - m_fLastKillFeedbackTime) <= 2.5f)
                     {
                         if(m_nKillFeedbackChain < 255)
                         {
@@ -1319,7 +1319,8 @@ void CPlayerSrvr::Respawn()
     m_nReloadSlot = 0;
     m_fBottomlessUntil = 0.0f;
     m_fOneHitUntil = 0.0f;
-    m_fGodUntil = 0.0f;
+    // Short server-authoritative invulnerability after respawn.
+    m_fGodUntil = g_pLTServer->GetTime() + 3.0f;
     m_nBottomlessStacks = 0;
     m_nOneHitStacks = 0;
     m_nGodStacks = 0;
