@@ -1060,7 +1060,8 @@ public sealed partial class MainWindow
         var difficultyControl =
             new StackPanel
             {
-                Spacing = 0
+                Spacing = 0,
+                Width = 174
             };
         difficultyControl.Children.Add(
             DifficultySlider);
