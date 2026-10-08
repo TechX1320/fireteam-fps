@@ -759,9 +759,12 @@ void FT_RenderRoundHud()
         s_pWallhackStatus->Render();
     }
 
+    // Round/Mutation announcements use the regular client game clock.
+    // The combat clock above intentionally pauses for perk timers, but
+    // must NOT be used to expire announcements (including intermissions).
+    const float fAnnouncementNow = g_pLTClient->GetTime();
     if(s_pAnnouncement &&
-       fNow <
-            s_fAnnouncementUntil)
+       fAnnouncementNow < s_fAnnouncementUntil)
     {
         const float fWidth =
             s_pAnnouncement->GetWidth();
