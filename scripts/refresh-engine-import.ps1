@@ -33,7 +33,8 @@ $archive = $candidates[0]
 # these change, fall back to the original SHA256 integrity check below.
 $metadataPath = Join-Path $engineRoot ".fireteam-engine-source.metadata"
 $archiveMetadata = "$($archive.FullName)|$($archive.Length)|$($archive.LastWriteTimeUtc.Ticks)"
-if ((Test-Path -LiteralPath $requiredSource) -and
+if ($env:FT_FORCE_ASSET_AUDIT -ne "1" -and
+    (Test-Path -LiteralPath $requiredSource) -and
     (Test-Path -LiteralPath $markerPath) -and
     (Test-Path -LiteralPath $metadataPath) -and
     ([System.IO.File]::ReadAllText($metadataPath).Trim() -ceq $archiveMetadata)) {
