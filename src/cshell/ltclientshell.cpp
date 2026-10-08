@@ -722,6 +722,7 @@ void CLTClientShell::OnEnterWorld()
 //---------------------------------------------------------------------------
 void CLTClientShell::OnExitWorld()
 {
+    FT_RoundHudSetSoloRetry(false);
     FT_RestoreCaptureLight();
     FT_AmbientAudioExitWorld();
 
@@ -2436,6 +2437,7 @@ LTRESULT CLTClientShell::StartNormalGame()
     if(LT_OK == result)
     {
         m_nGameMode = LOCAL_GAMEMODE_NORMAL;
+        FT_RoundHudSetSoloRetry(true);
     }
 
     return result;
@@ -2481,6 +2483,26 @@ void CLTClientShell::OnKeyDown(int key, int rep)
     if(FT_SettingsIsOpen())
     {
         FT_SettingsHandleKey(key);
+        return;
+    }
+
+    // The Jupiter SDK supports replacing an existing solo world via
+    // StartGame(), preserving the old world if the new one fails.
+    // Only local solo games can initiate this; MP rotations are server-owned.
+    if(m_bInWorld && FT_RoundHudIsGameOver() &&
+       m_nGameMode == LOCAL_GAMEMODE_NORMAL &&
+       key == 'R' && rep == 0 &&
+       !m_pChatGui->IsChatInputActive())
+    {
+        FT_RoundHudSetSoloRetry(false);
+        const LTRESULT nRetryResult = StartNormalGame();
+        if(nRetryResult != LT_OK)
+        {
+            g_pLTClient->CPrint(
+                "Fireteam: retry failed (%d). Original world remains active.",
+                (int)nRetryResult);
+            FT_RoundHudSetSoloRetry(true);
+        }
         return;
     }
 
