@@ -264,6 +264,61 @@ static void FT_ApplyWeaponPerturb(
 }
 
 
+static bool FT_AreAllFireteamPlayersOutOfLives()
+{
+    HCLASS hPlayerClass =
+        g_pLTServer->GetClass(
+            "CPlayerSrvr");
+
+    if(!hPlayerClass)
+    {
+        return false;
+    }
+
+    bool bFoundPlayer = false;
+
+    for(HOBJECT hObject =
+            g_pLTServer->GetNextObject(
+                LTNULL);
+        hObject;
+        hObject =
+            g_pLTServer->GetNextObject(
+                hObject))
+    {
+        HCLASS hClass =
+            g_pLTServer->GetObjectClass(
+                hObject);
+
+        if(!hClass ||
+           !g_pLTServer->IsKindOf(
+                hClass,
+                hPlayerClass))
+        {
+            continue;
+        }
+
+        CPlayerSrvr *pPlayer =
+            (CPlayerSrvr*)
+            g_pLTServer->HandleToObject(
+                hObject);
+
+        if(!pPlayer)
+        {
+            continue;
+        }
+
+        bFoundPlayer = true;
+
+        if(pPlayer->GetLives() > 0)
+        {
+            return false;
+        }
+    }
+
+    return bFoundPlayer;
+}
+
+
 static bool FTPenetrationGeometryFilter(
     HOBJECT hObject,
     void *pUserData)
@@ -434,10 +489,13 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
 
             if(!m_bAlive)
             {
-                m_fRespawnTimer -= 0.25f;
-                if(m_fRespawnTimer <= 0.0f)
+                if(m_nLives > 0)
                 {
-                    Respawn();
+                    m_fRespawnTimer -= 0.25f;
+                    if(m_fRespawnTimer <= 0.0f)
+                    {
+                        Respawn();
+                    }
                 }
             }
             else
@@ -445,6 +503,31 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
                 UpdateHazards();
                 CompleteReloadIfReady();
                 UpdatePowerups();
+            }
+
+            const float fTraceNow =
+                g_pLTServer->GetTime();
+
+            if(fTraceNow >=
+               m_fNextPositionTrace)
+            {
+                LTVector vTracePos;
+                g_pLTServer->GetObjectPos(
+                    m_hObject,
+                    &vTracePos);
+
+                g_pLTServer->CPrint(
+                    "Fireteam player trace: %s pos=%.1f %.1f %.1f lives=%u/%u alive=%u.",
+                    m_sName,
+                    vTracePos.x,
+                    vTracePos.y,
+                    vTracePos.z,
+                    (uint32)m_nLives,
+                    (uint32)m_nMaxLives,
+                    m_bAlive ? 1 : 0);
+
+                m_fNextPositionTrace =
+                    fTraceNow + 5.0f;
             }
 
             //Do we need to send score stats?
@@ -473,6 +556,7 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
                         pMsg->Writeuint32(scoreStruct[i].iClientID);
                         pMsg->WriteString(scoreStruct[i].sPlayerName);
                         pMsg->Writeuint32(scoreStruct[i].iScore);
+                        pMsg->Writeuint8(scoreStruct[i].iLives);
                         pMsg->Writefloat(scoreStruct[i].fMoney);
                     }
 
@@ -1132,12 +1216,44 @@ void CPlayerSrvr::ApplyDamage(uint8 nDamage)
     if(m_nHealth == 0)
     {
         m_bAlive = false;
-        m_fRespawnTimer = 2.0f;
+
+        if(m_nLives > 0)
+        {
+            --m_nLives;
+        }
+
+        SendLives();
 
         LTVector vZero(0.0f, 0.0f, 0.0f);
         g_pLTSPhysics->SetVelocity(m_hObject, &vZero);
 
-        g_pLTServer->CPrint("Fireteam: %s died. Respawning in 2 seconds.", m_sName);
+        if(m_nLives > 0)
+        {
+            m_fRespawnTimer = 2.0f;
+
+            g_pLTServer->CPrint(
+                "Fireteam: %s died. %u/%u lives remain; respawning in 2 seconds.",
+                m_sName,
+                (uint32)m_nLives,
+                (uint32)m_nMaxLives);
+        }
+        else
+        {
+            m_fRespawnTimer = 0.0f;
+
+            g_pLTServer->CPrint(
+                "Fireteam: %s is OUT OF LIVES.",
+                m_sName);
+
+            NotifyPowerup(
+                "OUT OF LIVES",
+                4.0f);
+
+            if(FT_AreAllFireteamPlayersOutOfLives())
+            {
+                FT_OnFireteamSquadGameOver();
+            }
+        }
     }
 }
 
@@ -1151,6 +1267,11 @@ void CPlayerSrvr::UpdateHazards()
 
 void CPlayerSrvr::Respawn()
 {
+    if(m_nLives == 0)
+    {
+        return;
+    }
+
     m_bAlive = true;
     m_nHealth = m_nMaxHealth;
     m_fRespawnTimer = 0.0f;
@@ -1197,6 +1318,7 @@ void CPlayerSrvr::Respawn()
     }
 
     SendHealth();
+    SendLives();
     SendPrimaryAmmo();
     SendPowerupState();
 }
@@ -1221,6 +1343,36 @@ void CPlayerSrvr::SendHealth()
     g_pLTServer->SendToClient(pMsg->Read(), m_hClient, MESSAGE_GUARANTEED);
     pMsg->DecRef();
 }
+
+void CPlayerSrvr::SendLives()
+{
+    if(!m_hClient)
+    {
+        return;
+    }
+
+    ILTMessage_Write *pMsg = LTNULL;
+    if(g_pLTSCommon->CreateMessage(pMsg) != LT_OK || !pMsg)
+    {
+        return;
+    }
+
+    pMsg->IncRef();
+    pMsg->Writeuint8(
+        MSG_SC_LIVES);
+    pMsg->Writeuint8(
+        m_nLives);
+    pMsg->Writeuint8(
+        m_nMaxLives);
+
+    g_pLTServer->SendToClient(
+        pMsg->Read(),
+        m_hClient,
+        MESSAGE_GUARANTEED);
+
+    pMsg->DecRef();
+}
+
 void CPlayerSrvr::NotifyPowerup(
     const char *pText,
     float fSeconds)
