@@ -19,6 +19,7 @@ static CUIFormattedPolyString *s_pOneHitStatus = LTNULL;
 static CUIFormattedPolyString *s_pGodStatus = LTNULL;
 static CUIFormattedPolyString *s_pWallhackStatus = LTNULL;
 static CUIFormattedPolyString *s_pSpectatorStatus = LTNULL;
+static CUIFormattedPolyString *s_pRespawnStatus = LTNULL;
 
 static uint16 s_nRound = 0;
 static uint16 s_nTarget = 0;
@@ -30,6 +31,7 @@ static bool s_bGameOver = false;
 static bool s_bSpectating = false;
 static bool s_bQaSpectating = false;
 static float s_fAnnouncementUntil = 0.0f;
+static float s_fRespawnUntil = 0.0f;
 static float s_fBottomlessUntil = 0.0f;
 static float s_fOneHitUntil = 0.0f;
 static float s_fGodUntil = 0.0f;
@@ -142,7 +144,15 @@ void FT_RoundHudInit()
             g_pLTCFontManager->CreateFormattedPolyString(
                 s_pBuffFont,
                 "");
+
+        s_pRespawnStatus =
+            g_pLTCFontManager->CreateFormattedPolyString(
+                s_pBuffFont,
+                "");
     }
+
+    if(s_pRespawnStatus)
+        s_pRespawnStatus->SetColor(0xFFFFFFFF);
 
     if(s_pAnnouncement)
         s_pAnnouncement->SetColor(0xFFFFB000);
@@ -168,6 +178,12 @@ void FT_RoundHudInit()
 
 void FT_RoundHudTerm()
 {
+    if(s_pRespawnStatus)
+    {
+        g_pLTCFontManager->DestroyPolyString(s_pRespawnStatus);
+        s_pRespawnStatus = LTNULL;
+    }
+
     if(s_pAnnouncement)
     {
         g_pLTCFontManager->DestroyPolyString(
@@ -241,6 +257,7 @@ void FT_RoundHudTerm()
     s_bSpectating = false;
     s_bQaSpectating = false;
     s_fAnnouncementUntil = 0.0f;
+    s_fRespawnUntil = 0.0f;
     s_fBottomlessUntil = 0.0f;
     s_fOneHitUntil = 0.0f;
     s_fGodUntil = 0.0f;
@@ -378,6 +395,13 @@ void FT_RoundHudSetTimedPowerups(
         : 0.0f;
 }
 
+void FT_RoundHudSetRespawnCountdown(float fSeconds)
+{
+    s_fRespawnUntil = fSeconds > 0.0f
+        ? g_pLTClient->GetTime() + fSeconds
+        : 0.0f;
+}
+
 void FT_RoundHudSetLives(
     uint8 nLives,
     uint8 nMaxLives)
@@ -468,6 +492,18 @@ void FT_RenderRoundHud()
             22.0f);
 
         s_pRoundStatus->Render();
+    }
+
+    const float fRespawnRemaining = s_fRespawnUntil - g_pLTClient->GetTime();
+    if(s_pRespawnStatus && fRespawnRemaining > 0.0f && s_nLives > 0 && !s_bGameOver)
+    {
+        char szRespawn[128];
+        sprintf(szRespawn, "YOU DIED  |  RESPAWN IN %u  |  ESC: QUIT / SETTINGS", (uint32)(fRespawnRemaining + 0.999f));
+        s_pRespawnStatus->SetText(szRespawn);
+        s_pRespawnStatus->SetPosition(
+            ((float)nScreenW - s_pRespawnStatus->GetWidth()) * 0.5f,
+            (float)nScreenH * 0.48f);
+        s_pRespawnStatus->Render();
     }
 
     if(s_pSpectatorStatus &&
