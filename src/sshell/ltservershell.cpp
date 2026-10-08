@@ -35,6 +35,7 @@
 #include "FireteamSpawner.h"
 #include "FireteamNavigation.h"
 #include "FireteamZombie.h"
+#include "FireteamSpawnSafety.h"
 #include "projectile.h"
 #include "statsmanager.h"
 
@@ -203,9 +204,19 @@ LPBASECLASS CLTServerShell::OnClientEnterWorld(HCLIENT hClient)
             "Fireteam: failed to load config/player.cfg.");
     }
 
-	// Set client's pos and rot according to the "StartPoint", if one exists.
-	this->FindStartPoint(vStartPos, rStartRot);
-	objCreateStruct.m_Pos = vStartPos;
+    // DAT start markers are authored object origins, not guaranteed safe
+    // collision-box centers. Ground-snap and check clearance BEFORE the
+    // initial client and server transforms diverge.
+    this->FindStartPoint(vStartPos, rStartRot);
+    LTVector vHalfDims(16.0f, 38.0f, 16.0f);
+    if(bPlayerDefLoaded)
+        vHalfDims.Init(playerDef.fCollisionX,
+                       playerDef.fCollisionY,
+                       playerDef.fCollisionZ);
+    LTVector vSafe;
+    if(FT_ResolveSafePlayerSpawn(vStartPos, vHalfDims, vSafe))
+        vStartPos = vSafe;
+    objCreateStruct.m_Pos = vStartPos;
 	objCreateStruct.m_Rotation = rStartRot;
 
 	// Create our client object
@@ -255,6 +266,12 @@ LPBASECLASS CLTServerShell::OnClientEnterWorld(HCLIENT hClient)
             hClientHandle,
             &vDims,
             0);
+
+        // Share the final authoritative transform with both respawns and
+        // the client's initial position packet; never send the old raw DAT
+        // marker after the engine has resolved the collision dimensions.
+        g_pLTServer->GetObjectPos(hClientHandle, &vStartPos);
+        pClientObj->SetRespawnAnchor(vStartPos, rStartRot);
 
         pClientObj->SetClient(hClient);
 
