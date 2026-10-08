@@ -38,6 +38,19 @@ struct FTNavVolume
 
 static const uint32 kMaxNavVolumes = 256;
 
+// Authored AIVolumes are static map objects. Re-scanning every world object
+// for every zombie LOS/path decision is unnecessarily expensive. Cache the
+// geometry for this world and invalidate it explicitly before map loading.
+static FTNavVolume s_aNavCache[kMaxNavVolumes];
+static uint32 s_nNavCacheCount = 0;
+static bool s_bNavCacheValid = false;
+
+void FT_ResetNavigationCache()
+{
+    s_nNavCacheCount = 0;
+    s_bNavCacheValid = false;
+}
+
 static float FTMax(float a, float b) { return a > b ? a : b; }
 static float FTMin(float a, float b) { return a < b ? a : b; }
 static float FTClamp(float v, float lo, float hi)
@@ -130,6 +143,15 @@ static float FTChooseGateCoordinate(
 
 static uint32 FTCollectVolumes(FTNavVolume *pVolumes, uint32 nMax)
 {
+    if(s_bNavCacheValid)
+    {
+        const uint32 nCopy =
+            s_nNavCacheCount < nMax ? s_nNavCacheCount : nMax;
+        for(uint32 i = 0; i < nCopy; ++i)
+            pVolumes[i] = s_aNavCache[i];
+        return nCopy;
+    }
+
     HCLASS hVolumeClass = g_pLTServer->GetClass("AIVolume");
     if(!hVolumeClass)
     {
@@ -157,6 +179,16 @@ static uint32 FTCollectVolumes(FTNavVolume *pVolumes, uint32 nMax)
         pVolumes[nCount].vDims = pVolume->GetDims();
         g_pLTServer->GetObjectPos(hObj, &pVolumes[nCount].vCenter);
         ++nCount;
+    }
+
+    // All callers currently use kMaxNavVolumes. Never cache a truncated
+    // result from a caller requesting a smaller list.
+    if(nMax >= kMaxNavVolumes)
+    {
+        s_nNavCacheCount = nCount;
+        for(uint32 i = 0; i < nCount; ++i)
+            s_aNavCache[i] = pVolumes[i];
+        s_bNavCacheValid = true;
     }
 
     return nCount;
