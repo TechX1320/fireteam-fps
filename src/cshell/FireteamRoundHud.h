@@ -16,6 +16,11 @@ void FT_RoundHudSetTimedPowerups(
     float fOneHitSeconds,
     float fGodSeconds,
     float fWallhackSeconds);
+void FT_RoundHudSetLives(
+    uint8 nLives,
+    uint8 nMaxLives);
+bool FT_RoundHudIsPlayerEliminated();
+bool FT_RoundHudIsGameOver();
 void FT_RenderRoundHud();
 
 #endif
