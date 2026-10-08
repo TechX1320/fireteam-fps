@@ -1282,13 +1282,14 @@ void FireteamZombie::RebuildPath(const LTVector &vTarget)
             m_nPathLane,
             m_aPath);
 
-    // If source and target are already in the same authored volume, a direct
-    // endpoint is still a valid path.  For a genuine graph failure across
-    // volumes, do not invent a blind dog-leg through unknown geometry.
+    // Maps without CA/NOLF AIVolumes still need a useful baseline. Let the
+    // existing collision probes/local steering work toward the target directly;
+    // authored navigation remains authoritative whenever volumes exist.
     if(!bBuilt &&
-       FT_ArePositionsInSameNavigationVolume(
-           vPos,
-           vTarget))
+       (FT_GetNavigationVolumeCount() == 0 ||
+        FT_ArePositionsInSameNavigationVolume(
+            vPos,
+            vTarget)))
     {
         m_aPath.push_back(
             vTarget);
@@ -1631,10 +1632,14 @@ void FireteamZombie::UpdateZombie()
         ? m_Def.fRunSpeed
         : m_Def.fWalkSpeed;
 
+    const bool bHasAuthoredNavigation =
+        FT_GetNavigationVolumeCount() > 0;
+
     const bool bDirectPursuit =
         m_fForcePathTime <= 0.0f &&
-        bSameVolume &&
-        bClearRouteToTarget;
+        bClearRouteToTarget &&
+        (bSameVolume ||
+         !bHasAuthoredNavigation);
 
     if(bDirectPursuit)
     {
