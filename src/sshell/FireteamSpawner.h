@@ -24,6 +24,7 @@ private:
     char m_sName[64];
 };
 
+void FT_OnFireteamPlayerJoined(HCLIENT hClient);
 void FT_OnFireteamEnemyKilled();
 void FT_OnFireteamSquadGameOver();
 void FT_SetQaZombiesEnabled(
