@@ -72,6 +72,7 @@ static bool s_bFirstRoundPreparing = false;
 static ULONGLONG s_nFirstPlayerJoinedTick = 0;
 static ULONGLONG s_nFirstRoundReadyTick = 0;
 static uint32 s_nLastPreparationSecond = 0xFFFFFFFF;
+static uint32 s_nPreparationRevision = 1;
 
 // The launcher's session file selects SP (15s) versus host/dedicated (45s).
 // GetTickCount64 runs while the player alt-tabs; engine GetTime can pause.
@@ -113,6 +114,7 @@ static void FT_SendFirstRoundPreparation(HCLIENT hClient, float fRemaining)
     pMsg->IncRef();
     pMsg->Writeuint8(MSG_SC_ROUND_PREP);
     pMsg->Writefloat(fRemaining > 0.0f ? fRemaining : 0.0f);
+    pMsg->Writeuint32(s_nPreparationRevision);
     g_pLTServer->SendToClient(pMsg->Read(), hClient, MESSAGE_GUARANTEED);
     pMsg->DecRef();
 }
@@ -158,6 +160,7 @@ void FT_OnFireteamPlayerJoined(HCLIENT hClient)
             s_bFirstRoundPreparing = true;
             s_nFirstPlayerJoinedTick = nNow;
             s_nFirstRoundReadyTick = nNow + (ULONGLONG)nDelay * 1000;
+            ++s_nPreparationRevision;
             g_pLTServer->CPrint(
                 "Fireteam: first player entered; Round 1 preparation %u wall-clock seconds.",
                 nDelay);
@@ -173,7 +176,10 @@ void FT_OnFireteamPlayerJoined(HCLIENT hClient)
             if(nExtendUntil > nHardCap)
                 nExtendUntil = nHardCap;
             if(nExtendUntil > s_nFirstRoundReadyTick)
+            {
                 s_nFirstRoundReadyTick = nExtendUntil;
+                ++s_nPreparationRevision;
+            }
         }
         s_nLastPreparationSecond = 0xFFFFFFFF;
         FT_SendFirstRoundPreparation(LTNULL, FT_FirstRoundRemaining());
@@ -215,6 +221,7 @@ void FT_SetQaZombiesEnabled(
     s_fMissingInfectedSince = 0.0f;
     s_nMissingInfectedRestores = 0;
     s_bFirstRoundPreparing = bEnabled;
+    ++s_nPreparationRevision;
     s_nFirstPlayerJoinedTick = GetTickCount64();
     s_nFirstRoundReadyTick = bEnabled
         ? s_nFirstPlayerJoinedTick + 5000 : 0;
@@ -337,6 +344,7 @@ void Spawner::ResetRoundController()
     s_nFirstPlayerJoinedTick = 0;
     s_nFirstRoundReadyTick = 0;
     s_nLastPreparationSecond = 0xFFFFFFFF;
+    s_nPreparationRevision = 1;
 
     if(!FT_LoadActiveDifficulty(
         "config/difficulties.cfg",
