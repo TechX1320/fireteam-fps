@@ -605,6 +605,7 @@ void CLTClientShell::OnEnterWorld()
     }
 
     m_bInWorld = true;
+    FT_RoundHudResetFirstRoundPreparation();
 
     // Low-volume Cabin Fever ambience loop supplied as a local mod asset.
     FT_AmbientAudioEnterWorld();
@@ -784,8 +785,9 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
         break;
     case MSG_SC_ROUND_PREP:
         {
-            FT_RoundHudSetFirstRoundPreparation(
-                pMessage->Readfloat());
+            const float fRemaining = pMessage->Readfloat();
+            const uint32 nRevision = pMessage->Readuint32();
+            FT_RoundHudSetFirstRoundPreparation(fRemaining, nRevision);
         }
         break;
     case MSG_SC_POWERUP:
