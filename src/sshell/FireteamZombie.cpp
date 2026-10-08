@@ -192,86 +192,30 @@ static float FT_ZombieWallhackStackSeconds(
 void FireteamZombie::ApplyWallhackRenderStyle(
     bool bEnabled)
 {
-    const char *pBodyStyle =
-        bEnabled
-        ? "RenderStyles/ZombieThroughWall.ltb"
-        : (m_Def.sBodyRenderStyle0[0]
-            ? m_Def.sBodyRenderStyle0
-            : "RenderStyles/default.ltb");
+    const char *pWallhackStyle =
+        "RenderStyles/ZombieThroughWall.ltb";
 
-    // SetObjectFilenames replaces the model resource bundle, not just the
-    // RenderStyle slot. Re-submit the complete composition so toggling the
-    // wallhack cannot accidentally clear the body/animation/child models.
+    // NOLF2's SetObjectRenderStyle helper does exactly this: submit a
+    // temporary ObjectCreateStruct containing only the render-style slot(s).
+    // Do not re-submit model filenames here; that can disturb child models.
     ObjectCreateStruct bodyOCS;
     bodyOCS.Clear();
 
     FT_CopyInfectedString(
-        bodyOCS.m_Filenames[0],
-        MAX_CS_FILENAME_LEN,
-        m_Def.sBodyModel);
-    FT_CopyInfectedString(
-        bodyOCS.m_SkinNames[0],
-        MAX_CS_FILENAME_LEN,
-        m_Def.sBodyTexture0);
-    FT_CopyInfectedString(
-        bodyOCS.m_SkinNames[1],
-        MAX_CS_FILENAME_LEN,
-        m_Def.sBodyTexture1);
-
-    if(m_Def.sAnimationModel[0])
-    {
-        FT_CopyInfectedString(
-            bodyOCS.m_Filenames[1],
-            MAX_CS_FILENAME_LEN,
-            m_Def.sAnimationModel);
-    }
-
-    if(_stricmp(
-           m_Def.sFaceMode,
-           "child_model") == 0 &&
-       m_Def.sFaceModel[0])
-    {
-        FT_CopyInfectedString(
-            bodyOCS.m_Filenames[2],
-            MAX_CS_FILENAME_LEN,
-            m_Def.sFaceModel);
-        FT_CopyInfectedString(
-            bodyOCS.m_SkinNames[2],
-            MAX_CS_FILENAME_LEN,
-            m_Def.sFaceTexture);
-    }
-
-    if(m_Def.sHeadModel[0])
-    {
-        FT_CopyInfectedString(
-            bodyOCS.m_Filenames[3],
-            MAX_CS_FILENAME_LEN,
-            m_Def.sHeadModel);
-        FT_CopyInfectedString(
-            bodyOCS.m_SkinNames[3],
-            MAX_CS_FILENAME_LEN,
-            m_Def.sHeadTexture);
-    }
-
-    FT_CopyInfectedString(
         bodyOCS.m_RenderStyleNames[0],
         MAX_CS_FILENAME_LEN,
-        pBodyStyle);
+        bEnabled
+            ? pWallhackStyle
+            : (m_Def.sBodyRenderStyle0[0]
+                ? m_Def.sBodyRenderStyle0
+                : "RenderStyles/default.ltb"));
 
-    if(bEnabled)
-    {
-        FT_CopyInfectedString(
-            bodyOCS.m_RenderStyleNames[1],
-            MAX_CS_FILENAME_LEN,
-            "RenderStyles/ZombieThroughWall.ltb");
-    }
-    else if(m_Def.sBodyRenderStyle1[0])
-    {
-        FT_CopyInfectedString(
-            bodyOCS.m_RenderStyleNames[1],
-            MAX_CS_FILENAME_LEN,
-            m_Def.sBodyRenderStyle1);
-    }
+    FT_CopyInfectedString(
+        bodyOCS.m_RenderStyleNames[1],
+        MAX_CS_FILENAME_LEN,
+        bEnabled
+            ? pWallhackStyle
+            : m_Def.sBodyRenderStyle1);
 
     const LTRESULT nBodyResult =
         g_pLTSCommon->SetObjectFilenames(
@@ -280,43 +224,24 @@ void FireteamZombie::ApplyWallhackRenderStyle(
 
     if(m_hFace)
     {
-        const char *pFaceStyle =
-            bEnabled
-            ? "RenderStyles/ZombieThroughWall.ltb"
-            : (m_Def.sFaceRenderStyle0[0]
-                ? m_Def.sFaceRenderStyle0
-                : "RenderStyles/default.ltb");
-
         ObjectCreateStruct faceOCS;
         faceOCS.Clear();
 
         FT_CopyInfectedString(
-            faceOCS.m_Filename,
-            MAX_CS_FILENAME_LEN,
-            m_Def.sFaceModel);
-        FT_CopyInfectedString(
-            faceOCS.m_SkinName,
-            MAX_CS_FILENAME_LEN,
-            m_Def.sFaceTexture);
-        FT_CopyInfectedString(
             faceOCS.m_RenderStyleNames[0],
             MAX_CS_FILENAME_LEN,
-            pFaceStyle);
+            bEnabled
+                ? pWallhackStyle
+                : (m_Def.sFaceRenderStyle0[0]
+                    ? m_Def.sFaceRenderStyle0
+                    : "RenderStyles/default.ltb"));
 
-        if(bEnabled)
-        {
-            FT_CopyInfectedString(
-                faceOCS.m_RenderStyleNames[1],
-                MAX_CS_FILENAME_LEN,
-                "RenderStyles/ZombieThroughWall.ltb");
-        }
-        else if(m_Def.sFaceRenderStyle1[0])
-        {
-            FT_CopyInfectedString(
-                faceOCS.m_RenderStyleNames[1],
-                MAX_CS_FILENAME_LEN,
-                m_Def.sFaceRenderStyle1);
-        }
+        FT_CopyInfectedString(
+            faceOCS.m_RenderStyleNames[1],
+            MAX_CS_FILENAME_LEN,
+            bEnabled
+                ? pWallhackStyle
+                : m_Def.sFaceRenderStyle1);
 
         g_pLTSCommon->SetObjectFilenames(
             m_hFace,
