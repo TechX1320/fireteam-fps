@@ -699,6 +699,18 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             FT_SetHealth(nHealth, nMaxHealth);
         }
         break;
+    case MSG_SC_LIVES:
+        {
+            const uint8 nLives =
+                pMessage->Readuint8();
+            const uint8 nMaxLives =
+                pMessage->Readuint8();
+
+            FT_RoundHudSetLives(
+                nLives,
+                nMaxLives);
+        }
+        break;
     case MSG_SC_RESPAWN:
         {
             LTVector vRespawn = pMessage->ReadLTVector();
@@ -1328,6 +1340,18 @@ LTRESULT CLTClientShell::PollInput()
         m_pPlayer->SetControllerMoveAxes(
             0.0f,
             0.0f);
+        return LT_OK;
+    }
+
+    if(FT_RoundHudIsPlayerEliminated() ||
+       FT_RoundHudIsGameOver())
+    {
+        m_pCamera->ClearWeaponZoom();
+        m_pPlayer->SetControllerMoveAxes(
+            0.0f,
+            0.0f);
+        m_pPlayer->UpdateMoveFlags(
+            0);
         return LT_OK;
     }
 
