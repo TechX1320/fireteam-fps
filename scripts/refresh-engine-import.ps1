@@ -28,6 +28,19 @@ if ($candidates.Count -eq 0) {
 }
 
 $archive = $candidates[0]
+# Hashing a multi-GB EngineMissing zip on EVERY build is unnecessary.
+# First compare file identity, byte length and UTC write time. If any of
+# these change, fall back to the original SHA256 integrity check below.
+$metadataPath = Join-Path $engineRoot ".fireteam-engine-source.metadata"
+$archiveMetadata = "$($archive.FullName)|$($archive.Length)|$($archive.LastWriteTimeUtc.Ticks)"
+if ((Test-Path -LiteralPath $requiredSource) -and
+    (Test-Path -LiteralPath $markerPath) -and
+    (Test-Path -LiteralPath $metadataPath) -and
+    ([System.IO.File]::ReadAllText($metadataPath).Trim() -ceq $archiveMetadata)) {
+    Write-Host "[FAST] Jupiter engine archive unchanged; skipping multi-GB SHA256 scan."
+    exit 0
+}
+
 $archiveHash = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash
 $storedHash = ""
 if (Test-Path -LiteralPath $markerPath) {
@@ -58,4 +71,6 @@ else {
     Write-Host "[OK] Full Jupiter ClientFX plugin source already current."
 }
 
+# Save only after hash validation and any required extraction succeeded.
+[System.IO.File]::WriteAllText($metadataPath, $archiveMetadata)
 Write-Host "[INFO] Engine source archive: $($archive.Name)"
