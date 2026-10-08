@@ -16,6 +16,24 @@ void FT_QueueLightGroup(uint32 nID, const LTVector &vAdjustment)
 
 void FT_UpdateLightGroups()
 {
+    // A/B diagnostic for Cabin Fever's torn-looking wall lamps. Authored
+    // lightmaps remain untouched; only compatibility overrides are skipped.
+    // +FTLightGroupOverrides 0 shows the compiled DAT's native LightGroup
+    // colors. If lamps still tear, investigate their sprite/DTX render style.
+    HCONSOLEVAR hOverrides =
+        g_pLTClient->GetConsoleVar("FTLightGroupOverrides");
+    const bool bAllowOverrides =
+        !hOverrides || g_pLTClient->GetVarValueFloat(hOverrides) != 0.0f;
+    if(!bAllowOverrides)
+    {
+        for(std::map<uint32, LTVector>::iterator p = s_BaseColors.begin();
+            p != s_BaseColors.end(); ++p)
+            g_pLTClient->SetLightGroupColor(p->first, p->second);
+        s_BaseColors.clear();
+        s_PendingAdjustments.clear();
+        return;
+    }
+
     if(!s_bPrintedGlobalLightScale)
     {
         LTVector vGlobalScale;
