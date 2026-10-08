@@ -44,6 +44,7 @@ enum EMessageID
         MSG_CS_CHAT,                // client->server
         MSG_SC_CHAT,                // server->client
         MSG_SC_HEALTH,              // server->client
+        MSG_SC_LIVES,               // server->client lives remaining
         MSG_SC_RESPAWN,             // server->client
         MSG_SC_LIGHTGROUP,          // server->client
         MSG_SC_AMMO,                // server->client
