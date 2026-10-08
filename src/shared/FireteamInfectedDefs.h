@@ -68,7 +68,14 @@ struct FTInfectedDef
     char sIdleAnim[64];
     char sWalkAnim[64];
     char sRunAnim[64];
+    char sAttackAnim1[64];
+    char sAttackAnim2[64];
+    char sAttackAnim3[64];
+    char sJumpAnim[64];
     char sDeathAnim[64];
+    float fAttackAnimSeconds;
+    float fJumpAnimSeconds;
+    float fJumpHeight;
     float fDeathSeconds;
 };
 
@@ -222,6 +229,20 @@ inline void FT_ApplyInfectedValue(
         FT_CopyInfectedString(def.sWalkAnim, sizeof(def.sWalkAnim), pValue);
     else if(_stricmp(pKey, "run_anim") == 0)
         FT_CopyInfectedString(def.sRunAnim, sizeof(def.sRunAnim), pValue);
+    else if(_stricmp(pKey, "attack_anim1") == 0)
+        FT_CopyInfectedString(def.sAttackAnim1, sizeof(def.sAttackAnim1), pValue);
+    else if(_stricmp(pKey, "attack_anim2") == 0)
+        FT_CopyInfectedString(def.sAttackAnim2, sizeof(def.sAttackAnim2), pValue);
+    else if(_stricmp(pKey, "attack_anim3") == 0)
+        FT_CopyInfectedString(def.sAttackAnim3, sizeof(def.sAttackAnim3), pValue);
+    else if(_stricmp(pKey, "jump_anim") == 0)
+        FT_CopyInfectedString(def.sJumpAnim, sizeof(def.sJumpAnim), pValue);
+    else if(_stricmp(pKey, "attack_anim_seconds") == 0)
+        def.fAttackAnimSeconds = (float)atof(pValue);
+    else if(_stricmp(pKey, "jump_anim_seconds") == 0)
+        def.fJumpAnimSeconds = (float)atof(pValue);
+    else if(_stricmp(pKey, "jump_height") == 0)
+        def.fJumpHeight = (float)atof(pValue);
     else if(_stricmp(pKey, "death_anim") == 0)
         FT_CopyInfectedString(def.sDeathAnim, sizeof(def.sDeathAnim), pValue);
     else if(_stricmp(pKey, "death_seconds") == 0)
