@@ -25,6 +25,56 @@ static bool s_bDifficultyLoaded = false;
 static bool s_bAnimationAuditComplete = false;
 static FTDifficultyDef s_ZombieDifficulty;
 
+// Snapshot neighbor positions once per short interval; do not enumerate
+// every world object separately for every zombie's steering decision.
+struct FTZombieNeighborSample
+{
+    HOBJECT hObject;
+    LTVector vPos;
+};
+static std::vector<FTZombieNeighborSample> s_aZombieNeighbors;
+static float s_fLastNeighborSnapshot = -1.0f;
+
+void FT_ResetZombieNeighborCache()
+{
+    s_aZombieNeighbors.clear();
+    s_fLastNeighborSnapshot = -1.0f;
+}
+
+static const std::vector<FTZombieNeighborSample>& FT_GetZombieNeighborSnapshot()
+{
+    const float fNow = g_pLTServer->GetTime();
+    if(s_fLastNeighborSnapshot >= 0.0f &&
+       fNow >= s_fLastNeighborSnapshot &&
+       fNow - s_fLastNeighborSnapshot < 0.075f)
+        return s_aZombieNeighbors;
+
+    s_aZombieNeighbors.clear();
+    s_fLastNeighborSnapshot = fNow;
+    HCLASS hZombieClass = g_pLTServer->GetClass("FireteamZombie");
+    if(!hZombieClass)
+        return s_aZombieNeighbors;
+
+    for(HOBJECT hObj = g_pLTServer->GetNextObject(LTNULL);
+        hObj; hObj = g_pLTServer->GetNextObject(hObj))
+    {
+        HCLASS hType = g_pLTServer->GetObjectClass(hObj);
+        if(!hType || !g_pLTServer->IsKindOf(hType, hZombieClass))
+            continue;
+
+        FireteamZombie *pZombie =
+            (FireteamZombie*)g_pLTServer->HandleToObject(hObj);
+        if(!pZombie || !pZombie->IsAliveForRound())
+            continue;
+
+        FTZombieNeighborSample sample;
+        sample.hObject = hObj;
+        g_pLTServer->GetObjectPos(hObj, &sample.vPos);
+        s_aZombieNeighbors.push_back(sample);
+    }
+    return s_aZombieNeighbors;
+}
+
 static float s_fZombieWallhackUntil = 0.0f;
 static uint8 s_nZombieWallhackStacks = 0;
 static bool s_bZombieWallhackApplied = false;
@@ -1763,52 +1813,15 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
             0.0f,
             0.0f);
 
-        HCLASS hZombieClass =
-            g_pLTServer->GetClass(
-                "FireteamZombie");
-
-        if(hZombieClass)
+        const std::vector<FTZombieNeighborSample> &aNeighbors =
+            FT_GetZombieNeighborSnapshot();
+        for(uint32 i = 0; i < (uint32)aNeighbors.size(); ++i)
         {
-            for(HOBJECT hObj =
-                    g_pLTServer->GetNextObject(
-                        LTNULL);
-                hObj;
-                hObj =
-                    g_pLTServer->GetNextObject(
-                        hObj))
-            {
-                if(hObj == m_hObject)
-                {
-                    continue;
-                }
+            const FTZombieNeighborSample &other = aNeighbors[i];
+            if(other.hObject == m_hObject)
+                continue;
 
-                HCLASS hClass =
-                    g_pLTServer->GetObjectClass(
-                        hObj);
-
-                if(!hClass ||
-                   !g_pLTServer->IsKindOf(
-                        hClass,
-                        hZombieClass))
-                {
-                    continue;
-                }
-
-                FireteamZombie *pOther =
-                    (FireteamZombie*)
-                    g_pLTServer->HandleToObject(
-                        hObj);
-
-                if(pOther &&
-                   pOther->m_bDying)
-                {
-                    continue;
-                }
-
-                LTVector vOther;
-                g_pLTServer->GetObjectPos(
-                    hObj,
-                    &vOther);
+            const LTVector &vOther = other.vPos;
 
                 LTVector vOtherToDest =
                     vOther -
@@ -1857,7 +1870,6 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
                     (fStrength *
                      2.0f *
                      fStepDistance);
-            }
         }
 
         LTVector vSteerStep =
