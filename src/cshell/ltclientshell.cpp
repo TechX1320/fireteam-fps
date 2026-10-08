@@ -54,6 +54,77 @@ SETUP_CLIENTSHELL();
 
 CLTClientShell* g_pCShell = NULL;
 
+// OBS Game Capture can miss display gamma-ramp adjustments used by older
+// Direct3D titles. Jupiter's camera light-add is applied inside the renderer,
+// rather than through the display's gamma ramp. This is deliberately OPT-IN:
+// it also affects gameplay and a large value would wash out baked lighting.
+static HLOCALOBJ s_hFTCaptureCamera = LTNULL;
+static LTVector s_vFTCaptureOriginal(0.0f, 0.0f, 0.0f);
+static float s_fFTCaptureApplied = -1.0f;
+
+static void FT_RestoreCaptureLight()
+{
+    if(s_hFTCaptureCamera && s_fFTCaptureApplied >= 0.0f)
+        g_pLTClient->SetCameraLightAdd(
+            s_hFTCaptureCamera, &s_vFTCaptureOriginal);
+    s_hFTCaptureCamera = LTNULL;
+    s_fFTCaptureApplied = -1.0f;
+}
+
+static void FT_UpdateCaptureLight(HLOCALOBJ hCamera)
+{
+    if(!hCamera)
+        return;
+
+    if(hCamera != s_hFTCaptureCamera)
+    {
+        // Old camera may have been destroyed during video mode changes.
+        // World-exit restores an existing camera before teardown.
+        s_hFTCaptureCamera = hCamera;
+        s_fFTCaptureApplied = -1.0f;
+        s_vFTCaptureOriginal.Init(0.0f, 0.0f, 0.0f);
+    }
+
+    HCONSOLEVAR hCapture =
+        g_pLTClient->GetConsoleVar("FTCaptureBrightness");
+    float fAmount = hCapture
+        ? g_pLTClient->GetVarValueFloat(hCapture) : 0.0f;
+    if(fAmount < 0.0f) fAmount = 0.0f;
+    if(fAmount > 0.15f) fAmount = 0.15f;
+
+    if(fAmount <= 0.0f)
+    {
+        if(s_fFTCaptureApplied >= 0.0f)
+        {
+            FT_RestoreCaptureLight();
+        }
+        return;
+    }
+
+    if(s_fFTCaptureApplied == fAmount)
+        return;
+
+    if(s_fFTCaptureApplied < 0.0f &&
+       !g_pLTClient->GetCameraLightAdd(
+           hCamera, &s_vFTCaptureOriginal))
+        return;
+
+    LTVector vLightAdd = s_vFTCaptureOriginal;
+    vLightAdd.x += fAmount;
+    vLightAdd.y += fAmount;
+    vLightAdd.z += fAmount;
+    if(vLightAdd.x > 1.0f) vLightAdd.x = 1.0f;
+    if(vLightAdd.y > 1.0f) vLightAdd.y = 1.0f;
+    if(vLightAdd.z > 1.0f) vLightAdd.z = 1.0f;
+    if(g_pLTClient->SetCameraLightAdd(hCamera, &vLightAdd))
+    {
+        s_fFTCaptureApplied = fAmount;
+        g_pLTClient->CPrint(
+            "Fireteam capture: in-renderer camera brightness +%.2f applied. OBS Game Capture test recommended; +FTCaptureBrightness 0 disables.",
+            fAmount);
+    }
+}
+
 static const float g_aQaMoveSteps[] =
 {
     0.01f,
@@ -651,6 +722,7 @@ void CLTClientShell::OnEnterWorld()
 //---------------------------------------------------------------------------
 void CLTClientShell::OnExitWorld()
 {
+    FT_RestoreCaptureLight();
     FT_AmbientAudioExitWorld();
 
 	if (m_pPlayer)
@@ -1028,6 +1100,8 @@ LTRESULT CLTClientShell::Render()
 	LTRESULT result;
 
     float fFrameTime = g_pLTClient->GetFrameTime();
+
+    FT_UpdateCaptureLight(m_hCamera);
 
     // Optional, low-overhead frame pacing telemetry to diagnose background
     // shimmer versus genuine long frames. Enable with launcher +FTPerf 1.
