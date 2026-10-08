@@ -55,7 +55,12 @@ if not exist "BUILT\Engine.REZ" (
 copy /y "out\build\bin\FireteamDedicatedServer.exe" "BUILT\FireteamDedicatedServer.exe" >nul
 if errorlevel 1 goto :fail
 
-echo [OK] BUILT\FireteamDedicatedServer.exe
+echo [STAGE] Preparing independent server runtime and config...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\stage-dedicated-server.ps1" -RepoRoot "%CD%"
+if errorlevel 1 goto :fail
+
+echo [OK] BUILT\Dedicated\FireteamDedicatedServer.exe
+echo [INFO] Game and dedicated server now have independent config/session.cfg files.
 echo [INFO] Experimental binary: verify map load and network joins before public hosting.
 exit /b 0
 
