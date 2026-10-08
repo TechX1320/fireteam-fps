@@ -1404,7 +1404,8 @@ void FireteamZombie::AdvanceSmoothMotion()
     g_pLTServer->GetObjectPos(m_hObject, &vCurrent);
     const float fPart =
         1.0f / (float)m_nMotionStepsRemaining;
-    const LTVector vNext =
+    // Jupiter's movement API takes a writable LTVector*.
+    LTVector vNext =
         vCurrent + (m_vMotionGoal - vCurrent) * fPart;
     g_pLTServer->MoveObject(m_hObject, &vNext);
     --m_nMotionStepsRemaining;
