@@ -31,6 +31,8 @@ static bool s_bZombieWallhackApplied = false;
 FireteamZombie::FireteamZombie() :
     m_nHealth(0),
     m_fAttackCooldown(0.0f),
+    m_fAttackAnimationTime(0.0f),
+    m_fJumpAnimationTime(0.0f),
     m_fRepathCooldown(0.0f),
     m_fStuckTime(0.0f),
     m_fForcePathTime(0.0f),
@@ -1219,6 +1221,12 @@ void FireteamZombie::UpdateZombie()
     if(m_fAttackCooldown > 0.0f)
         m_fAttackCooldown -= kUpdate;
 
+    if(m_fAttackAnimationTime > 0.0f)
+        m_fAttackAnimationTime -= kUpdate;
+
+    if(m_fJumpAnimationTime > 0.0f)
+        m_fJumpAnimationTime -= kUpdate;
+
     if(m_fRepathCooldown > 0.0f)
         m_fRepathCooldown -= kUpdate;
 
@@ -1245,9 +1253,13 @@ void FireteamZombie::UpdateZombie()
             m_hObject,
             &vStop);
 
-        SetZombieAnimation(
-            m_Def.sIdleAnim,
-            true);
+        if(m_fAttackAnimationTime <= 0.0f &&
+           m_fJumpAnimationTime <= 0.0f)
+        {
+            SetZombieAnimation(
+                m_Def.sIdleAnim,
+                true);
+        }
 
         m_fTargetMemory = 0.0f;
         m_bHasLastKnownTarget = false;
@@ -1357,9 +1369,13 @@ void FireteamZombie::UpdateZombie()
             m_hObject,
             &vStop);
 
-        SetZombieAnimation(
-            m_Def.sIdleAnim,
-            true);
+        if(m_fAttackAnimationTime <= 0.0f &&
+           m_fAttackCooldown > 0.0f)
+        {
+            SetZombieAnimation(
+                m_Def.sIdleAnim,
+                true);
+        }
 
         if(fPlayerDistance > 1.0f)
         {
@@ -1379,6 +1395,58 @@ void FireteamZombie::UpdateZombie()
 
         if(m_fAttackCooldown <= 0.0f)
         {
+            const char *aAttackAnimations[3] =
+            {
+                m_Def.sAttackAnim1,
+                m_Def.sAttackAnim2,
+                m_Def.sAttackAnim3
+            };
+
+            const uint32 nAttackStart =
+                (uint32)(rand() % 3);
+
+            const char *pAttackAnimation =
+                LTNULL;
+
+            for(uint32 nAttackTry = 0;
+                nAttackTry < 3;
+                ++nAttackTry)
+            {
+                const char *pCandidate =
+                    aAttackAnimations[
+                        (nAttackStart +
+                         nAttackTry) %
+                        3];
+
+                if(pCandidate &&
+                   pCandidate[0])
+                {
+                    pAttackAnimation =
+                        pCandidate;
+                    break;
+                }
+            }
+
+            if(pAttackAnimation)
+            {
+                SetZombieAnimation(
+                    pAttackAnimation,
+                    false);
+
+                m_fAttackAnimationTime =
+                    m_Def.fAttackAnimSeconds > 0.0f
+                    ? m_Def.fAttackAnimSeconds
+                    : 0.65f;
+            }
+            else
+            {
+                SetZombieAnimation(
+                    m_Def.sIdleAnim,
+                    true);
+                m_fAttackAnimationTime =
+                    0.0f;
+            }
+
             CPlayerSrvr *pPlayer =
                 (CPlayerSrvr*)
                 g_pLTServer->HandleToObject(
@@ -1718,15 +1786,18 @@ void FireteamZombie::UpdateZombie()
                 m_hObject,
                 &rLook);
 
-            SetZombieAnimation(
-                bRunning
-                    ? (m_Def.sRunAnim[0]
-                        ? m_Def.sRunAnim
-                        : m_Def.sWalkAnim)
-                    : (m_Def.sWalkAnim[0]
-                        ? m_Def.sWalkAnim
-                        : m_Def.sRunAnim),
-                true);
+            if(m_fJumpAnimationTime <= 0.0f)
+            {
+                SetZombieAnimation(
+                    bRunning
+                        ? (m_Def.sRunAnim[0]
+                            ? m_Def.sRunAnim
+                            : m_Def.sWalkAnim)
+                        : (m_Def.sWalkAnim[0]
+                            ? m_Def.sWalkAnim
+                            : m_Def.sRunAnim),
+                    true);
+            }
 
             LTVector vDesired =
                 vPos +
@@ -1784,11 +1855,44 @@ void FireteamZombie::UpdateZombie()
                     fFloorY -
                     vPos.y;
 
-                if(fHeightDelta <= 42.0f &&
+                const float fNormalStepHeight =
+                    42.0f;
+
+                const float fJumpHeight =
+                    m_Def.fJumpHeight >
+                        fNormalStepHeight
+                    ? m_Def.fJumpHeight
+                    : fNormalStepHeight;
+
+                if(fHeightDelta <=
+                       fNormalStepHeight &&
                    fHeightDelta >= -80.0f)
                 {
                     vDesired.y =
                         fFloorY;
+                }
+                else if(fHeightDelta >
+                            fNormalStepHeight &&
+                        fHeightDelta <=
+                            fJumpHeight)
+                {
+                    vDesired.y =
+                        fFloorY;
+
+                    if(m_Def.sJumpAnim[0] &&
+                       m_fJumpAnimationTime <=
+                           0.0f)
+                    {
+                        SetZombieAnimation(
+                            m_Def.sJumpAnim,
+                            false);
+
+                        m_fJumpAnimationTime =
+                            m_Def.fJumpAnimSeconds >
+                                0.0f
+                            ? m_Def.fJumpAnimSeconds
+                            : 0.45f;
+                    }
                 }
                 else
                 {
@@ -1818,9 +1922,13 @@ void FireteamZombie::UpdateZombie()
     }
     else
     {
-        SetZombieAnimation(
-            m_Def.sIdleAnim,
-            true);
+        if(m_fAttackAnimationTime <= 0.0f &&
+           m_fJumpAnimationTime <= 0.0f)
+        {
+            SetZombieAnimation(
+                m_Def.sIdleAnim,
+                true);
+        }
     }
 
     LTVector vNewPos;
