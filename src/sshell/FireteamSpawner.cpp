@@ -64,6 +64,42 @@ static float s_fMissingInfectedSince = 0.0f;
 static uint32 s_nMissingInfectedRestores = 0;
 static FTDifficultyDef s_Difficulty;
 
+// Cabin Fever safe-area approximation while we map the DAT's authored
+// Spawner locations. The exact coordinates are logged once per world.
+static bool s_bCabinGuardRequested = false;
+static bool s_bCabinStartValid = false;
+static LTVector s_vCabinStart(0.0f, 0.0f, 0.0f);
+
+static bool FT_IsCabinInnerAnchor(HOBJECT hAnchor)
+{
+    if(!s_bCabinGuardRequested || !s_bCabinStartValid || !hAnchor)
+        return false;
+    LTVector vAnchor;
+    g_pLTServer->GetObjectPos(hAnchor, &vAnchor);
+    const float fDx = vAnchor.x - s_vCabinStart.x;
+    const float fDz = vAnchor.z - s_vCabinStart.z;
+    return fabs(vAnchor.y - s_vCabinStart.y) < 245.0f &&
+        fDx * fDx + fDz * fDz < 720.0f * 720.0f;
+}
+
+static bool FT_AllowCabinSurpriseSpawns()
+{
+    const int nDifficulty = atoi(s_Difficulty.sId);
+    if(nDifficulty >= 10) return true;
+    if(nDifficulty >= 8) return s_nRound >= 2;
+    if(nDifficulty >= 6) return s_nRound >= 5;
+    if(nDifficulty >= 4) return s_nRound >= 8;
+    if(nDifficulty >= 2) return s_nRound >= 14;
+    return s_nRound >= 20;
+}
+
+static bool FT_CanUseCurrentRoundAnchor(HOBJECT hAnchor)
+{
+    return FT_AllowCabinSurpriseSpawns() ||
+        !FT_IsCabinInnerAnchor(hAnchor);
+}
+
+
 // Combat-only clock for timed powerups. Pauses between waves, before
 // round one, and after game over; no free time is lost during preparation.
 static float s_fCombatTime = 0.0f;
@@ -394,6 +430,33 @@ void Spawner::ResetRoundController()
 void Spawner::CollectPerimeterSpawners()
 {
     s_nPerimeterSpawnerCount = 0;
+    s_bCabinGuardRequested = false;
+    s_bCabinStartValid = false;
+    FILE *pSession = fopen("config/session.cfg", "r");
+    if(pSession)
+    {
+        char line[160];
+        while(fgets(line, sizeof(line), pSession))
+        {
+            unsigned enabled = 0;
+            if(sscanf(line, "cabin_spawn_guard=%u", &enabled) == 1)
+                s_bCabinGuardRequested = enabled != 0;
+        }
+        fclose(pSession);
+    }
+    if(s_bCabinGuardRequested)
+    {
+        ObjArray<HOBJECT, 1> playerStart;
+        g_pLTServer->FindNamedObjects("GameStartPoint00", playerStart);
+        if(playerStart.NumObjects() == 0)
+            g_pLTServer->FindNamedObjects("GameStartPoint0", playerStart);
+        if(playerStart.NumObjects() > 0)
+        {
+            g_pLTServer->GetObjectPos(
+                playerStart.GetObject(0), &s_vCabinStart);
+            s_bCabinStartValid = true;
+        }
+    }
 
     const char *pSource =
         "Spawner";
@@ -561,9 +624,28 @@ void Spawner::CollectPerimeterSpawners()
     }
 
     g_pLTServer->CPrint(
-        "Fireteam: registered %u round spawn anchors from %s.",
-        s_nPerimeterSpawnerCount,
-        pSource);
+        "Fireteam: registered %u round spawn anchors from %s (Cabin guard=%u start=%u at %.1f %.1f %.1f).",
+        s_nPerimeterSpawnerCount, pSource,
+        s_bCabinGuardRequested ? 1u : 0u,
+        s_bCabinStartValid ? 1u : 0u,
+        s_vCabinStart.x, s_vCabinStart.y, s_vCabinStart.z);
+
+    // DAT world objects expose their authored class/name/position at runtime.
+    // These one-time entries let us identify genuine perimeter vs cabin
+    // spawners without guessing from an unavailable LTA source.
+    for(uint32 i = 0; i < s_nPerimeterSpawnerCount; ++i)
+    {
+        char szName[128] = {0};
+        LTVector vPos;
+        g_pLTServer->GetObjectName(
+            s_hPerimeterSpawners[i], szName, sizeof(szName));
+        g_pLTServer->GetObjectPos(s_hPerimeterSpawners[i], &vPos);
+        g_pLTServer->CPrint(
+            "Fireteam DAT anchor %u/%u: %s %.1f %.1f %.1f inner=%u.",
+            i + 1, s_nPerimeterSpawnerCount, szName,
+            vPos.x, vPos.y, vPos.z,
+            FT_IsCabinInnerAnchor(s_hPerimeterSpawners[i]) ? 1u : 0u);
+    }
 }
 
 static bool FT_SpawnZombieAt(
