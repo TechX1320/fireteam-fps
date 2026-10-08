@@ -29,5 +29,6 @@ void FT_OnFireteamSquadGameOver();
 void FT_SetQaZombiesEnabled(
     bool bEnabled);
 bool FT_AreQaZombiesEnabled();
+void FT_EnsureFireteamRoundController();
 
 #endif
