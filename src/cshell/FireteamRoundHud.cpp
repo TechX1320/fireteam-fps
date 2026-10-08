@@ -18,6 +18,7 @@ static CUIFormattedPolyString *s_pBottomlessStatus = LTNULL;
 static CUIFormattedPolyString *s_pOneHitStatus = LTNULL;
 static CUIFormattedPolyString *s_pGodStatus = LTNULL;
 static CUIFormattedPolyString *s_pWallhackStatus = LTNULL;
+static CUIFormattedPolyString *s_pSpectatorStatus = LTNULL;
 
 static uint16 s_nRound = 0;
 static uint16 s_nTarget = 0;
@@ -26,6 +27,8 @@ static uint16 s_nAlive = 0;
 static uint8 s_nLives = 3;
 static uint8 s_nMaxLives = 3;
 static bool s_bGameOver = false;
+static bool s_bSpectating = false;
+static bool s_bQaSpectating = false;
 static float s_fAnnouncementUntil = 0.0f;
 static float s_fBottomlessUntil = 0.0f;
 static float s_fOneHitUntil = 0.0f;
@@ -134,6 +137,11 @@ void FT_RoundHudInit()
             g_pLTCFontManager->CreateFormattedPolyString(
                 s_pBuffFont,
                 "");
+
+        s_pSpectatorStatus =
+            g_pLTCFontManager->CreateFormattedPolyString(
+                s_pBuffFont,
+                "");
     }
 
     if(s_pAnnouncement)
@@ -153,6 +161,9 @@ void FT_RoundHudInit()
 
     if(s_pWallhackStatus)
         s_pWallhackStatus->SetColor(0xFFFF5AE0);
+
+    if(s_pSpectatorStatus)
+        s_pSpectatorStatus->SetColor(0xFF30BDE7);
 }
 
 void FT_RoundHudTerm()
@@ -199,6 +210,13 @@ void FT_RoundHudTerm()
         s_pWallhackStatus = LTNULL;
     }
 
+    if(s_pSpectatorStatus)
+    {
+        g_pLTCFontManager->DestroyPolyString(
+            s_pSpectatorStatus);
+        s_pSpectatorStatus = LTNULL;
+    }
+
     if(s_pBuffFont)
     {
         g_pLTCFontManager->DestroyFont(
@@ -220,6 +238,8 @@ void FT_RoundHudTerm()
     s_nLives = 3;
     s_nMaxLives = 3;
     s_bGameOver = false;
+    s_bSpectating = false;
+    s_bQaSpectating = false;
     s_fAnnouncementUntil = 0.0f;
     s_fBottomlessUntil = 0.0f;
     s_fOneHitUntil = 0.0f;
@@ -399,6 +419,17 @@ bool FT_RoundHudIsGameOver()
     return s_bGameOver;
 }
 
+void FT_RoundHudSetSpectator(
+    bool bSpectating,
+    bool bQaMode)
+{
+    s_bSpectating =
+        bSpectating;
+    s_bQaSpectating =
+        bSpectating &&
+        bQaMode;
+}
+
 void FT_RenderRoundHud()
 {
     if(!s_pRoundFont || s_nRound == 0)
@@ -436,6 +467,24 @@ void FT_RenderRoundHud()
             22.0f);
 
         s_pRoundStatus->Render();
+    }
+
+    if(s_pSpectatorStatus &&
+       s_bSpectating)
+    {
+        s_pSpectatorStatus->SetText(
+            s_bQaSpectating
+                ? "QA FREECAM  |  WASD MOVE  SPACE/CTRL UP/DOWN  SHIFT FAST  F8 EXIT"
+                : "SPECTATOR FREECAM  |  WASD MOVE  SPACE/CTRL UP/DOWN  SHIFT FAST");
+
+        const float fWidth =
+            s_pSpectatorStatus->GetWidth();
+
+        s_pSpectatorStatus->SetPosition(
+            ((float)nScreenW - fWidth) * 0.5f,
+            56.0f);
+
+        s_pSpectatorStatus->Render();
     }
 
     const float fNow =
