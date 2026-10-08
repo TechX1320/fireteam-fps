@@ -3,6 +3,7 @@
 #include "msgids.h"
 #include "FireteamDifficultyDefs.h"
 #include "FireteamMutationBox.h"
+#include "playersrvr.h"
 
 #include <iltcommon.h>
 #include <iltmessage.h>
@@ -533,6 +534,48 @@ static bool FT_SpawnZombieAt(
         &ocs) != LTNULL;
 }
 
+// Generic CA maps may have authored spawners on several disconnected floors.
+// Prefer a nearby, same-level anchor so infected do not spawn one kilometer
+// below the squad and endlessly report waypoint=0/0.
+static bool FT_SpawnAnchorNearLivingPlayer(HOBJECT hAnchor)
+{
+    if(!hAnchor)
+        return false;
+
+    HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
+    if(!hPlayerClass)
+        return false;
+
+    LTVector vAnchor;
+    g_pLTServer->GetObjectPos(hAnchor, &vAnchor);
+
+    for(HOBJECT hObj = g_pLTServer->GetNextObject(LTNULL);
+        hObj;
+        hObj = g_pLTServer->GetNextObject(hObj))
+    {
+        HCLASS hClass = g_pLTServer->GetObjectClass(hObj);
+        if(!hClass || !g_pLTServer->IsKindOf(hClass, hPlayerClass))
+            continue;
+
+        CPlayerSrvr *pPlayer = (CPlayerSrvr*)g_pLTServer->HandleToObject(hObj);
+        if(!pPlayer || !pPlayer->IsTargetable())
+            continue;
+
+        LTVector vPlayer;
+        g_pLTServer->GetObjectPos(hObj, &vPlayer);
+        float fY = vAnchor.y - vPlayer.y;
+        if(fY < 0.0f)
+            fY = -fY;
+
+        const float fX = vAnchor.x - vPlayer.x;
+        const float fZ = vAnchor.z - vPlayer.z;
+        if(fY <= 260.0f && (fX * fX + fZ * fZ) <= 2400.0f * 2400.0f)
+            return true;
+    }
+
+    return false;
+}
+
 bool Spawner::SpawnZombie()
 {
     return FT_SpawnZombieAt(
@@ -780,14 +823,36 @@ void Spawner::UpdateRoundController()
         return;
     }
 
+    // Select from reachable-looking local floor anchors first. A zero-match
+    // fallback retains compatibility with large authored FireTeam maps.
+    uint32 aEligible[kMaxPerimeterSpawners];
+    uint32 nEligible = 0;
+    for(uint32 i = 0; i < s_nPerimeterSpawnerCount; ++i)
+    {
+        if(FT_SpawnAnchorNearLivingPlayer(s_hPerimeterSpawners[i]))
+            aEligible[nEligible++] = i;
+    }
+
     int nChoice = 0;
-    if(s_nPerimeterSpawnerCount > 1)
+    const uint32 nPool = nEligible > 0
+        ? nEligible : s_nPerimeterSpawnerCount;
+
+    if(nPool > 0)
     {
         for(uint32 nTry = 0; nTry < 8; ++nTry)
         {
-            nChoice = rand() % s_nPerimeterSpawnerCount;
-            if(nChoice != s_nLastSpawner) break;
+            const uint32 nCandidate = (uint32)(rand() % nPool);
+            nChoice = (int)(nEligible > 0
+                ? aEligible[nCandidate] : nCandidate);
+            if(nChoice != s_nLastSpawner || nPool == 1)
+                break;
         }
+    }
+
+    if(nEligible == 0 && s_nRoundSpawned == 0)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam: no spawn anchor within 260Y/2400XZ of a living player; using map fallback.");
     }
 
     HOBJECT hSpawnObject =
