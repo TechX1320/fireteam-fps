@@ -459,6 +459,10 @@ void FT_RoundHudResetFirstRoundPreparation()
     s_bCombatTimerActive = false;
     s_fCombatHudSeconds = 0.0f;
     s_fLastCombatHudSample = -1.0f;
+    s_fBottomlessUntil = 0.0f;
+    s_fOneHitUntil = 0.0f;
+    s_fGodUntil = 0.0f;
+    s_fWallhackUntil = 0.0f;
     s_nFirstRoundPrepRevision = 0;
     s_nFirstRoundPrepDeadlineTick = 0;
     s_bFirstRoundPrepClosed = false;
