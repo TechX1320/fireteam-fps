@@ -29,6 +29,7 @@
 #include "FxFlags.h"
 #include "statsmanager.h"
 #include <string.h>
+#include <stdlib.h>
 #include "FireteamPoisonGas.h"
 #include "FireteamExplosiveProjectile.h"
 #include "FireteamDifficultyDefs.h"
@@ -139,15 +140,27 @@ static void FT_ApplyWeaponPerturb(
     bool bZoomed,
     LTVector &vDirection)
 {
-    if(def.nMaxPerturb == 0 ||
-       def.nMaxPerturb <
-           def.nMinPerturb)
+    if(def.nMaxPerturb <
+       def.nMinPerturb)
     {
         return;
     }
 
     uint32 nPerturb =
         def.nMinPerturb;
+
+    // Existing curated configs predate CA MinPerturb/MaxPerturb import.
+    // Keep them playable, but make an unscoped shot from a scoped rifle
+    // meaningfully inaccurate until the next attribute import fills the
+    // real Combat Arms values.
+    if(def.nMaxPerturb == 0 &&
+       def.fZoomFovDegrees > 0.0f)
+    {
+        nPerturb =
+            bZoomed
+            ? 0
+            : 90;
+    }
 
     if(def.fZoomFovDegrees > 0.0f)
     {
@@ -218,16 +231,26 @@ static void FT_ApplyWeaponPerturb(
         1.0f,
         0.0f);
 
+    const float fUnitRight =
+        ((float)rand() /
+         (float)RAND_MAX) *
+        2.0f -
+        1.0f;
+
+    const float fUnitUp =
+        ((float)rand() /
+         (float)RAND_MAX) *
+        2.0f -
+        1.0f;
+
     const float fRightPerturb =
-        g_pLTServer->Random(
-            -(float)nPerturb,
-            (float)nPerturb) /
+        fUnitRight *
+        (float)nPerturb /
         1000.0f;
 
     const float fUpPerturb =
-        g_pLTServer->Random(
-            -(float)nPerturb,
-            (float)nPerturb) /
+        fUnitUp *
+        (float)nPerturb /
         1000.0f;
 
     vDirection +=
@@ -1175,6 +1198,7 @@ void CPlayerSrvr::Respawn()
 
     SendHealth();
     SendPrimaryAmmo();
+    SendPowerupState();
 }
 
 void CPlayerSrvr::SendHealth()
