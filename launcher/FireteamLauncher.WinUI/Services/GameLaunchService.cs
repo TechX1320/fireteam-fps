@@ -20,10 +20,22 @@ public sealed class GameLaunchService
             ?? throw new InvalidOperationException(
                 "Could not locate Lithtech.exe. Build FIRETEAM first or run the launcher from BUILT\\Launcher.");
 
-        var mapFile = Path.Combine(gameDir, "rez", "Worlds", "CABINFEVER.DAT");
+        var mapName =
+            NormalizeMapName(
+                profile.Map);
+
+        var mapFile =
+            Path.Combine(
+                gameDir,
+                "rez",
+                "Worlds",
+                mapName + ".DAT");
+
         if(!File.Exists(mapFile))
         {
-            throw new FileNotFoundException("Cabin Fever is not staged in BUILT.", mapFile);
+            throw new FileNotFoundException(
+                $"{mapName}.DAT is not staged in BUILT.",
+                mapFile);
         }
 
         _settings.SaveSettings(settings);
@@ -40,7 +52,10 @@ public sealed class GameLaunchService
         AddArg(start, "-rez", "Engine.REZ");
         AddArg(start, "-rez", "rez");
         AddArg(start, "-config", "autoexec.cfg");
-        AddArg(start, "+runworld", "Worlds/CABINFEVER");
+        AddArg(
+            start,
+            "+runworld",
+            "Worlds/" + mapName);
         AddArg(start, "+autostart", "1");
 
         var mode = profile.Mode switch
@@ -78,8 +93,32 @@ public sealed class GameLaunchService
         {
             "host" => "Starting FIRETEAM host...",
             "join" => "Connecting to FIRETEAM server...",
-            _ => "Starting Cabin Fever..."
+            _ => $"Starting {mapName}..."
         };
+    }
+
+    private static string NormalizeMapName(
+        string? map)
+    {
+        var value =
+            string.IsNullOrWhiteSpace(map)
+            ? "CABINFEVER"
+            : Path.GetFileNameWithoutExtension(
+                map.Trim());
+
+        var safe =
+            new string(
+                value
+                    .Where(
+                        ch =>
+                            char.IsLetterOrDigit(ch) ||
+                            ch == '_' ||
+                            ch == '-')
+                    .ToArray());
+
+        return string.IsNullOrWhiteSpace(safe)
+            ? "CABINFEVER"
+            : safe.ToUpperInvariant();
     }
 
     private static void WriteSession(string gameDir, string difficulty)
