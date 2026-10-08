@@ -87,6 +87,7 @@ LTRESULT StatsManager::GetPlayerScores(SCORESTRUCT *scores)
         scores[i].iClientID = pPlayer->GetClientID();
         sprintf(scores[i].sPlayerName, "%s", pPlayer->GetPlayerName());
         scores[i].iScore    = pPlayer->GetScore();
+        scores[i].iLives    = pPlayer->GetLives();
         scores[i].fMoney    = pPlayer->GetMoney();
 
         // Next element
