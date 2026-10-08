@@ -2003,7 +2003,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void ImportCombatArmsMapButton_Click(
+    private async void ImportCombatArmsMapButton_Click(
         object sender,
         RoutedEventArgs e)
     {
@@ -2020,9 +2020,14 @@ public sealed partial class MainWindow : Window
             CaMapImportButton.IsEnabled =
                 false;
 
+            CaImportStatusText.Text =
+                "Importing map and refreshing local dependencies...";
+
             var result =
-                App.Instance.Services.MapImports.Import(
-                    _caMapPath);
+                await Task.Run(
+                    () =>
+                        App.Instance.Services.MapImports.Import(
+                            _caMapPath));
 
             RefreshMaps();
 
