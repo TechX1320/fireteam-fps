@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <server_interface.h>
 #include <ltbasedefs.h>
+#include <ltmodule.h>
 
 #include "FireteamGameGuid.h"
 
@@ -119,16 +120,27 @@ int main(int argc, char **argv)
     }
 
     if(GetFileAttributesA("Engine.REZ") == INVALID_FILE_ATTRIBUTES ||
-       GetFileAttributesA("rez") == INVALID_FILE_ATTRIBUTES)
+       GetFileAttributesA("rez") == INVALID_FILE_ATTRIBUTES ||
+       GetFileAttributesA("rez\\object.lto") == INVALID_FILE_ATTRIBUTES)
     {
-        fputs("Missing Engine.REZ or rez directory. Run from BUILT.\n", stderr);
+        fputs("Missing Engine.REZ, rez directory, or rez\\\\object.lto. Run build.cmd first.\n", stderr);
+        return 2;
+    }
+
+    char sMapFile[MAX_PATH];
+    _snprintf(sMapFile, sizeof(sMapFile), "rez\\\\Worlds\\\\%s.DAT", sMap);
+    sMapFile[sizeof(sMapFile) - 1] = '\0';
+    if(GetFileAttributesA(sMapFile) == INVALID_FILE_ATTRIBUTES)
+    {
+        fprintf(stderr, "Missing staged map: %s\n", sMapFile);
         return 2;
     }
 
     HMODULE hServerDll = LoadLibraryA("server.dll");
     if(!hServerDll)
     {
-        fputs("Unable to load the Jupiter server.dll.\n", stderr);
+        fprintf(stderr, "Unable to load Jupiter server.dll (Win32 error %lu).\n",
+                GetLastError());
         return 3;
     }
 
@@ -161,13 +173,32 @@ int main(int argc, char **argv)
         return 3;
     }
 
+    // Match NOLF2/ServerApp/ServerDlg.cpp: the executable must register its
+    // LithTech interface database with server.dll before loading the world
+    // and object.lto. Otherwise VerifyServerInterfaces may find null holders.
+    TSetMasterFn pSetMaster =
+        reinterpret_cast<TSetMasterFn>(
+            GetProcAddress(hServerDll, "SetMasterDatabase"));
+    if(pSetMaster)
+    {
+        pSetMaster(GetMasterDatabase());
+        puts("[OK] Jupiter master interface database registered.");
+    }
+    else
+    {
+        puts("[WARN] server.dll has no SetMasterDatabase export.");
+    }
+
     FireteamDedicatedHandler handler;
     bool bReady = false;
 
     do
     {
         if(pServer->SetAppHandler(&handler) != LT_OK)
+        {
+            fputs("SetAppHandler failed.\n", stderr);
             break;
+        }
 
         const char *pResources[] = { "Engine.REZ", "rez" };
         if(!pServer->AddResources(pResources, 2))
@@ -218,10 +249,10 @@ int main(int argc, char **argv)
             break;
         }
 
-        // Jupiter requires game-info bytes before loading the server shell.
-        // FIRETEAM currently has no separate dedicated-game-info payload.
-        uint32 nGameInfoVersion = 1;
-        if(!pServer->SetGameInfo(&nGameInfoVersion, sizeof(nGameInfoVersion)))
+        // FIRETEAM's server shell does not consume NOLF2's ServerGameOptions.
+        // Do not send a fabricated 4-byte "version" pretending to be that
+        // structure. StartWorld also replaces game info with request data.
+        if(!pServer->SetGameInfo(NULL, 0))
         {
             fputs("SetGameInfo failed.\n", stderr);
             break;
@@ -243,13 +274,17 @@ int main(int argc, char **argv)
 
         if(!pServer->StartWorld(&request))
         {
-            fprintf(stderr, "StartWorld failed: %s.\n", request.m_WorldName);
+            char sError[256] = {};
+            pServer->GetErrorString(sError, sizeof(sError));
+            fprintf(stderr, "StartWorld failed for %s: %s\n",
+                    request.m_WorldName, sError);
             break;
         }
 
         bReady = true;
         printf("FIRETEAM dedicated server running: %s on port %u (max %u)\n",
                sMap, (unsigned)nPort, (unsigned)nMaxPlayers);
+        printf("Local client test: 127.0.0.1:%u\n", (unsigned)nPort);
         puts("Use Ctrl+C to shut down.");
 
         SetConsoleCtrlHandler(OnConsoleControl, TRUE);
