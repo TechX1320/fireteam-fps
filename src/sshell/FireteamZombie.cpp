@@ -467,7 +467,7 @@ static void FT_UpdateZombieWallhackState()
     }
 
     const float fNow =
-        g_pLTServer->GetTime();
+        FT_GetRoundCombatTime();
 
     if(fNow <
        s_fZombieWallhackUntil)
@@ -509,7 +509,7 @@ float FT_ExtendZombieWallhack(
     FT_UpdateZombieWallhackState();
 
     const float fNow =
-        g_pLTServer->GetTime();
+        FT_GetRoundCombatTime();
 
     if(s_fZombieWallhackUntil <=
        fNow)
@@ -567,7 +567,7 @@ float FT_GetZombieWallhackRemaining()
 
     const float fRemaining =
         s_fZombieWallhackUntil -
-        g_pLTServer->GetTime();
+        FT_GetRoundCombatTime();
 
     return fRemaining > 0.0f
         ? fRemaining
