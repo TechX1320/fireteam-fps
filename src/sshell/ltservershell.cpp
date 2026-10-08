@@ -33,6 +33,7 @@
 #include "playersrvr.h"
 #include "FireteamPlayerDefs.h"
 #include "FireteamSpawner.h"
+#include "FireteamNavigation.h"
 #include "projectile.h"
 #include "statsmanager.h"
 
@@ -599,7 +600,8 @@ void CLTServerShell::OnRemoveClient(HCLIENT hClient)
 //-----------------------------------------------------------------------------
 void CLTServerShell::PreStartWorld(bool bSwitchingWorlds)
 {
-	//g_pLTServer->CPrint("PreStartWorld(%d)", bSwitchingWorlds);
+    // AIVolumes belong to the current world. Never reuse old map handles.
+    FT_ResetNavigationCache();
 }
 
 
