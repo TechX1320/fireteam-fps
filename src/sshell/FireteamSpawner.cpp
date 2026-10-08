@@ -733,60 +733,14 @@ bool Spawner::SpawnCrawlerSeal()
         return false;
     }
 
-    // The easter egg belongs inside the cabin rather than entering through a
-    // perimeter infected spawner. Reuse the map's authored player starts so
-    // this remains correct if the supported map has multiple spawn points.
-    static const uint32 kMaxPlayerStarts = 32;
-    HOBJECT aPlayerStarts[kMaxPlayerStarts];
-    uint32 nPlayerStartCount = 0;
-
-    HCLASS hStartClass =
-        g_pLTServer->GetClass(
-            "GameStartPoint");
-
-    if(hStartClass)
-    {
-        for(HOBJECT hObj =
-                g_pLTServer->GetNextObject(
-                    LTNULL);
-            hObj &&
-            nPlayerStartCount <
-                kMaxPlayerStarts;
-            hObj =
-                g_pLTServer->GetNextObject(
-                    hObj))
-        {
-            HCLASS hClass =
-                g_pLTServer->GetObjectClass(
-                    hObj);
-
-            if(hClass &&
-               g_pLTServer->IsKindOf(
-                   hClass,
-                   hStartClass))
-            {
-                aPlayerStarts[
-                    nPlayerStartCount++] =
-                    hObj;
-            }
-        }
-    }
-
-    HOBJECT hSpawnPoint =
-        nPlayerStartCount > 0
-        ? aPlayerStarts[
-            rand() % nPlayerStartCount]
-        : m_hObject;
-
+    // A Seal is a BONUS easter egg, never one of the round's infected.
+    // Spawning it at GameStartPoint made it appear inside players' safe
+    // rooms on Cabin Fever and BLACKLUNG; use the authorized perimeter
+    // Spawner that triggered the easter egg instead.
     LTVector vBasePos;
     LTRotation rBaseRot;
-
-    g_pLTServer->GetObjectPos(
-        hSpawnPoint,
-        &vBasePos);
-    g_pLTServer->GetObjectRotation(
-        hSpawnPoint,
-        &rBaseRot);
+    g_pLTServer->GetObjectPos(m_hObject, &vBasePos);
+    g_pLTServer->GetObjectRotation(m_hObject, &rBaseRot);
 
     ObjectCreateStruct ocs;
     ocs.Clear();
@@ -813,19 +767,9 @@ bool Spawner::SpawnCrawlerSeal()
         hSealClass,
         &ocs))
     {
-        if(nPlayerStartCount > 0)
-        {
-            g_pLTServer->CPrint(
-                "Fireteam: crawler seal easter egg spawned at cabin player start (%u available).",
-                nPlayerStartCount);
-        }
-        else
-        {
-            g_pLTServer->CPrint(
-                "Fireteam: crawler seal easter egg fallback spawn from %s; no GameStartPoint found.",
-                m_sName);
-        }
-
+        g_pLTServer->CPrint(
+            "Fireteam: BONUS crawler Seal spawned from perimeter anchor %s (not counted in round ALIVE/KILLS).",
+            m_sName);
         return true;
     }
 
