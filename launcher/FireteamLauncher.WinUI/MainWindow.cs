@@ -41,6 +41,7 @@ public sealed partial class MainWindow : Window
     private readonly ScrollViewer HomeView = new();
     private readonly TextBox PlayerNameBox = new();
     private readonly ComboBox ModeCombo = new();
+    private readonly ComboBox MapCombo = new();
     private readonly Slider DifficultySlider = new();
     private readonly TextBlock DifficultyValueText = new();
     private readonly TextBlock JoinIpLabel = new();
@@ -83,9 +84,15 @@ public sealed partial class MainWindow : Window
     private readonly TextBlock CaWeaponsSourceText = new();
     private readonly TextBlock CaGunsSourceText = new();
     private readonly TextBlock CaAttachmentsSourceText = new();
+    private readonly TextBlock CaMapSourceText = new();
+    private readonly Button CaMapImportButton = new();
     private string? _caWeaponsPath;
     private string? _caGunsPath;
     private string? _caAttachmentsPath;
+    private string? _caMapPath;
+
+    private readonly ScrollViewer MiniToolsView = new();
+    private readonly TextBlock MiniToolsStatusText = new();
 
     private readonly ScrollViewer ArsenalView = new();
     private readonly TextBox WeaponSearchBox = new();
@@ -149,6 +156,8 @@ public sealed partial class MainWindow : Window
 
         ResolutionCombo.ItemsSource = Resolutions;
 
+        RefreshMaps();
+
         StartupDiagnostics.Write(
             "MainWindow control data sources configured.");
 
@@ -191,6 +200,7 @@ public sealed partial class MainWindow : Window
         PlayerGearView.Visibility = tag == "player-gear" ? Visibility.Visible : Visibility.Collapsed;
         WeaponModsView.Visibility = tag == "weapon-mods" ? Visibility.Visible : Visibility.Collapsed;
         CaImportView.Visibility = tag == "ca-importer" ? Visibility.Visible : Visibility.Collapsed;
+        MiniToolsView.Visibility = tag == "mini-tools" ? Visibility.Visible : Visibility.Collapsed;
         ArsenalView.Visibility = tag == "weapon-editor" ? Visibility.Visible : Visibility.Collapsed;
         ModsView.Visibility = tag == "tools" ? Visibility.Visible : Visibility.Collapsed;
         SettingsView.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
@@ -202,6 +212,7 @@ public sealed partial class MainWindow : Window
             "weapon-mods" => "WEAPON MODS",
             "weapon-editor" => "WEAPON CATALOG",
             "ca-importer" => "COMBAT ARMS IMPORTER",
+            "mini-tools" => "MINI TOOLS",
             "tools" => "MODS & CONTENT TOOLS",
             "settings" => "SETTINGS",
             _ => "READY ROOM"
@@ -217,6 +228,29 @@ public sealed partial class MainWindow : Window
         CommandsBox.Text = profile.CustomCommands;
 
         SelectString(ModeCombo, profile.Mode, "Single Player");
+
+        var map =
+            (profile.Map ?? "CABINFEVER")
+                .ToUpperInvariant();
+
+        if(MapCombo.ItemsSource is IEnumerable<string> maps &&
+           maps.Contains(
+               map,
+               StringComparer.OrdinalIgnoreCase))
+        {
+            MapCombo.SelectedItem =
+                maps.First(
+                    item =>
+                        item.Equals(
+                            map,
+                            StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            MapCombo.SelectedItem =
+                "CABINFEVER";
+        }
+
         DifficultySlider.Value =
             ParseDifficultyLevel(
                 profile.Difficulty);
@@ -228,7 +262,66 @@ public sealed partial class MainWindow : Window
         PlayButton.IsEnabled = game is not null;
         RunStatusText.Text = game is null
             ? "FIRETEAM runtime not found. Run build.cmd first."
-            : "FIRETEAM runtime ready. Cabin Fever is available for this run.";
+            : $"FIRETEAM runtime ready. {(MapCombo.SelectedItem?.ToString() ?? "CABINFEVER")} is selected.";
+    }
+
+    private void RefreshMaps()
+    {
+        var maps =
+            new List<string>
+            {
+                "CABINFEVER"
+            };
+
+        var game =
+            LauncherPaths.FindGameDirectory();
+
+        if(game is not null)
+        {
+            var worlds =
+                Path.Combine(
+                    game,
+                    "rez",
+                    "Worlds");
+
+            if(Directory.Exists(worlds))
+            {
+                maps.AddRange(
+                    Directory
+                        .EnumerateFiles(
+                            worlds,
+                            "*.DAT",
+                            SearchOption.TopDirectoryOnly)
+                        .Select(
+                            path =>
+                                Path
+                                    .GetFileNameWithoutExtension(
+                                        path)
+                                    .ToUpperInvariant()));
+            }
+        }
+
+        MapCombo.ItemsSource =
+            maps
+                .Distinct(
+                    StringComparer.OrdinalIgnoreCase)
+                .OrderBy(
+                    value =>
+                        value.Equals(
+                            "CABINFEVER",
+                            StringComparison.OrdinalIgnoreCase)
+                            ? 0
+                            : 1)
+                .ThenBy(
+                    value =>
+                        value)
+                .ToArray();
+
+        if(MapCombo.SelectedItem is null)
+        {
+            MapCombo.SelectedItem =
+                "CABINFEVER";
+        }
     }
 
     private void LoadSettings()
@@ -1710,6 +1803,29 @@ public sealed partial class MainWindow : Window
         UpdateCaImportReadyState();
     }
 
+    private async void SelectCaMapSourceButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        var path =
+            await PickLauncherFileAsync(
+                ".dat");
+
+        if(path is null)
+        {
+            return;
+        }
+
+        _caMapPath =
+            path;
+
+        CaMapSourceText.Text =
+            Path.GetFileName(
+                path);
+
+        UpdateCaImportReadyState();
+    }
+
     private void UpdateCaImportReadyState()
     {
         CaImportRunButton.IsEnabled =
@@ -1722,6 +1838,10 @@ public sealed partial class MainWindow : Window
             !string.IsNullOrWhiteSpace(
                 _caAttachmentsPath);
 
+        CaMapImportButton.IsEnabled =
+            !string.IsNullOrWhiteSpace(
+                _caMapPath);
+
         if(CaImportRunButton.IsEnabled)
         {
             CaImportStatusText.Text =
@@ -1731,6 +1851,11 @@ public sealed partial class MainWindow : Window
         {
             CaImportStatusText.Text =
                 "Attachment archive ready. IMPORT ATTACHMENTS will extract it and rebuild config/attachments.cfg.";
+        }
+        else if(CaMapImportButton.IsEnabled)
+        {
+            CaImportStatusText.Text =
+                "Map source ready. IMPORT MAP will copy the DAT into local map storage and stage it when possible.";
         }
         else
         {
@@ -1873,6 +1998,67 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void ImportCombatArmsMapButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if(string.IsNullOrWhiteSpace(
+               _caMapPath))
+        {
+            CaImportStatusText.Text =
+                "Select a .DAT map first.";
+            return;
+        }
+
+        try
+        {
+            CaMapImportButton.IsEnabled =
+                false;
+
+            var result =
+                App.Instance.Services.MapImports.Import(
+                    _caMapPath);
+
+            RefreshMaps();
+
+            var selected =
+                (MapCombo.ItemsSource as IEnumerable<string>)?
+                    .FirstOrDefault(
+                        item =>
+                            item.Equals(
+                                result.MapName,
+                                StringComparison.OrdinalIgnoreCase));
+
+            if(selected is not null)
+            {
+                MapCombo.SelectedItem =
+                    selected;
+            }
+
+            CaImportStatusText.Text =
+                result.Summary;
+
+            AppendImportLog(
+                $"MAP: {result.SourcePath}");
+            AppendImportLog(
+                result.Summary);
+        }
+        catch(Exception ex)
+        {
+            CaImportStatusText.Text =
+                "Combat Arms map import failed: " +
+                ex.Message;
+
+            AppendImportLog(
+                "[ERROR] " +
+                ex);
+        }
+        finally
+        {
+            UpdateCaImportReadyState();
+        }
+    }
+
     private void AppendImportLog(string line)
     {
         var current = CaImportLogBox.Text;
@@ -1934,6 +2120,21 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void LaunchRezExtract()
+    {
+        if(LauncherPaths.LaunchMiniTool(
+               "RezExtract.exe"))
+        {
+            MiniToolsStatusText.Text =
+                "RezExtract opened.";
+        }
+        else
+        {
+            MiniToolsStatusText.Text =
+                "RezExtract.exe was not found. Put it in modTools, Tools, or assets-local/Tools.";
+        }
+    }
+
     private void RefreshToolPaths()
     {
         ModsPathText.Text =
@@ -1982,6 +2183,54 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void LaunchSpectatorQa()
+    {
+        try
+        {
+            var customCommands =
+                CommandsBox.Text ??
+                string.Empty;
+
+            if(!string.IsNullOrWhiteSpace(
+                   customCommands))
+            {
+                customCommands +=
+                    " ";
+            }
+
+            customCommands +=
+                "+devspectator 1";
+
+            var profile =
+                new LauncherProfile(
+                    string.IsNullOrWhiteSpace(
+                        PlayerNameBox.Text)
+                        ? "Player"
+                        : PlayerNameBox.Text.Trim(),
+                    "Single Player",
+                    DifficultyProfileValue(),
+                    "127.0.0.1",
+                    customCommands,
+                    MapCombo.SelectedItem?.ToString()
+                        ?? "CABINFEVER");
+
+            var settings =
+                App.Instance.Services.Settings.LoadSettings();
+
+            RunStatusText.Text =
+                App.Instance.Services.Game.Launch(
+                    profile,
+                    settings) +
+                " Spectator QA freecam enabled.";
+        }
+        catch(Exception ex)
+        {
+            RunStatusText.Text =
+                "Spectator QA launch failed: " +
+                ex.Message;
+        }
+    }
+
     private void LaunchWeaponQa()
     {
         try
@@ -2009,7 +2258,9 @@ public sealed partial class MainWindow : Window
                     "Single Player",
                     DifficultyProfileValue(),
                     "127.0.0.1",
-                    customCommands);
+                    customCommands,
+                    MapCombo.SelectedItem?.ToString()
+                        ?? "CABINFEVER");
 
             var settings =
                 App.Instance.Services.Settings.LoadSettings();
@@ -2042,7 +2293,9 @@ public sealed partial class MainWindow : Window
                 string.IsNullOrWhiteSpace(JoinIpBox.Text)
                     ? "127.0.0.1"
                     : JoinIpBox.Text.Trim(),
-                CommandsBox.Text ?? string.Empty);
+                CommandsBox.Text ?? string.Empty,
+                MapCombo.SelectedItem?.ToString()
+                    ?? "CABINFEVER");
 
             var settings =
                 App.Instance.Services.Settings.LoadSettings();
