@@ -76,9 +76,17 @@ public sealed class GameLaunchService
         AddArg(start, "+screenwidth", settings.Width.ToString(CultureInfo.InvariantCulture));
         AddArg(start, "+screenheight", settings.Height.ToString(CultureInfo.InvariantCulture));
         AddArg(start, "+windowed", settings.Windowed ? "1" : "0");
+        var errorLog =
+            mapName.Equals(
+                "CABINFEVER",
+                StringComparison.OrdinalIgnoreCase)
+                ? "cabinfever-error.log"
+                : mapName.ToLowerInvariant() +
+                    "-error.log";
+
         AddArg(start, "+errorlog", "1");
         AddArg(start, "+alwaysflushlog", "1");
-        AddArg(start, "+errorlogfile", "cabinfever-error.log");
+        AddArg(start, "+errorlogfile", errorLog);
         AddArg(start, "+consoleenable", "1");
         AddArg(start, "+numconsolelines", "0");
 
