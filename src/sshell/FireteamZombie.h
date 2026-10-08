@@ -32,7 +32,8 @@ private:
     };
 
     HOBJECT FindNearestPlayer();
-    void UpdateZombie();
+    void UpdateZombie(float fDeltaSeconds);
+    void AdvanceSmoothMotion();
     void RebuildPath(const LTVector &vTarget);
     bool HasDirectPathToTarget(
         HOBJECT hTarget,
@@ -73,6 +74,14 @@ private:
     BehaviorState m_eBehaviorState;
     bool m_bDying;
     float m_fDeathTimeRemaining;
+
+    // Expensive AI stays at fUpdateSeconds; collision movement is spread
+    // across 1-4 smaller engine updates for smoother replication.
+    float m_fLastServerTick;
+    float m_fDecisionElapsed;
+    uint8 m_nTicksUntilDecision;
+    uint8 m_nMotionStepsRemaining;
+    LTVector m_vMotionGoal;
     uint32 m_nPathLane;
     uint32 m_nWaypoint;
     LTVector m_vLastPos;
