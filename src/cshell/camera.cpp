@@ -32,10 +32,16 @@ m_fPitch(0.0f),
 m_fZoom(MIN_ZOOM),
 m_bFirstPerson(true),
 m_bWeaponZoom(false),
+m_bFreecam(false),
 m_fWeaponZoomFovDegrees(24.0f),
 m_nViewportWidth(0),
 m_nViewportHeight(0)
 {
+    m_vFreecamPos.Init(
+        0.0f,
+        0.0f,
+        0.0f);
+    m_rFreecamRot.Init();
 }
 
 
@@ -137,6 +143,15 @@ void CCamera::UpdatePosition(HOBJECT hObject, float fEyeHeight)
 {
     RefreshViewport();
 
+    if(m_bFreecam)
+    {
+        g_pLTClient->SetObjectPosAndRotation(
+            m_hObject,
+            &m_vFreecamPos,
+            &m_rFreecamRot);
+        return;
+    }
+
     LTVector vPos;
     LTRotation rRot;
 
@@ -216,6 +231,163 @@ void CCamera::UpdateZoom(float zoom)
 	{
 		m_fZoom = MAX_ZOOM;
 	}
+}
+
+
+//----------------------------------------------------------------------------
+// Spectator / QA free-fly camera.
+//----------------------------------------------------------------------------
+void CCamera::SetFreecamEnabled(
+    bool bEnabled,
+    HOBJECT hSource,
+    float fEyeHeight)
+{
+    if(m_bFreecam == bEnabled)
+    {
+        return;
+    }
+
+    m_bFreecam =
+        bEnabled;
+
+    if(!m_bFreecam)
+    {
+        return;
+    }
+
+    ClearWeaponZoom();
+
+    if(hSource)
+    {
+        g_pLTClient->GetObjectPos(
+            hSource,
+            &m_vFreecamPos);
+
+        g_pLTClient->GetObjectRotation(
+            hSource,
+            &m_rFreecamRot);
+
+        LTVector vEyeUp =
+            m_rFreecamRot.Up();
+
+        m_rFreecamRot.Rotate(
+            m_rFreecamRot.Right(),
+            m_fPitch);
+
+        m_vFreecamPos +=
+            vEyeUp *
+            fEyeHeight;
+        m_vFreecamPos +=
+            m_rFreecamRot.Forward() *
+            3.0f;
+    }
+    else if(m_hObject)
+    {
+        g_pLTClient->GetObjectPos(
+            m_hObject,
+            &m_vFreecamPos);
+
+        g_pLTClient->GetObjectRotation(
+            m_hObject,
+            &m_rFreecamRot);
+    }
+
+    if(m_hObject)
+    {
+        g_pLTClient->SetObjectPosAndRotation(
+            m_hObject,
+            &m_vFreecamPos,
+            &m_rFreecamRot);
+    }
+}
+
+
+void CCamera::UpdateFreecam(
+    float fForward,
+    float fRight,
+    float fUp,
+    float fYaw,
+    float fPitch,
+    float fFrameTime,
+    bool bFast)
+{
+    if(!m_bFreecam ||
+       !m_hObject)
+    {
+        return;
+    }
+
+    if(fYaw != 0.0f)
+    {
+        LTVector vWorldUp(
+            0.0f,
+            1.0f,
+            0.0f);
+
+        m_rFreecamRot.Rotate(
+            vWorldUp,
+            fYaw);
+    }
+
+    if(fPitch != 0.0f)
+    {
+        const float kLegacyPitchInputScale =
+            5.0f *
+            (MATH_PI / 180.0f);
+
+        LTRotation rCandidate =
+            m_rFreecamRot;
+
+        rCandidate.Rotate(
+            rCandidate.Right(),
+            fPitch *
+            kLegacyPitchInputScale);
+
+        if((float)fabs(
+               rCandidate.Forward().y) <
+           0.995f)
+        {
+            m_rFreecamRot =
+                rCandidate;
+        }
+    }
+
+    LTVector vMove =
+        (m_rFreecamRot.Forward() *
+            fForward) +
+        (m_rFreecamRot.Right() *
+            fRight) +
+        (LTVector(
+            0.0f,
+            1.0f,
+            0.0f) *
+            fUp);
+
+    const float fMagnitudeSqr =
+        vMove.MagSqr();
+
+    if(fMagnitudeSqr > 0.0001f)
+    {
+        if(fMagnitudeSqr > 1.0f)
+        {
+            vMove.Normalize();
+        }
+
+        const float fSpeed =
+            bFast
+            ? 1200.0f
+            : 500.0f;
+
+        m_vFreecamPos +=
+            vMove *
+            fSpeed *
+            fFrameTime;
+    }
+
+    g_pLTClient->SetObjectPosAndRotation(
+        m_hObject,
+        &m_vFreecamPos,
+        &m_rFreecamRot);
 }
 
 
