@@ -1027,6 +1027,58 @@ LTRESULT CLTClientShell::Render()
 
     float fFrameTime = g_pLTClient->GetFrameTime();
 
+    // Optional, low-overhead frame pacing telemetry to diagnose background
+    // shimmer versus genuine long frames. Enable with launcher +FTPerf 1.
+    // This deliberately avoids logging on every frame.
+    HCONSOLEVAR hPerf = g_pLTClient->GetConsoleVar("FTPerf");
+    static float s_fPerfStart = 0.0f;
+    static float s_fPerfTotalSeconds = 0.0f;
+    static float s_fPerfMaxSeconds = 0.0f;
+    static uint32 s_nPerfFrames = 0;
+    static uint32 s_nPerfHitches = 0;
+    if(hPerf && g_pLTClient->GetVarValueFloat(hPerf) > 0.0f)
+    {
+        const float fNow = g_pLTClient->GetTime();
+        if(s_fPerfStart <= 0.0f || fNow < s_fPerfStart)
+        {
+            s_fPerfStart = fNow;
+            s_fPerfTotalSeconds = 0.0f;
+            s_fPerfMaxSeconds = 0.0f;
+            s_nPerfFrames = 0;
+            s_nPerfHitches = 0;
+        }
+        if(fFrameTime >= 0.0f && fFrameTime < 5.0f)
+        {
+            s_fPerfTotalSeconds += fFrameTime;
+            if(fFrameTime > s_fPerfMaxSeconds)
+                s_fPerfMaxSeconds = fFrameTime;
+            if(fFrameTime > 0.050f)
+                ++s_nPerfHitches;
+            ++s_nPerfFrames;
+        }
+        const float fInterval = fNow - s_fPerfStart;
+        if(fInterval >= 5.0f)
+        {
+            const float fAverageMs = s_nPerfFrames
+                ? (1000.0f * s_fPerfTotalSeconds / (float)s_nPerfFrames)
+                : 0.0f;
+            g_pLTClient->CPrint(
+                "Fireteam frame pacing: avg %.1f FPS / %.1f ms, worst %.1f ms, >50ms frames %u/%u (5s).",
+                fInterval > 0.0f ? (float)s_nPerfFrames / fInterval : 0.0f,
+                fAverageMs, 1000.0f * s_fPerfMaxSeconds,
+                s_nPerfHitches, s_nPerfFrames);
+            s_fPerfStart = fNow;
+            s_fPerfTotalSeconds = 0.0f;
+            s_fPerfMaxSeconds = 0.0f;
+            s_nPerfFrames = 0;
+            s_nPerfHitches = 0;
+        }
+    }
+    else
+    {
+        s_fPerfStart = 0.0f;
+    }
+
 	//	Clear the screen to prepare for the next draw
 	result = g_pLTClient->ClearScreen(NULL, CLEARSCREEN_SCREEN | CLEARSCREEN_RENDER, NULL);
 	if (LT_OK != result)
