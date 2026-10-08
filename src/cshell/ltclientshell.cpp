@@ -136,6 +136,8 @@ m_bQaMenuOpen(false),
 m_bQaMenuKeyHeld(false),
 m_bQaZombiesEnabled(false),
 m_bQaZombieSettingSent(false),
+m_bQaSpectator(false),
+m_bQaSpectatorSettingSent(false),
 m_nQaMoveStepIndex(2),
 m_bControllerWasConnected(false),
 m_bControllerMenuDown(false),
@@ -265,6 +267,21 @@ LTRESULT CLTClientShell::OnEngineInitialized(RMode *pMode, LTGUID *pAppGuid)
     FT_RoundHudInit();
     FT_CombatFeedbackInit();
     FT_LoadingScreenInit();
+
+    HCONSOLEVAR hDevSpectator =
+        g_pLTClient->GetConsoleVar(
+            "devspectator");
+
+    m_bQaSpectator =
+        hDevSpectator &&
+        g_pLTClient->GetVarValueFloat(
+            hDevSpectator) != 0.0f;
+
+    if(m_bQaSpectator)
+    {
+        g_pLTClient->CPrint(
+            "Fireteam QA spectator: requested by +devspectator.");
+    }
 
     HCONSOLEVAR hAutoStart = g_pLTClient->GetConsoleVar("autostart");
     if(hAutoStart && g_pLTClient->GetVarValueFloat(hAutoStart) != 0.0f)
@@ -640,6 +657,7 @@ void CLTClientShell::OnExitWorld()
     m_bQaMenuOpen = false;
     m_bQaMenuKeyHeld = false;
     m_bQaZombieSettingSent = false;
+    m_bQaSpectatorSettingSent = false;
     m_bControllerWasConnected = false;
     m_bControllerMenuDown = false;
     m_bControllerMenuHoldActivated = false;
@@ -649,6 +667,16 @@ void CLTClientShell::OnExitWorld()
         false,
         g_aQaMoveSteps[m_nQaMoveStepIndex],
         m_bQaZombiesEnabled);
+
+    if(m_pCamera)
+    {
+        m_pCamera->SetFreecamEnabled(
+            false);
+    }
+
+    FT_RoundHudSetSpectator(
+        false,
+        false);
 
     FT_ClearLightGroups();
 
@@ -920,24 +948,33 @@ void CLTClientShell::Update()
             // Poll for user input
             PollInput();
 
-            //Update our player object
-            m_pPlayer->Update();
+            if(!m_pCamera->IsFreecam())
+            {
+                //Update our player object
+                m_pPlayer->Update();
 
-            // Update our camera
-            m_pCamera->UpdatePosition(
-                m_pPlayer->GetPlayerObject(),
-                m_pPlayer->GetEyeHeight());
+                // Update our camera
+                m_pCamera->UpdatePosition(
+                    m_pPlayer->GetPlayerObject(),
+                    m_pPlayer->GetEyeHeight());
 
-            const FTWeaponDef *pViewWeapon =
-                m_pPlayer->GetCurrentWeaponDef();
+                const FTWeaponDef *pViewWeapon =
+                    m_pPlayer->GetCurrentWeaponDef();
 
-            const bool bShowViewWeapon =
-                m_pCamera->IsFirstPerson() &&
-                !(m_pCamera->IsWeaponZoomed() &&
-                  pViewWeapon &&
-                  pViewWeapon->bZoomHideWeapon);
+                const bool bShowViewWeapon =
+                    m_pCamera->IsFirstPerson() &&
+                    !(m_pCamera->IsWeaponZoomed() &&
+                      pViewWeapon &&
+                      pViewWeapon->bZoomHideWeapon);
 
-            m_pPlayer->UpdateWeaponView(bShowViewWeapon);
+                m_pPlayer->UpdateWeaponView(
+                    bShowViewWeapon);
+            }
+            else
+            {
+                m_pPlayer->UpdateWeaponView(
+                    false);
+            }
         }
     }
 
@@ -1343,10 +1380,179 @@ LTRESULT CLTClientShell::PollInput()
         return LT_OK;
     }
 
-    if(FT_RoundHudIsPlayerEliminated() ||
-       FT_RoundHudIsGameOver())
+    const bool bEliminated =
+        FT_RoundHudIsPlayerEliminated();
+
+    const bool bQaFreecam =
+        m_bQaSpectator &&
+        m_nGameMode ==
+            LOCAL_GAMEMODE_NORMAL;
+
+    const bool bSpectating =
+        bEliminated ||
+        bQaFreecam;
+
+    if(bSpectating)
     {
+        if(bQaFreecam &&
+           !m_bQaSpectatorSettingSent)
+        {
+            SendQaSpectatorSetting();
+        }
+
         m_pCamera->ClearWeaponZoom();
+        m_pCamera->SetFreecamEnabled(
+            true,
+            m_pPlayer->GetPlayerObject(),
+            m_pPlayer->GetEyeHeight());
+
+        FT_RoundHudSetSpectator(
+            true,
+            bQaFreecam);
+
+        m_pPlayer->SetControllerMoveAxes(
+            0.0f,
+            0.0f);
+        m_pPlayer->UpdateMoveFlags(
+            0);
+
+        HLOCALOBJ hPlayer =
+            m_pPlayer->GetPlayerObject();
+
+        if(hPlayer)
+        {
+            LTVector vStop(
+                0.0f,
+                0.0f,
+                0.0f);
+
+            g_pLTCPhysics->SetVelocity(
+                hPlayer,
+                &vStop);
+        }
+
+        float spectatorOffsets[3] =
+        {
+            0.0f,
+            0.0f,
+            0.0f
+        };
+
+        g_pLTClient->GetAxisOffsets(
+            spectatorOffsets);
+
+        const float fSpectatorFrameTime =
+            g_pLTClient->GetFrameTime();
+
+        float fForward = 0.0f;
+        float fRight = 0.0f;
+        float fUp = 0.0f;
+
+        if(g_pLTClient->IsCommandOn(
+               COMMAND_MOVE_FORWARD))
+        {
+            fForward += 1.0f;
+        }
+
+        if(g_pLTClient->IsCommandOn(
+               COMMAND_MOVE_BACKWARD))
+        {
+            fForward -= 1.0f;
+        }
+
+        if(g_pLTClient->IsCommandOn(
+               COMMAND_MOVE_RIGHT))
+        {
+            fRight += 1.0f;
+        }
+
+        if(g_pLTClient->IsCommandOn(
+               COMMAND_MOVE_LEFT))
+        {
+            fRight -= 1.0f;
+        }
+
+        if(g_pLTClient->IsCommandOn(
+               COMMAND_JUMP))
+        {
+            fUp += 1.0f;
+        }
+
+        if(g_pLTClient->IsCommandOn(
+               COMMAND_CROUCH))
+        {
+            fUp -= 1.0f;
+        }
+
+        if(controller.bConnected)
+        {
+            fForward +=
+                controller.fMoveY;
+            fRight +=
+                controller.fMoveX;
+
+            if(controller.nButtons &
+               FT_PAD_A)
+            {
+                fUp += 1.0f;
+            }
+
+            if(controller.nButtons &
+               FT_PAD_B)
+            {
+                fUp -= 1.0f;
+            }
+        }
+
+        const bool bFast =
+            g_pLTClient->IsCommandOn(
+                COMMAND_SPRINT) ||
+            (controller.bConnected &&
+             (controller.nButtons &
+              FT_PAD_LTHUMB));
+
+        const float fYaw =
+            spectatorOffsets[0] +
+            (controller.bConnected
+                ? controller.fLookX *
+                    fSpectatorFrameTime *
+                    2.65f
+                : 0.0f);
+
+        const float fPitch =
+            spectatorOffsets[1] +
+            (controller.bConnected
+                ? -controller.fLookY *
+                    fSpectatorFrameTime *
+                    2.10f
+                : 0.0f);
+
+        m_pCamera->UpdateFreecam(
+            fForward,
+            fRight,
+            fUp,
+            fYaw,
+            fPitch,
+            fSpectatorFrameTime,
+            bFast);
+
+        SendSpectatorViewPosition();
+
+        return LT_OK;
+    }
+
+    if(m_pCamera->IsFreecam())
+    {
+        m_pCamera->SetFreecamEnabled(
+            false);
+
+        FT_RoundHudSetSpectator(
+            false,
+            false);
+    }
+
+    if(FT_RoundHudIsGameOver())
+    {
         m_pPlayer->SetControllerMoveAxes(
             0.0f,
             0.0f);
@@ -1829,6 +2035,85 @@ void CLTClientShell::SendQaZombieSetting()
 }
 
 
+void CLTClientShell::SendQaSpectatorSetting()
+{
+    if(m_nGameMode !=
+           LOCAL_GAMEMODE_NORMAL)
+    {
+        return;
+    }
+
+    ILTMessage_Write *pMessage =
+        LTNULL;
+
+    if(g_pLTCCommon->CreateMessage(
+           pMessage) != LT_OK ||
+       !pMessage)
+    {
+        return;
+    }
+
+    pMessage->IncRef();
+    pMessage->Writeuint8(
+        MSG_CS_QA_SPECTATOR);
+    pMessage->Writebool(
+        m_bQaSpectator);
+
+    g_pLTClient->SendToServer(
+        pMessage->Read(),
+        MESSAGE_GUARANTEED);
+
+    pMessage->DecRef();
+
+    m_bQaSpectatorSettingSent =
+        true;
+
+    g_pLTClient->CPrint(
+        "Fireteam QA spectator: %s",
+        m_bQaSpectator
+            ? "ON"
+            : "OFF");
+}
+
+
+void CLTClientShell::SendSpectatorViewPosition()
+{
+    if(!m_pCamera ||
+       !m_pCamera->IsFreecam())
+    {
+        return;
+    }
+
+    LTVector vViewPos;
+
+    g_pLTClient->GetObjectPos(
+        m_pCamera->GetCamera(),
+        &vViewPos);
+
+    ILTMessage_Write *pMessage =
+        LTNULL;
+
+    if(g_pLTCCommon->CreateMessage(
+           pMessage) != LT_OK ||
+       !pMessage)
+    {
+        return;
+    }
+
+    pMessage->IncRef();
+    pMessage->Writeuint8(
+        MSG_CS_SPECTATOR_POS);
+    pMessage->WriteLTVector(
+        vViewPos);
+
+    g_pLTClient->SendToServer(
+        pMessage->Read(),
+        0);
+
+    pMessage->DecRef();
+}
+
+
 //-----------------------------------------------------------------------------
 void CLTClientShell::SendPlayerName()
 {
@@ -2048,6 +2333,32 @@ void CLTClientShell::OnKeyDown(int key, int rep)
 	//g_pLTClient->CPrint("OnKeyDown(%d,%d)", key, rep);
     if(m_bInWorld)
     {
+        if(VK_F8 == key &&
+           rep == 0 &&
+           m_nGameMode ==
+               LOCAL_GAMEMODE_NORMAL &&
+           !m_pChatGui->IsChatInputActive())
+        {
+            m_bQaSpectator =
+                !m_bQaSpectator;
+
+            SendQaSpectatorSetting();
+
+            if(!m_bQaSpectator &&
+               !FT_RoundHudIsPlayerEliminated() &&
+               m_pCamera)
+            {
+                m_pCamera->SetFreecamEnabled(
+                    false);
+
+                FT_RoundHudSetSpectator(
+                    false,
+                    false);
+            }
+
+            return;
+        }
+
         if( VK_F9 == key &&
             rep == 0 )
         {
