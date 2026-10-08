@@ -74,7 +74,7 @@ static float FT_StackedPowerupUntil(
     }
 
     const float fNow =
-        g_pLTServer->GetTime();
+        FT_GetRoundCombatTime();
 
     if(fCurrentUntil <=
        fNow)
@@ -1235,8 +1235,8 @@ void CPlayerSrvr::ApplyDamage(uint8 nDamage)
         return;
     }
 
-    if(g_pLTServer->GetTime() <
-       m_fGodUntil)
+    if(g_pLTServer->GetTime() < m_fRespawnInvulnerableUntil ||
+       FT_GetRoundCombatTime() < m_fGodUntil)
     {
         g_pLTServer->CPrint(
             "Fireteam: %s GOD MODE absorbed %u damage.",
@@ -1321,8 +1321,9 @@ void CPlayerSrvr::Respawn()
     m_nReloadSlot = 0;
     m_fBottomlessUntil = 0.0f;
     m_fOneHitUntil = 0.0f;
-    // Short server-authoritative invulnerability after respawn.
-    m_fGodUntil = g_pLTServer->GetTime() + 3.0f;
+    // Respawn protection uses real server time, independent of power-ups.
+    m_fGodUntil = 0.0f;
+    m_fRespawnInvulnerableUntil = g_pLTServer->GetTime() + 3.0f;
     m_nBottomlessStacks = 0;
     m_nOneHitStacks = 0;
     m_nGodStacks = 0;
@@ -1471,7 +1472,7 @@ void CPlayerSrvr::SendPowerupState()
     }
 
     const float fNow =
-        g_pLTServer->GetTime();
+        FT_GetRoundCombatTime();
 
     float fBottomless =
         m_bBottomlessWasActive
@@ -1717,7 +1718,7 @@ void CPlayerSrvr::GrantGodMode(
 void CPlayerSrvr::UpdatePowerups()
 {
     const float fNow =
-        g_pLTServer->GetTime();
+        FT_GetRoundCombatTime();
 
     bool bChanged = false;
 
@@ -1831,12 +1832,16 @@ void CPlayerSrvr::FirePrimary(
     }
 
     const float fNow = g_pLTServer->GetTime();
+    const bool bBottomless = m_bBottomlessWasActive &&
+        FT_GetRoundCombatTime() < m_fBottomlessUntil;
     if(fNow < m_fNextWeaponShot[m_nWeaponSlot])
     {
         return;
     }
 
-    if(m_nWeaponAmmoInClip[m_nWeaponSlot] == 0)
+    // A zero-reserve gun still fires while Bottomless Mag is active.
+    // No reserve ammo is fabricated; reloading works again after expiry.
+    if(m_nWeaponAmmoInClip[m_nWeaponSlot] == 0 && !bBottomless)
     {
         SendPrimaryAmmo();
 
@@ -1893,10 +1898,6 @@ void CPlayerSrvr::FirePrimary(
 
     m_fNextWeaponShot[m_nWeaponSlot] =
         fNow + pDef->fFireInterval;
-
-    const bool bBottomless =
-        fNow <
-        m_fBottomlessUntil;
 
     if(!bBottomless)
     {
@@ -2073,8 +2074,8 @@ void CPlayerSrvr::FirePrimary(
             }
 
             const bool bOneHit =
-                fNow <
-                m_fOneHitUntil;
+                m_bOneHitWasActive &&
+                FT_GetRoundCombatTime() < m_fOneHitUntil;
 
             const uint8 nDamage =
                 bOneHit
@@ -2297,7 +2298,8 @@ void CPlayerSrvr::SyncPrimaryAmmo()
 
 void CPlayerSrvr::ReloadWeapon()
 {
-    if(g_pLTServer->GetTime() < m_fBottomlessUntil)
+    if(m_bBottomlessWasActive &&
+       FT_GetRoundCombatTime() < m_fBottomlessUntil)
         return;
     if(!m_bAlive ||
        m_bQaSpectating)
