@@ -14,4 +14,5 @@ public sealed record LauncherProfile(
     string Mode,
     string Difficulty,
     string JoinIp,
-    string CustomCommands);
+    string CustomCommands,
+    string Map = "CABINFEVER");
