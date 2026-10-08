@@ -138,6 +138,8 @@ private:
     bool        			IsInWorld(){return m_bInWorld;}
     void        			SendPlayerName();
     void                    SendQaZombieSetting();
+    void                    SendQaSpectatorSetting();
+    void                    SendSpectatorViewPosition();
     void                    SetStatsVisible(bool bVisible);
 
 private:
@@ -153,6 +155,8 @@ private:
     bool                    m_bQaMenuKeyHeld;
     bool                    m_bQaZombiesEnabled;
     bool                    m_bQaZombieSettingSent;
+    bool                    m_bQaSpectator;
+    bool                    m_bQaSpectatorSettingSent;
     uint8                   m_nQaMoveStepIndex;
     bool                    m_bControllerWasConnected;
     bool                    m_bControllerMenuDown;
