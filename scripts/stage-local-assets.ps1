@@ -533,6 +533,35 @@ if(Test-Path -LiteralPath $infectedAnimModel) {
     Write-Host "[OK] ST_M_CHILD animation candidates -> rez\Fireteam\ST_M_CHILD-strings.txt"
 }
 
+# The dedicated assassin/tanker animation databases are distinct from
+# ST_M_CHILD. Export candidate strings for each so QA can validate the actual
+# available animation names on the corresponding runtime model.
+foreach($animBase in @("ANI_VI_ASSASSIN_CH", "ANI_VI_TANKER_SH")) {
+    $animModel = Join-Path $rezRoot ("Characters\infected\body\" + $animBase + ".LTB")
+    if(-not (Test-Path -LiteralPath $animModel)) {
+        Write-Host "[INFO] $animBase model not present; animation audit skipped"
+        continue
+    }
+
+    $reports = Join-Path $assetRoot "Reports"
+    $runtimeReports = Join-Path $rezRoot "Fireteam"
+    New-Item -ItemType Directory -Force -Path $reports, $runtimeReports | Out-Null
+
+    # Text fragments are CANDIDATES, not proof of a playable model animation.
+    # Validate through GetAnimIndex on the target character before assigning.
+    $animBytes = [System.IO.File]::ReadAllBytes($animModel)
+    $animText = [System.Text.Encoding]::ASCII.GetString($animBytes)
+    $animMatches = [regex]::Matches(
+        $animText,
+        '(?<![A-Za-z0-9_\-])[A-Za-z][A-Za-z0-9_\-]{1,47}(?![A-Za-z0-9_\-])'
+    )
+    $animTokens = @($animMatches | ForEach-Object { $_.Value } | Sort-Object -Unique)
+    $reportName = $animBase + "-strings.txt"
+    $animTokens | Set-Content -LiteralPath (Join-Path $reports $reportName)
+    $animTokens | Set-Content -LiteralPath (Join-Path $runtimeReports $reportName)
+    Write-Host "[OK] $animBase printable candidates -> assets-local\Reports\$reportName"
+}
+
 $gunsZip = Join-Path $assetRoot "Guns.zip"
 $gunsHHZip = Join-Path $assetRoot "GunsHH.zip"
 
