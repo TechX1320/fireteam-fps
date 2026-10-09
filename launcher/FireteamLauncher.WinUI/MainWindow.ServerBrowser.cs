@@ -209,7 +209,7 @@ public sealed partial class MainWindow
         ServerColumns(row.Listing.Name, row.Listing.Map,
             row.IsLan ? $"LAN • D{row.Difficulty}" : "Directory",
             row.IsLan ? $"{row.Players}/{row.MaxPlayers}" : "—",
-            "—", row.IsLan ? "Base" : "Unknown", false);
+            "—", "Not checked", false);
 
     private async Task RefreshCommunityServersAsync()
     {
