@@ -7,7 +7,8 @@ public sealed record LauncherSettings(
     double SensitivityXMultiplier,
     double SensitivityYMultiplier,
     int Volume,
-    double Gamma);
+    double Gamma,
+    bool RadarEnabled = true);
 
 public sealed record LauncherProfile(
     string PlayerName,
