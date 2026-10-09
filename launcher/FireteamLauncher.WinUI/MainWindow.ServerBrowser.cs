@@ -296,7 +296,7 @@ public sealed partial class MainWindow
             var cabinGuard = mapName == "CABINFEVER" ? 1 : 0;
             File.WriteAllText(
                 Path.Combine(configDir, "session.cfg"),
-                $"difficulty={difficulty}\nfirst_round_prep=45\ncabin_spawn_guard={cabinGuard}\n");
+                $"difficulty={difficulty}\nmap={mapName}\nfirst_round_prep=45\ncabin_spawn_guard={cabinGuard}\n");
 
             var start = new System.Diagnostics.ProcessStartInfo(serverPath)
             {
