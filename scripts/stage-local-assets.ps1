@@ -538,6 +538,7 @@ if($charZipName) {
     # model-name-to-DTX substitutions. Keep proprietary bytes ignored.
     Extract-OptionalZipEntry $charZipName "CHARS_T_BODY/CW_VST_ASSAVIRUS_HM.DTX" "Characters\infected\body\CW_VST_ASSAVIRUS_HM.DTX" | Out-Null
     Extract-OptionalZipEntry $charZipName "CHARS_T_BODY/CW_LG_ASSAVIRUS_HM.DTX" "Characters\infected\body\CW_LG_ASSAVIRUS_HM.DTX" | Out-Null
+    Extract-OptionalZipEntry $charZipName "CHARS_T_FACE/CW_FC_NM_VIRUS_HM.DTX" "Characters\infected\body\CW_FC_NM_VIRUS_HM.DTX" | Out-Null
     Extract-OptionalZipEntry $charZipName "CHARS_T_BODY/CM_VST_TANKERBLUE_YK.DTX" "Characters\infected\body\CM_VST_TANKERBLUE_YK.DTX" | Out-Null
     Extract-OptionalZipEntry $charZipName "CHARS_T_BODY/CM_LG_TANKERBLUE_YK.DTX" "Characters\infected\body\CM_LG_TANKERBLUE_YK.DTX" | Out-Null
     Extract-OptionalZipEntry $charZipName "CHARS_T_BODY/CM_FC_TANKERBLUE_YK.DTX" "Characters\infected\body\CM_FC_TANKERBLUE_YK.DTX" | Out-Null
