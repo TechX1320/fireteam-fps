@@ -167,7 +167,9 @@ public sealed partial class MainWindow
                 s.Difficulty ?? 0));
         var entries = nearby.Concat(saved)
             .GroupBy(row => row.Listing.Address, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.OrderByDescending(item => item.IsLan).First())
+            .Select(group => group.OrderByDescending(item =>
+                item.IsLan ? 3 : item.Listing.Source == "Hub" ? 2 :
+                item.Listing.Source == "Favorite" ? 1 : 0).First())
             .OrderByDescending(item => item.IsLan)
             .ThenBy(item => item.Listing.Name)
             .ToList();
