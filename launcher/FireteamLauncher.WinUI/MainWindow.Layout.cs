@@ -3183,11 +3183,14 @@ public sealed partial class MainWindow
         SettingsView.HorizontalContentAlignment =
             HorizontalAlignment.Center;
 
-        var page =
-            NewPagePanel(
-                "FIRETEAM / SETTINGS",
-                "Game Settings",
-                "Launcher-side settings mirror the real FIRETEAM runtime file. Unsupported engine switches are not exposed until their LithTech variables are verified.");
+        // The top chrome already says SETTINGS; avoid repeating page titles.
+        var page = new StackPanel
+        {
+            Spacing = 16,
+            Margin = new Thickness(24, 18, 24, 32),
+            MaxWidth = 1120,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
 
         var groups =
             new Grid
@@ -3298,17 +3301,6 @@ public sealed partial class MainWindow
                 "GAME VOLUME",
                 VolumeBox));
 
-        var developer =
-            CardHeading(
-                "NEXT SETTINGS PASS",
-                "Engine / Developer",
-                "VSync, FPS limit, debug menu and related switches need their actual Jupiter console variables verified before the launcher writes them.",
-                AccentRedBrush);
-
-        developer.Children.Add(
-            BodyText(
-                "They are deliberately not fake toggles in this build. Once verified, they will live here with clear restart/apply behavior."));
-
         var displayCard =
             Card(
                 display,
@@ -3321,24 +3313,17 @@ public sealed partial class MainWindow
             Card(
                 audio,
                 AccentBrush);
-        var developerCard =
-            Card(
-                developer,
-                AccentRedBrush);
-
         Grid.SetRow(displayCard, 0);
         Grid.SetColumn(displayCard, 0);
         Grid.SetRow(inputCard, 0);
         Grid.SetColumn(inputCard, 1);
         Grid.SetRow(audioCard, 1);
         Grid.SetColumn(audioCard, 0);
-        Grid.SetRow(developerCard, 1);
-        Grid.SetColumn(developerCard, 1);
+        Grid.SetColumnSpan(audioCard, 2);
 
         groups.Children.Add(displayCard);
         groups.Children.Add(inputCard);
         groups.Children.Add(audioCard);
-        groups.Children.Add(developerCard);
 
         page.Children.Add(groups);
 
