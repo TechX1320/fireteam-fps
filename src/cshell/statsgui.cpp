@@ -12,6 +12,7 @@
 #include <windows.h>
 
 #include "statsgui.h"
+#include "FireteamRoundHud.h"
 #include "clientinterfaces.h"
 #include <iltdrawprim.h>
 #include <iltmessage.h>
@@ -459,7 +460,10 @@ LTRESULT CStatsGui::RecalcStatsString()
         strncat(sLives, line, sizeof(sLives) - strlen(sLives) - 1);
     }
 
-    m_pStatsString_Title->SetText("FIRETEAM  /  SQUAD PERFORMANCE");
+    m_pStatsString_Title->SetText(
+        FT_RoundHudIsGameOver()
+            ? "FIRETEAM  /  GAME OVER  /  SQUAD PERFORMANCE"
+            : "FIRETEAM  /  LIVE SQUAD PERFORMANCE");
     m_pStatsString_Title->SetColor(0xFFFFB000);
     m_pStatsString_Playername->SetText(sNames);
     m_pStatsString_Sealswhacked->SetText(sKills);
