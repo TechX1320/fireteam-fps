@@ -77,6 +77,7 @@ public sealed class GameLaunchService
         AddArg(start, "+screenwidth", settings.Width.ToString(CultureInfo.InvariantCulture));
         AddArg(start, "+screenheight", settings.Height.ToString(CultureInfo.InvariantCulture));
         AddArg(start, "+windowed", settings.Windowed ? "1" : "0");
+        AddArg(start, "+ftradarenabled", settings.RadarEnabled ? "1" : "0");
         var errorLog =
             mapName.Equals(
                 "CABINFEVER",
