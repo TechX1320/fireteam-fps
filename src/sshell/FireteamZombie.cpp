@@ -2825,6 +2825,10 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
                             0.0f);
                         pKill->Writeuint8(
                             nKillingHitRegion);
+                        // Authoritative zombie subtype for local match
+                        // receipts and the future per-type kill leaderboard.
+                        pKill->WriteString(
+                            m_Def.sId[0] ? m_Def.sId : "unknown");
                         g_pLTServer->SendToObject(
                             pKill->Read(),
                             m_hObject,
