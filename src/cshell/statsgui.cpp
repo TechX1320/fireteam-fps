@@ -360,6 +360,14 @@ LTRESULT CStatsGui::HandleMessage(ILTMessage_Read* pMessage)
         // Recalculate the poly string
         RecalcStatsString();
     }
+    else
+    {
+        // A new world/lobby may temporarily have no players. Do not show
+        // stale rows from the previous completed match.
+        delete[] m_pScores;
+        m_pScores = NULL;
+        RecalcStatsString();
+    }
 
     return LT_OK;
 }
