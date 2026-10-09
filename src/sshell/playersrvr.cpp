@@ -693,10 +693,15 @@ uint32 CPlayerSrvr::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
                 {
                     const uint8 nKillingRegion =
                         pMsg->Readuint8();
+                    char szZombieType[32] = {0};
+                    pMsg->ReadString(szZombieType, sizeof(szZombieType));
+                    RecordZombieTypeKill(
+                        szZombieType[0] ? szZombieType : "unknown");
 
                     if(nKillingRegion ==
                        (uint8)FT_HITREGION_HEAD)
                     {
+                        ++m_nHeadshotKills;
                         SendCombatFeedback(
                             FT_COMBAT_FEEDBACK_HEADSHOT);
                     }
@@ -806,6 +811,42 @@ uint32 CPlayerSrvr::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
 }
 
 
+
+// Named counters use bounded fixed arrays so no allocations are needed in
+// the server's authoritative hit/kill/pickup message hot paths.
+static void FT_RecordNamedMatchCounter(
+    FTNamedCounter *pCounters, uint8 &nUsed, const char *pId)
+{
+    if(!pCounters || !pId || !pId[0])
+        return;
+    for(uint8 n = 0; n < nUsed; ++n)
+    {
+        if(_stricmp(pCounters[n].sId, pId) == 0)
+        {
+            ++pCounters[n].nCount;
+            return;
+        }
+    }
+    if(nUsed >= FT_MAX_MATCH_CATEGORIES)
+        return;
+    FTNamedCounter &entry = pCounters[nUsed++];
+    strncpy(entry.sId, pId, sizeof(entry.sId) - 1);
+    entry.sId[sizeof(entry.sId) - 1] = '\0';
+    entry.nCount = 1;
+}
+
+void CPlayerSrvr::RecordZombieTypeKill(const char *pType)
+{
+    FT_RecordNamedMatchCounter(
+        m_aZombieTypes, m_nZombieTypeCount, pType);
+}
+
+void CPlayerSrvr::RecordPowerupPickup(const char *pType)
+{
+    ++m_nPowerups;
+    FT_RecordNamedMatchCounter(
+        m_aPowerupTypes, m_nPowerupTypeCount, pType);
+}
 
 //-----------------------------------------------------------------------------
 //	CPlayerSrvr::SetPlayerName(const char* name)
@@ -1245,6 +1286,9 @@ void CPlayerSrvr::ApplyDamage(uint8 nDamage)
         return;
     }
 
+    const uint8 nActuallyTaken =
+        nDamage >= m_nHealth ? m_nHealth : nDamage;
+    m_nDamageTaken += nActuallyTaken;
     m_nHealth = (nDamage >= m_nHealth) ? 0 : (uint8)(m_nHealth - nDamage);
     g_pLTServer->CPrint(
         "Fireteam: %s took %u damage (%u/%u HP).",
@@ -1256,6 +1300,7 @@ void CPlayerSrvr::ApplyDamage(uint8 nDamage)
 
     if(m_nHealth == 0)
     {
+        ++m_nDeaths;
         m_bAlive = false;
 
         if(m_nLives > 0)
@@ -1541,6 +1586,7 @@ void CPlayerSrvr::GrantAmmoMagazines(
         return;
     }
 
+    RecordPowerupPickup("ammo_resupply");
     for(uint8 nSlot = 1;
         nSlot <= 5;
         ++nSlot)
@@ -1602,6 +1648,7 @@ void CPlayerSrvr::GrantHealth(
     m_nHealth =
         (uint8)nHealth;
 
+    RecordPowerupPickup("health");
     SendHealth();
 }
 
@@ -1612,6 +1659,7 @@ void CPlayerSrvr::GrantBottomless(
     {
         return;
     }
+    RecordPowerupPickup("bottomless");
 
     float fAdded =
         0.0f;
@@ -1662,6 +1710,7 @@ void CPlayerSrvr::GrantOneHit(
     {
         return;
     }
+    RecordPowerupPickup("one_hit");
 
     float fAdded =
         0.0f;
@@ -1692,6 +1741,7 @@ void CPlayerSrvr::GrantGodMode(
     {
         return;
     }
+    RecordPowerupPickup("god_mode");
 
     float fAdded =
         0.0f;
@@ -1914,6 +1964,10 @@ void CPlayerSrvr::FirePrimary(
 
     m_fNextWeaponShot[m_nWeaponSlot] =
         fNow + pDef->fFireInterval;
+    // Only accepted server-side attacks count. Premature reload shots,
+    // untrusted client firing rate and invalid aim directions do not.
+    ++m_nAcceptedShots;
+    ++m_aShotsBySlot[m_nWeaponSlot];
 
     if(!bBottomless)
     {
@@ -2130,6 +2184,9 @@ void CPlayerSrvr::FirePrimary(
                     info.m_hObject,
                     0);
                 pDamage->DecRef();
+                // Counts a confirmed direct hitscan impact, not theoretical
+                // pellet/projectile hits or a client-reported hit marker.
+                ++m_nConfirmedHits;
 
                 g_pLTServer->CPrint(
                     "Fireteam weapon: %s infected hit region=%s damage=%u distance=%.1f penetrations=%u",
