@@ -8,6 +8,7 @@
 #include <ltmodule.h>
 
 #include "FireteamGameGuid.h"
+#include "FireteamPublicAnnouncer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -185,6 +186,7 @@ static void PrintUsage()
     puts("FIRETEAM Dedicated Server (experimental)");
     puts("Usage: FireteamDedicatedServer.exe [--map CABINFEVER] [--port 27889]");
     puts("       [--name \"Fireteam Server\"] [--max-players 24]");
+    puts("       [--hub-url https://your-fireteam-hub.example] (opt-in listing)");
     puts("Press Ctrl+C to stop. Start from a complete FIRETEAM BUILT directory.");
 }
 
@@ -194,6 +196,7 @@ int main(int argc, char **argv)
     char sName[96] = "FIRETEAM Dedicated";
     uint32 nPort = 27889;
     uint32 nMaxPlayers = 24;
+    char sHubUrl[256] = "";
 
     for(int i = 1; i < argc; ++i)
     {
@@ -226,6 +229,12 @@ int main(int argc, char **argv)
         else if(strcmp(argv[i - 1], "--max-players") == 0)
         {
             nMaxPlayers = (uint32)atoi(pValue);
+        }
+        else if(strcmp(argv[i - 1], "--hub-url") == 0)
+        {
+            if(strlen(pValue) >= sizeof(sHubUrl))
+                return 2;
+            strcpy(sHubUrl, pValue);
         }
         else
         {
@@ -416,6 +425,18 @@ int main(int argc, char **argv)
             puts("[WARN] LAN discovery unavailable; direct IP still works.");
         const unsigned lanDifficulty = ReadLanDifficulty();
 
+        // The hub URL is an explicit opt-in. No outbound Internet traffic
+        // or public IP publication occurs without --hub-url.
+        FireteamPublicAnnouncer publicAnnouncer;
+        if(sHubUrl[0])
+        {
+            if(publicAnnouncer.Start(sHubUrl, sName, sMap, nPort,
+                                     nMaxPlayers, lanDifficulty))
+                puts("FIRETEAM Hub: public heartbeats enabled (reachability NOT verified).");
+            else
+                fputs("[WARN] FIRETEAM Hub registration could not start; LAN/direct-IP only.\n", stderr);
+        }
+
         SetConsoleCtrlHandler(OnConsoleControl, TRUE);
         while(InterlockedCompareExchange(&s_nStopRequested, 0, 0) == 0)
         {
@@ -429,6 +450,7 @@ int main(int argc, char **argv)
             }
             lanAdvertiser.Update(pServer, sName, sMap, nPort,
                                  nMaxPlayers, lanDifficulty);
+            publicAnnouncer.UpdatePlayers(pServer->GetNumClients());
             // Launcher requests graceful shutdown through a local file.
             // The server checks it on its normal update loop; no forced kill.
             if(GetFileAttributesA("data\\server-stop.request") != INVALID_FILE_ATTRIBUTES)
@@ -440,6 +462,7 @@ int main(int argc, char **argv)
             Sleep(15);
         }
         SetConsoleCtrlHandler(OnConsoleControl, FALSE);
+        publicAnnouncer.Stop();
         lanAdvertiser.Close();
     } while(false);
 

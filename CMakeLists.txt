@@ -77,12 +77,13 @@ set_target_properties(object_module PROPERTIES OUTPUT_NAME "object" PREFIX "" SU
 if(EXISTS "${SDK_DIR}/server_interface.h")
     add_executable(fireteam_dedicated EXCLUDE_FROM_ALL
         "src/dedicated/FireteamDedicatedServer.cpp"
+        "src/dedicated/FireteamPublicAnnouncer.cpp"
         # NOLF2 ServerApp supplies this module's GetMasterDatabase().
         # Merge Jupiter interface holders with the runtime server.dll.
         "${SDK_DIR}/ltmodule.cpp"
     )
     target_include_directories(fireteam_dedicated PRIVATE "${SDK_DIR}" "${GAME_SHARED_DIR}")
-    target_link_libraries(fireteam_dedicated PRIVATE user32 ws2_32)
+    target_link_libraries(fireteam_dedicated PRIVATE user32 ws2_32 winhttp bcrypt)
     set_target_properties(fireteam_dedicated PROPERTIES
         OUTPUT_NAME "FireteamDedicatedServer"
     )
