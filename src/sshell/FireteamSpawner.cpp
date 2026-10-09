@@ -69,6 +69,7 @@ static float s_fMissingInfectedSince = 0.0f;
 // Crash-resilient local match files: overwrite the same record each 15s.
 static const float kMatchCheckpointInterval = 15.0f;
 static float s_fNextMatchCheckpoint = 0.0f;
+static bool s_bRoundCheckpointPending = false;
 static uint32 s_nMissingInfectedRestores = 0;
 static FTDifficultyDef s_Difficulty;
 static bool s_bAssassinAssetsReady = false;
@@ -505,6 +506,7 @@ void Spawner::ResetRoundController()
     s_nMissingInfectedRestores = 0;
     s_fNextMatchCheckpoint = g_pLTServer->GetTime() +
         kMatchCheckpointInterval;
+    s_bRoundCheckpointPending = false;
     if(g_pStatsManager)
         g_pStatsManager->BeginMatch();
     s_bFirstRoundPreparing = false;
@@ -1178,10 +1180,13 @@ void Spawner::UpdateRoundController()
 
     const float fNow = g_pLTServer->GetTime();
 
-    if(s_nRound > 0 && fNow >= s_fNextMatchCheckpoint)
+    if(s_nRound > 0 &&
+       (s_bRoundCheckpointPending || fNow >= s_fNextMatchCheckpoint))
     {
-        // Save even during a long round. Completed games write a FINAL
-        // snapshot through FT_OnFireteamSquadGameOver separately.
+        // A round-clear kill score is dispatched to the player object after
+        // FT_OnFireteamEnemyKilled returns. Snapshot on the next controller
+        // tick so the killing blow and exact infected type are included.
+        s_bRoundCheckpointPending = false;
         s_fNextMatchCheckpoint = fNow + kMatchCheckpointInterval;
         if(g_pStatsManager)
             g_pStatsManager->SaveMatchSnapshot(
@@ -1533,11 +1538,9 @@ void FT_OnFireteamEnemyKilled()
 
             FT_SpawnRoundClearMutationBoxes();
 
-            // Survive an early exit/crash immediately after clearing a wave.
-            if(g_pStatsManager)
-                g_pStatsManager->SaveMatchSnapshot(
-                    s_nRound, s_Difficulty.sId,
-                    FT_GetRoundCombatTime(), false);
+            // Delay this save until the next 200ms controller tick so
+            // the final death's kill-score message updates player totals.
+            s_bRoundCheckpointPending = true;
         }
         else
         {
