@@ -1,6 +1,10 @@
 # FIRETEAM - One-click public hosting / live directory / guest identities
 
-Status: architecture and read-only diagnostics, **not implemented Internet NAT mapping, live WAN directory, or a relay**. No remote Windows host tests yet.
+Status: **first implementation committed** (hub .NET service, opt-in WinHTTP
+heartbeats, live launcher queries, duplicate-name reservation, and opt-in
+Windows UPnP IGD mapping). **Not deployed or Windows tested.** PCP/NAT-PMP,
+STUN/ICE, relay, public reachability verification and the real Lenovo
+installation still remain. Read docs/HUB_DEPLOYMENT.md first. No remote Windows host tests yet.
 
 ## Nonnegotiable player UX
 - Host presses **Start Dedicated** in the FIRETEAM launcher.
