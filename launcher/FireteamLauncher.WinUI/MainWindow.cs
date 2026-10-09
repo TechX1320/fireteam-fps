@@ -123,6 +123,7 @@ public sealed partial class MainWindow : Window
     private readonly ScrollViewer SettingsView = new();
     private readonly ComboBox ResolutionCombo = new();
     private readonly ToggleSwitch WindowedToggle = new();
+    private readonly ToggleSwitch RadarToggle = new();
     private readonly NumberBox SensitivityXBox = new();
     private readonly NumberBox SensitivityYBox = new();
     private readonly NumberBox VolumeBox = new();
