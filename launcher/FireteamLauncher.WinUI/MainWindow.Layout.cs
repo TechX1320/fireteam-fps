@@ -3407,6 +3407,14 @@ public sealed partial class MainWindow
                     ? "RezExtract.exe not found yet."
                     : "RezExtract.exe detected and ready.";
         }
+        else if(tag == "servers")
+        {
+            if(!_curatedDirectoryRequested)
+            {
+                _curatedDirectoryRequested = true;
+                _ = RefreshCommunityServersAsync();
+            }
+        }
         else if(tag == "profile")
         {
             RefreshPlayerProfile();
