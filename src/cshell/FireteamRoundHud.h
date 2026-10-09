@@ -17,6 +17,7 @@ void FT_RoundHudSetTimedPowerups(
     float fGodSeconds,
     float fWallhackSeconds);
 void FT_RoundHudSetRespawnCountdown(float fSeconds);
+void FT_RoundHudSetWaitingForNextRound(bool bWaiting);
 bool FT_RoundHudIsBottomlessActive();
 void FT_RoundHudSetFirstRoundPreparation(float fSeconds, uint32 nRevision);
 void FT_RoundHudResetFirstRoundPreparation();
