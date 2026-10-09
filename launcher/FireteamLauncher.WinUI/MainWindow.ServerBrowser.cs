@@ -14,6 +14,12 @@ public sealed partial class MainWindow
     private readonly TextBox ServerBrowserAddress = new();
     private readonly TextBlock ServerBrowserStatus = new();
     private readonly ServerDirectoryService _serverDirectory = new();
+    private readonly LanServerDiscoveryService _lanDiscovery = new();
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _lanRefreshTimer;
+    private sealed record ServerBrowserRow(
+        FireteamServerListing Listing, bool IsLan, int Players, int MaxPlayers,
+        int Difficulty);
+    private bool _lanDiscoveryInitialized;
     private IReadOnlyList<FireteamServerListing> _communityServers = [];
 
     private void BuildServerBrowserView()
@@ -33,7 +39,7 @@ public sealed partial class MainWindow
         page.Children.Add(CardHeading(
             "SERVER BROWSER",
             "Community Servers",
-            "Halo CE-style fixed-grid list. Directory entries are not live: unknown population, ping and mod status are shown honestly until a server query protocol exists."));
+            "Nearby dedicated servers appear automatically on LAN. Internet listings still require an opt-in public directory; unknown ping or population is never fabricated."));
 
         var controls = new StackPanel
         {
@@ -58,10 +64,10 @@ public sealed partial class MainWindow
         ServerBrowserList.SelectionMode = ListViewSelectionMode.Single;
         ServerBrowserList.SelectionChanged += (sender, args) =>
         {
-            if(ServerBrowserList.SelectedItem is ListViewItem { Tag: FireteamServerListing entry })
+            if(ServerBrowserList.SelectedItem is ListViewItem { Tag: ServerBrowserRow selection })
             {
-                ServerBrowserName.Text = entry.Name;
-                ServerBrowserAddress.Text = entry.Address;
+                ServerBrowserName.Text = selection.Listing.Name;
+                ServerBrowserAddress.Text = selection.Listing.Address;
             }
         };
         page.Children.Add(ServerGridHeader());
@@ -115,13 +121,43 @@ public sealed partial class MainWindow
         RefreshServerBrowserList();
     }
 
+    private void StartLanServerDiscovery()
+    {
+        if(_lanDiscoveryInitialized) return;
+        _lanDiscoveryInitialized = true;
+        _lanDiscovery.Changed += () =>
+            DispatcherQueue.TryEnqueue(() => RefreshServerBrowserList());
+        _lanDiscovery.Start();
+        _lanRefreshTimer = DispatcherQueue.CreateTimer();
+        _lanRefreshTimer.Interval = TimeSpan.FromSeconds(3);
+        _lanRefreshTimer.Tick += (sender, args) => RefreshServerBrowserList();
+        _lanRefreshTimer.Start();
+        Closed += (sender, args) =>
+        {
+            _lanRefreshTimer.Stop();
+            _lanDiscovery.Dispose();
+        };
+        ServerBrowserStatus.Text = _lanDiscovery.IsListening
+            ? "Listening for automatic LAN hosts (UDP 27888). " +
+              "Internet servers still require curated listings or direct IP."
+            : "LAN discovery unavailable: " + _lanDiscovery.StartError +
+              ". Direct IP and saved favorites still work.";
+    }
+
     private void RefreshServerBrowserList()
     {
-        var entries = _serverDirectory.LoadFavorites()
+        var nearby = _lanDiscovery.Snapshot()
+            .Select(s => new ServerBrowserRow(
+                new FireteamServerListing(s.Name, s.Address, s.Map),
+                true, s.Players, s.MaxPlayers, s.Difficulty));
+        var saved = _serverDirectory.LoadFavorites()
             .Concat(_communityServers)
-            .GroupBy(entry => entry.Address, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .OrderBy(entry => entry.Name)
+            .Select(s => new ServerBrowserRow(s, false, 0, 0, 0));
+        var entries = nearby.Concat(saved)
+            .GroupBy(row => row.Listing.Address, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(item => item.IsLan).First())
+            .OrderByDescending(item => item.IsLan)
+            .ThenBy(item => item.Listing.Name)
             .ToList();
 
         ServerBrowserList.Items.Clear();
@@ -169,8 +205,11 @@ public sealed partial class MainWindow
         ServerColumns("SERVER NAME / ADDRESS", "MAP", "MODE", "PLAYERS",
                       "PING", "MODS", true);
 
-    private static Grid ServerGridRow(FireteamServerListing entry) =>
-        ServerColumns(entry.Name, entry.Map, "Survival", "—", "—", "Unknown", false);
+    private static Grid ServerGridRow(ServerBrowserRow row) =>
+        ServerColumns(row.Listing.Name, row.Listing.Map,
+            row.IsLan ? $"LAN • D{row.Difficulty}" : "Directory",
+            row.IsLan ? $"{row.Players}/{row.MaxPlayers}" : "—",
+            "—", row.IsLan ? "Base" : "Unknown", false);
 
     private async Task RefreshCommunityServersAsync()
     {
@@ -235,10 +274,10 @@ public sealed partial class MainWindow
             return;
         }
 
-        var selection = (ServerBrowserList.SelectedItem as ListViewItem)?.Tag as FireteamServerListing;
+        var selection = (ServerBrowserList.SelectedItem as ListViewItem)?.Tag as ServerBrowserRow;
         var map = selection is not null &&
-                  selection.Address.Equals(address, StringComparison.OrdinalIgnoreCase)
-            ? selection.Map
+                  selection.Listing.Address.Equals(address, StringComparison.OrdinalIgnoreCase)
+            ? selection.Listing.Map
             : MapCombo.SelectedItem?.ToString() ?? "CABINFEVER";
 
         try

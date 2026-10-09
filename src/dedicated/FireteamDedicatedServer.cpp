@@ -1,5 +1,7 @@
 // Standalone headless FIRETEAM host using the Jupiter ServerInterface.
 // No renderer, player client shell or NOLF2 ServerApp/MFC dependency.
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <server_interface.h>
 #include <ltbasedefs.h>
@@ -10,6 +12,126 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+// Minimal, opt-in-free LAN advertisements for the dedicated HOST only.
+// Broadcast packets stay inside the local network. This is NOT Internet
+// master-server registration and does not create router/NAT mappings.
+static const unsigned short kFtLanDiscoveryPort = 27888;
+class FireteamLanAdvertiser
+{
+public:
+    FireteamLanAdvertiser()
+        : m_Socket(INVALID_SOCKET), m_bWinsock(false),
+          m_LastAnnouncement(0), m_nInstance(0) { }
+
+    bool Open()
+    {
+        WSADATA data;
+        if(WSAStartup(MAKEWORD(2, 2), &data) != 0)
+            return false;
+        m_bWinsock = true;
+        m_Socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if(m_Socket == INVALID_SOCKET)
+            return false;
+        BOOL broadcast = TRUE;
+        if(setsockopt(m_Socket, SOL_SOCKET, SO_BROADCAST,
+                      (const char*)&broadcast, sizeof(broadcast)) != 0)
+            return false;
+        m_nInstance = ((ULONGLONG)GetCurrentProcessId() << 32) |
+                      (ULONGLONG)GetTickCount();
+        return true;
+    }
+
+    void Close()
+    {
+        if(m_Socket != INVALID_SOCKET)
+        {
+            closesocket(m_Socket);
+            m_Socket = INVALID_SOCKET;
+        }
+        if(m_bWinsock)
+        {
+            WSACleanup();
+            m_bWinsock = false;
+        }
+    }
+
+    // Called on the normal 15ms dedicated tick, but actually transmits
+    // once per 2s. Uses actual Jupiter GetNumClients (not an estimate).
+    void Update(ServerInterface *pServer, const char *pName,
+                const char *pMap, uint32 nGamePort, uint32 nMaxPlayers,
+                uint32 nDifficulty)
+    {
+        if(m_Socket == INVALID_SOCKET || !pServer)
+            return;
+        const ULONGLONG now = GetTickCount64();
+        if(m_LastAnnouncement && now - m_LastAnnouncement < 2000)
+            return;
+        m_LastAnnouncement = now;
+
+        char sCleanName[65];
+        size_t i = 0;
+        for(; i < sizeof(sCleanName) - 1 && pName && pName[i]; ++i)
+        {
+            char c = pName[i];
+            sCleanName[i] = (c == '|' || c == '\r' || c == '\n' ||
+                             (unsigned char)c < 32) ? ' ' : c;
+        }
+        sCleanName[i] = '\0';
+
+        int nClients = pServer->GetNumClients();
+        if(nClients < 0) nClients = 0;
+        if(nClients > (int)nMaxPlayers) nClients = (int)nMaxPlayers;
+
+        char packet[280];
+        // Delimited, bounded and versioned so the launcher can reject
+        // untrusted/malformed LAN packets. No passwords or personal data.
+        _snprintf(packet, sizeof(packet),
+                  "FTLAN1|%08lX%08lX|%u|%u|%d|%u|%s|%s",
+                  (unsigned long)(m_nInstance >> 32),
+                  (unsigned long)(m_nInstance & 0xffffffff),
+                  (unsigned)nGamePort, (unsigned)nMaxPlayers, nClients,
+                  (unsigned)nDifficulty, pMap, sCleanName);
+        packet[sizeof(packet) - 1] = '\0';
+
+        sockaddr_in address;
+        memset(&address, 0, sizeof(address));
+        address.sin_family = AF_INET;
+        address.sin_port = htons(kFtLanDiscoveryPort);
+        address.sin_addr.s_addr = INADDR_BROADCAST;
+        sendto(m_Socket, packet, (int)strlen(packet), 0,
+               (sockaddr*)&address, sizeof(address));
+
+        // Broadcast may not loop back on the hosting PC: announce to its
+        // local launcher explicitly without needing an Internet path.
+        address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        sendto(m_Socket, packet, (int)strlen(packet), 0,
+               (sockaddr*)&address, sizeof(address));
+    }
+
+private:
+    SOCKET m_Socket;
+    bool m_bWinsock;
+    ULONGLONG m_LastAnnouncement;
+    ULONGLONG m_nInstance;
+};
+
+static unsigned ReadLanDifficulty()
+{
+    FILE *pFile = fopen("config/session.cfg", "rt");
+    if(!pFile) return 4;
+    unsigned nDifficulty = 4;
+    char line[160];
+    while(fgets(line, sizeof(line), pFile))
+    {
+        unsigned nRead = 0;
+        if(sscanf(line, "difficulty=%u", &nRead) == 1 &&
+           nRead >= 1 && nRead <= 10)
+            nDifficulty = nRead;
+    }
+    fclose(pFile);
+    return nDifficulty;
+}
 
 static volatile LONG s_nStopRequested = 0;
 
@@ -287,6 +409,13 @@ int main(int argc, char **argv)
         printf("Local client test: 127.0.0.1:%u\n", (unsigned)nPort);
         puts("Use Ctrl+C to shut down.");
 
+        FireteamLanAdvertiser lanAdvertiser;
+        if(lanAdvertiser.Open())
+            puts("FIRETEAM LAN discovery: advertising to launchers on UDP 27888.");
+        else
+            puts("[WARN] LAN discovery unavailable; direct IP still works.");
+        const unsigned lanDifficulty = ReadLanDifficulty();
+
         SetConsoleCtrlHandler(OnConsoleControl, TRUE);
         while(InterlockedCompareExchange(&s_nStopRequested, 0, 0) == 0)
         {
@@ -298,6 +427,8 @@ int main(int argc, char **argv)
                 bReady = false;
                 break;
             }
+            lanAdvertiser.Update(pServer, sName, sMap, nPort,
+                                 nMaxPlayers, lanDifficulty);
             // Launcher requests graceful shutdown through a local file.
             // The server checks it on its normal update loop; no forced kill.
             if(GetFileAttributesA("data\\server-stop.request") != INVALID_FILE_ATTRIBUTES)
@@ -309,6 +440,7 @@ int main(int argc, char **argv)
             Sleep(15);
         }
         SetConsoleCtrlHandler(OnConsoleControl, FALSE);
+        lanAdvertiser.Close();
     } while(false);
 
     pServer->SetAppHandler(NULL);

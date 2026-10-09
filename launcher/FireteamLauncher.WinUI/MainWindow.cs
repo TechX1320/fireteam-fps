@@ -179,6 +179,7 @@ public sealed partial class MainWindow : Window
             "MainWindow tool paths refreshed.");
 
         ShowView("home");
+        StartLanServerDiscovery();
         StartupDiagnostics.Write(
             "MainWindow constructor completed.");
     }
