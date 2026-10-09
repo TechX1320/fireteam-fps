@@ -178,6 +178,9 @@ private:
     void                UpdateHazards();
     void                UpdatePowerups();
     void                SendPowerupState();
+    void                TracePrimaryPellet(
+        const FTWeaponDef &def, const LTVector &vFrom,
+        const LTVector &vDir, bool bLogMiss, uint32 &nFeedbackSent);
     void                SendCombatFeedback(uint8 nFeedback, const LTVector *pWorldHit = LTNULL);
 
 private:

@@ -10,6 +10,7 @@ public sealed class WeaponCatalogService
     [
         "id", "name", "type",
         "clip", "reserve", "damage",
+        "ca_vectors_per_round", "pellets", "pellet_spread",
         "fire_interval", "range",
         "effect_range0", "effect_range1", "effect_range2",
         "damage_mult0", "damage_mult1", "damage_mult2",

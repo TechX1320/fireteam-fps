@@ -31,6 +31,7 @@
 #include "statsmanager.h"
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 #include "FireteamPoisonGas.h"
 #include "FireteamExplosiveProjectile.h"
 #include "FireteamDifficultyDefs.h"
@@ -2010,6 +2011,57 @@ void CPlayerSrvr::FirePrimary(
         return;
     }
 
+    // Imported CA shotgun metadata supplies 6 or 8 vectors per trigger.
+    // All rays are server-authoritative. The center pellet is straight and
+    // the remaining pellets form a rotating cone: close-range clusters do
+    // more damage, while spread and falloff lower long-range effectiveness.
+    uint32 nPellets = pDef->nPellets;
+    if(nPellets == 0) nPellets = 1;
+    if(nPellets > 12) nPellets = 12;
+    const float fShotRotation =
+        ((float)rand() / (float)RAND_MAX) * 6.2831853f;
+    uint32 nFeedbackSent = 0;
+
+    for(uint32 nPellet = 0; nPellet < nPellets; ++nPellet)
+    {
+        LTVector vPelletDir = vDir;
+        if(nPellets > 1 && nPellet > 0)
+        {
+            LTVector vRight(-vDir.z, 0.0f, vDir.x);
+            if(vRight.MagSqr() < 0.0001f)
+                vRight.Init(1.0f, 0.0f, 0.0f);
+            else
+                vRight.Normalize();
+
+            // Camera-relative up vector, including steep look angles.
+            LTVector vUp(
+                vRight.y * vDir.z - vRight.z * vDir.y,
+                vRight.z * vDir.x - vRight.x * vDir.z,
+                vRight.x * vDir.y - vRight.y * vDir.x);
+            if(vUp.MagSqr() < 0.0001f)
+                vUp.Init(0.0f, 1.0f, 0.0f);
+            else
+                vUp.Normalize();
+
+            const float fAngle = fShotRotation +
+                (float)(nPellet - 1) * 6.2831853f / (float)(nPellets - 1);
+            const float fCone = pDef->fPelletSpread;
+            vPelletDir += vRight * (cosf(fAngle) * fCone);
+            vPelletDir += vUp * (sinf(fAngle) * fCone);
+            vPelletDir.Normalize();
+        }
+        TracePrimaryPellet(*pDef, vServerFrom, vPelletDir,
+                           nPellet == 0, nFeedbackSent);
+    }
+}
+
+// Penetration, hit-region multipliers, obstacles and friendly-fire behavior
+// remain the same as the previous proven single-ray implementation.
+void CPlayerSrvr::TracePrimaryPellet(
+    const FTWeaponDef &def, const LTVector &vServerFrom,
+    const LTVector &vDir, bool bLogMiss, uint32 &nFeedbackSent)
+{
+    const FTWeaponDef *pDef = &def;
     FTFireFilterData filterData;
     filterData.hPlayer = m_hObject;
     filterData.hWeapon = m_hClub;
@@ -2058,7 +2110,7 @@ void CPlayerSrvr::FirePrimary(
             &query,
             &info))
         {
-            if(nPass == 0)
+            if(nPass == 0 && bLogMiss)
             {
                 g_pLTServer->CPrint(
                     "Fireteam weapon: %s no hit (%u/%u)",
@@ -2199,7 +2251,11 @@ void CPlayerSrvr::FirePrimary(
                 // pellet/projectile hits or a client-reported hit marker.
                 ++m_nConfirmedHits;
                 // Shooter-only marker after server collision and damage delivery.
-                SendCombatFeedback(FT_COMBAT_FEEDBACK_HIT, &info.m_Point);
+                if(nFeedbackSent < 2)
+                {
+                    SendCombatFeedback(FT_COMBAT_FEEDBACK_HIT, &info.m_Point);
+                    ++nFeedbackSent;
+                }
 
                 g_pLTServer->CPrint(
                     "Fireteam weapon: %s infected hit region=%s damage=%u distance=%.1f penetrations=%u",

@@ -27,6 +27,8 @@ struct FTWeaponDef
     uint16 nClipSize;
     uint16 nStartReserve;
     uint8  nDamage;
+    uint8  nPellets;     // One trigger pull -> N rays for a CA shotgun.
+    float fPelletSpread; // Angle as an orthogonal direction offset.
 
     float fFireInterval;
     float fRange;
@@ -146,6 +148,8 @@ inline void FT_InitWeaponDef(FTWeaponDef &def, uint8 nSlot)
 {
     memset(&def, 0, sizeof(FTWeaponDef));
     def.nSlot = nSlot;
+    def.nPellets = 1;
+    def.fPelletSpread = 0.105f;
     def.fProjectileScale = 1.0f;
     def.fViewScale = 1.0f;
     def.fPenetrationDamageMult = 1.0f;
@@ -175,6 +179,18 @@ inline void FT_AssignWeaponField(
     else if(_stricmp(pKey, "clip") == 0) def.nClipSize = (uint16)atoi(pValue);
     else if(_stricmp(pKey, "reserve") == 0) def.nStartReserve = (uint16)atoi(pValue);
     else if(_stricmp(pKey, "damage") == 0) def.nDamage = (uint8)atoi(pValue);
+    else if(_stricmp(pKey, "ca_vectors_per_round") == 0 ||
+            _stricmp(pKey, "pellets") == 0)
+    {
+        const int n = atoi(pValue);
+        if(n >= 1 && n <= 12) def.nPellets = (uint8)n;
+    }
+    else if(_stricmp(pKey, "pellet_spread") == 0)
+    {
+        const float fSpread = (float)atof(pValue);
+        if(fSpread >= 0.0f && fSpread <= 0.40f)
+            def.fPelletSpread = fSpread;
+    }
     else if(_stricmp(pKey, "fire_interval") == 0) def.fFireInterval = (float)atof(pValue);
     else if(_stricmp(pKey, "range") == 0) def.fRange = (float)atof(pValue);
     else if(_stricmp(pKey, "effect_range0") == 0) def.fEffectRange0 = (float)atof(pValue);
