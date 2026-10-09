@@ -191,6 +191,65 @@ FireteamZombie::~FireteamZombie()
     }
 }
 
+bool FireteamZombie::ConfigureInfectedVariant(const char *pSection)
+{
+    if(!pSection || !pSection[0])
+        return false;
+
+    FTInfectedDef variant;
+    FT_InitInfectedDef(variant);
+    if(!FT_LoadInfectedSection(
+           "config/infected.cfg", pSection, variant) ||
+       !FT_LoadInfectedSection(
+           "config/characters.cfg", pSection, variant) ||
+       !variant.sId[0] ||
+       !variant.sBodyModel[0] ||
+       !variant.sAnimationModel[0] ||
+       variant.nHealth == 0 ||
+       variant.fRunSpeed <= 0.0f)
+    {
+        g_pLTServer->CPrint(
+            "Fireteam infected: variant '%s' incomplete; using normal.",
+            pSection);
+        return false;
+    }
+
+    // The constructor already loaded the common difficulty profile. Apply
+    // exactly the same scaling to the selected special before PRECREATE
+    // sends its own body, skins and animation child to Jupiter.
+    m_Def = variant;
+    m_bDefLoaded = true;
+
+    float fHealth = (float)m_Def.nHealth *
+        s_ZombieDifficulty.fHealthMultiplier;
+    if(fHealth < 1.0f) fHealth = 1.0f;
+    if(fHealth > 65535.0f) fHealth = 65535.0f;
+    m_nHealth = (uint16)(fHealth + 0.5f);
+
+    m_Def.fRunSpeed *= s_ZombieDifficulty.fSpeedMultiplier;
+    if(m_Def.fWalkSpeed <= 0.0f)
+        m_Def.fWalkSpeed = m_Def.fRunSpeed * 0.52f;
+    else
+        m_Def.fWalkSpeed *= s_ZombieDifficulty.fSpeedMultiplier;
+
+    if(m_Def.fAlertDistance <= 0.0f)
+        m_Def.fAlertDistance = 300.0f;
+    if(m_Def.fTargetMemorySeconds <= 0.0f)
+        m_Def.fTargetMemorySeconds = 3.5f;
+
+    float fDamage = (float)m_Def.nAttackDamage *
+        s_ZombieDifficulty.fDamageMultiplier;
+    if(fDamage < 1.0f) fDamage = 1.0f;
+    if(fDamage > 255.0f) fDamage = 255.0f;
+    m_Def.nAttackDamage = (uint8)(fDamage + 0.5f);
+
+    g_pLTServer->CPrint(
+        "Fireteam infected: special %s health=%u run=%.1f damage=%u.",
+        m_Def.sId, (unsigned)m_nHealth,
+        m_Def.fRunSpeed, (unsigned)m_Def.nAttackDamage);
+    return true;
+}
+
 static bool FT_ZombieAssetExists(const char *pPath)
 {
     FILE *pFile = fopen(pPath, "rb");
@@ -2353,6 +2412,14 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
             ObjectCreateStruct *pOCS = (ObjectCreateStruct*)pData;
             if(pOCS)
             {
+                // Spawn kind is passed before CreateObject/MID_PRECREATE via
+                // ObjectCreateStruct::m_Name, not changed after the model
+                // has already been created and replicated to clients.
+                if(_stricmp(pOCS->m_Name, "FT_ASSASSIN") == 0)
+                    ConfigureInfectedVariant("infected_assassin");
+                else if(_stricmp(pOCS->m_Name, "FT_TANKER") == 0)
+                    ConfigureInfectedVariant("infected_tanker");
+
                 pOCS->m_ObjectType = OT_MODEL;
                 pOCS->m_Flags |= FLAG_SOLID | FLAG_VISIBLE | FLAG_GRAVITY |
                                  FLAG_STAIRSTEP | FLAG_YROTATION |
@@ -2400,6 +2467,13 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                         pOCS->m_SkinNames[1],
                         MAX_CS_FILENAME_LEN,
                         m_Def.sBodyTexture1);
+                    if(m_Def.sBodyTexture2[0])
+                    {
+                        FT_CopyInfectedString(
+                            pOCS->m_SkinNames[2],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sBodyTexture2);
+                    }
 
                     if(m_Def.sBodyRenderStyle0[0])
                     {
@@ -2513,6 +2587,13 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                     modelOCS.m_SkinNames[1],
                     MAX_CS_FILENAME_LEN,
                     m_Def.sBodyTexture1);
+                if(m_Def.sBodyTexture2[0])
+                {
+                    FT_CopyInfectedString(
+                        modelOCS.m_SkinNames[2],
+                        MAX_CS_FILENAME_LEN,
+                        m_Def.sBodyTexture2);
+                }
 
                 if(m_Def.sBodyRenderStyle0[0])
                 {
