@@ -626,9 +626,20 @@ void FireteamZombie::PlayVoiceSound(
     HLTSOUND hSound =
         LTNULL;
 
-    g_pLTServer->SoundMgr()->PlaySound(
+    const LTRESULT nSound = g_pLTServer->SoundMgr()->PlaySound(
         &soundInfo,
         hSound);
+    if(nSound != LT_OK)
+    {
+        static bool s_bWarnedMissingVoice = false;
+        if(!s_bWarnedMissingVoice)
+        {
+            s_bWarnedMissingVoice = true;
+            g_pLTServer->CPrint(
+                "Fireteam infected audio: PlaySound failed for %s (error %d). Verify SND.zip voice paths in staged rez.",
+                sSound, (int)nSound);
+        }
+    }
 }
 
 void FireteamZombie::PlayAttackVoice()
