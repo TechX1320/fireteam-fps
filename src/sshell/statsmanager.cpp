@@ -171,6 +171,23 @@ bool StatsManager::SaveMatchSnapshot(
 {
     if(!GetNumPlayers() || nRound == 0)
         return false;
+
+    // Dedicated hosts may turn off local match recording explicitly.
+    // Missing setting preserves the existing enabled-by-default behavior.
+    FILE *pStatsConfig = fopen("config/session.cfg", "rt");
+    if(pStatsConfig)
+    {
+        char sStatsLine[256];
+        bool bDisabled = false;
+        while(fgets(sStatsLine, sizeof(sStatsLine), pStatsConfig))
+        {
+            int nEnabled = 1;
+            if(sscanf(sStatsLine, "stats_enabled=%d", &nEnabled) == 1)
+                bDisabled = nEnabled == 0;
+        }
+        fclose(pStatsConfig);
+        if(bDisabled) return false;
+    }
     if(m_bMatchFinalized)
         return false;
     if(!m_sMatchId[0])
