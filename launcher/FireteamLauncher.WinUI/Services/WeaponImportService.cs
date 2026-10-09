@@ -161,10 +161,9 @@ public sealed class WeaponImportService
                 "weapons.cfg");
 
         var configPath =
-            configPaths.Source ??
             configPaths.Runtime ??
             throw new FileNotFoundException(
-                "Could not locate config\\weapons.cfg.");
+                "Build FIRETEAM first. Weapon import must not modify repository source.");
 
         var sections =
             ParseSections(
@@ -1309,21 +1308,12 @@ public sealed class WeaponImportService
         FireteamConfigDocument doc,
         (string? Source, string? Runtime) paths)
     {
-        if(paths.Source is not null)
-        {
-            doc.Save(
-                paths.Source);
-        }
-
-        if(paths.Runtime is not null &&
-           !string.Equals(
-               paths.Runtime,
-               paths.Source,
-               StringComparison.OrdinalIgnoreCase))
-        {
-            doc.Save(
-                paths.Runtime);
-        }
+        // Import only into the working build. Promotion to GitHub source is
+        // a separate, explicit scripts/sync-local-config.ps1 operation.
+        if(paths.Runtime is null)
+            throw new FileNotFoundException(
+                "Build FIRETEAM first; repository catalog is read-only.");
+        doc.Save(paths.Runtime);
     }
 
     private static void ReportImportProgress(
