@@ -518,6 +518,12 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
 
             const float fTraceNow =
                 g_pLTServer->GetTime();
+            if(fTraceNow >= m_fNextRadarTime)
+            {
+                // Two snapshots/sec; unreliable and disposable, no queue buildup.
+                m_fNextRadarTime = fTraceNow + 0.5f;
+                SendRadarSnapshot();
+            }
 
             if(fTraceNow >=
                m_fNextPositionTrace)
@@ -1288,6 +1294,119 @@ void CPlayerSrvr::SetClubID()
 //-----------------------------------------------------------------------------
 // Reconnection keeps the original authoritative state, including damage
 // and a pending 5s respawn. A client only sends a random lookup capability.
+// The HUD needs no proprietary Combat Arms texture or raw enemy world
+// coordinates. A 2Hz short-radius, quantized per-player snapshot gives the
+// client only the dots that belong on its radar.
+void CPlayerSrvr::SendRadarSnapshot()
+{
+    if(!m_hClient || !m_bResumeVerified || !m_hObject)
+        return;
+
+    enum { kRadarCapacity = 64 };
+    struct FTRadarPoint
+    {
+        uint8 nType;
+        int8 nX, nY;
+        float fDistanceSq;
+    };
+    FTRadarPoint points[kRadarCapacity];
+    uint8 nCount = 0;
+    uint8 nTeammates = 0;
+    const float fRange = 1150.0f;
+    const float fRangeSq = fRange * fRange;
+    LTVector vSelf;
+    LTRotation rSelf;
+    g_pLTServer->GetObjectPos(m_hObject, &vSelf);
+    g_pLTServer->GetObjectRotation(m_hObject, &rSelf);
+    LTVector vForward = rSelf.Forward();
+    vForward.y = 0.0f;
+    if(vForward.MagSqr() < 0.001f)
+        vForward.Init(0.0f, 0.0f, 1.0f);
+    vForward.Normalize();
+    const LTVector vRight(vForward.z, 0.0f, -vForward.x);
+
+    const HCLASS hPlayer = g_pLTServer->GetClass("CPlayerSrvr");
+    const HCLASS hZombie = g_pLTServer->GetClass("FireteamZombie");
+    for(uint32 nPass = 0; nPass < 2; ++nPass)
+    {
+        for(HOBJECT hObj = g_pLTServer->GetNextObject(LTNULL);
+            hObj; hObj = g_pLTServer->GetNextObject(hObj))
+        {
+            if(hObj == m_hObject) continue;
+            const HCLASS hType = g_pLTServer->GetObjectClass(hObj);
+            if(!hType) continue;
+            uint8 nMarker = 0;
+            if(nPass == 0 && hPlayer &&
+               g_pLTServer->IsKindOf(hType, hPlayer))
+            {
+                CPlayerSrvr *pOther = (CPlayerSrvr*)
+                    g_pLTServer->HandleToObject(hObj);
+                if(pOther && pOther->IsTargetable())
+                    nMarker = 1; // teammate
+            }
+            else if(nPass == 1 && hZombie &&
+                    g_pLTServer->IsKindOf(hType, hZombie))
+            {
+                FireteamZombie *pZombie = (FireteamZombie*)
+                    g_pLTServer->HandleToObject(hObj);
+                if(pZombie && pZombie->IsAliveForRound())
+                {
+                    const char *pId = pZombie->GetInfectedTypeId();
+                    nMarker = (pId && strstr(pId, "tanker")) ? 3 :
+                              (pId && strstr(pId, "assassin")) ? 4 : 2;
+                }
+            }
+            if(nMarker == 0) continue;
+            LTVector vObj;
+            g_pLTServer->GetObjectPos(hObj, &vObj);
+            const LTVector diff = vObj - vSelf;
+            if(diff.y < -170.0f || diff.y > 170.0f) continue;
+            const float fLocalX = diff.Dot(vRight);
+            const float fLocalY = diff.Dot(vForward);
+            const float fDistanceSq = fLocalX * fLocalX +
+                                      fLocalY * fLocalY;
+            if(fDistanceSq > fRangeSq) continue;
+
+            FTRadarPoint point;
+            point.nType = nMarker;
+            point.fDistanceSq = fDistanceSq;
+            point.nX = (int8)(fLocalX * 115.0f / fRange);
+            point.nY = (int8)(fLocalY * 115.0f / fRange);
+            if(nCount < kRadarCapacity)
+            {
+                points[nCount++] = point;
+            }
+            else if(nPass == 1)
+            {
+                // Prioritize all teammates, then the nearest infected.
+                uint32 nFurthest = nTeammates;
+                for(uint32 k = nTeammates + 1; k < kRadarCapacity; ++k)
+                    if(points[k].fDistanceSq >
+                       points[nFurthest].fDistanceSq)
+                        nFurthest = k;
+                if(point.fDistanceSq < points[nFurthest].fDistanceSq)
+                    points[nFurthest] = point;
+            }
+        }
+        if(nPass == 0) nTeammates = nCount;
+    }
+
+    ILTMessage_Write *pMsg = LTNULL;
+    if(g_pLTSCommon->CreateMessage(pMsg) != LT_OK || !pMsg)
+        return;
+    pMsg->IncRef();
+    pMsg->Writeuint8(MSG_SC_RADAR);
+    pMsg->Writeuint8(nCount);
+    for(uint8 n = 0; n < nCount; ++n)
+    {
+        pMsg->Writeuint8(points[n].nType);
+        pMsg->Writeint8(points[n].nX);
+        pMsg->Writeint8(points[n].nY);
+    }
+    g_pLTServer->SendToClient(pMsg->Read(), m_hClient, 0);
+    pMsg->DecRef();
+}
+
 void CPlayerSrvr::SendWaitingStatus(bool bWait)
 {
     if(!m_hClient) return;
