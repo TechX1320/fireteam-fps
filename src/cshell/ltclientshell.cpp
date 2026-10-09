@@ -45,6 +45,10 @@
 #include <iltsoundmgr.h>
 #include <iltcommon.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <direct.h>
+#include <bcrypt.h>
 
 #define DEFAULT_GRAVITY     -2000.0f
 
@@ -2285,6 +2289,90 @@ void CLTClientShell::SendSpectatorViewPosition()
 
 
 //-----------------------------------------------------------------------------
+// Persistent, locally generated random reconnect capability.
+// No username/IP-based resurrection and no client-provided HP or lives.
+static bool FT_GetReconnectTicket(const char *pName, char result[33])
+{
+    if(!result) return false;
+    result[0] = '\0';
+
+    char safe[20];
+    uint32 j = 0;
+    for(uint32 i = 0; pName && pName[i] && j < 15; ++i)
+    {
+        const unsigned char c = (unsigned char)pName[i];
+        if((c >= 'a' && c <= 'z') ||
+           (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') || c == '_' || c == '-')
+            safe[j++] = (char)c;
+        else if(c == ' ')
+            safe[j++] = '_';
+    }
+    if(!j) strcpy(safe, "Player");
+    else safe[j] = '\0';
+
+    char directory[MAX_PATH];
+    const DWORD size = GetEnvironmentVariableA(
+        "LOCALAPPDATA", directory, sizeof(directory));
+    if(size == 0 || size >= sizeof(directory))
+        return false; // No durable ticket means no reconnect claim.
+    if(strlen(directory) + 32 + strlen(safe) >= MAX_PATH)
+        return false;
+    strcat(directory, "\\FIRETEAM");
+    _mkdir(directory);
+
+    char path[MAX_PATH];
+    _snprintf(path, sizeof(path), "%s\\reconnect-%s.token", directory, safe);
+    path[sizeof(path) - 1] = '\0';
+
+    FILE *pSaved = fopen(path, "rt");
+    if(pSaved)
+    {
+        char cached[48] = "";
+        const bool bRead = fgets(cached, sizeof(cached), pSaved) != NULL;
+        fclose(pSaved);
+        if(bRead && strlen(cached) >= 32)
+        {
+            bool bValid = true;
+            for(uint32 n = 0; n < 32; ++n)
+            {
+                const char c = cached[n];
+                if(!((c >= '0' && c <= '9') ||
+                     (c >= 'a' && c <= 'f') ||
+                     (c >= 'A' && c <= 'F')))
+                    bValid = false;
+            }
+            if(bValid &&
+               (cached[32] == '\0' || cached[32] == '\r' ||
+                cached[32] == '\n'))
+            {
+                memcpy(result, cached, 32);
+                result[32] = '\0';
+                return true;
+            }
+        }
+    }
+
+    unsigned char randomBytes[16];
+    if(BCryptGenRandom(NULL, randomBytes, sizeof(randomBytes),
+                       BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0)
+        return false;
+    static const char hex[] = "0123456789abcdef";
+    for(uint32 i = 0; i < sizeof(randomBytes); ++i)
+    {
+        result[2*i] = hex[randomBytes[i] >> 4];
+        result[2*i+1] = hex[randomBytes[i] & 15];
+    }
+    result[32] = '\0';
+
+    FILE *pOutput = fopen(path, "wt");
+    if(!pOutput) return false;
+    const bool bWritten = fwrite(result, 1, 32, pOutput) == 32 &&
+                          fputc('\n', pOutput) != EOF;
+    const bool bClosed = fclose(pOutput) == 0;
+    return bWritten && bClosed;
+}
+
 void CLTClientShell::SendPlayerName()
 {
     ILTMessage_Write *pMessage;
@@ -2339,6 +2427,15 @@ void CLTClientShell::SendPlayerName()
         pMessage->Writeuint8(
             MSG_CS_PLAYERNAME);
         pMessage->WriteString(szName);
+        char ticket[33];
+        if(!FT_GetReconnectTicket(szName, ticket))
+        {
+            g_pLTClient->CPrint(
+                "FIRETEAM: unable to create durable reconnect identity in LocalAppData.");
+            pMessage->DecRef();
+            return;
+        }
+        pMessage->WriteString(ticket);
         g_pLTClient->SendToServer(
             pMessage->Read(),
             MESSAGE_GUARANTEED);
