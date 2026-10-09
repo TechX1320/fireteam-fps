@@ -1428,8 +1428,10 @@ void CPlayerSrvr::RestoreResumeState(
             m_nWeaponAmmoReserve[slot] = state.aReserve[slot];
         }
     }
-    m_vSpawnPos = state.vPosition;
-    m_rSpawnRot = state.rRotation;
+    // Restore the original safe respawn anchor separately from where the
+    // player disconnected, or dying after reconnect would spawn at the quit spot.
+    m_vSpawnPos = state.vRespawnAnchor;
+    m_rSpawnRot = state.rRespawnAnchor;
     g_pLTServer->TeleportObject(m_hObject, &state.vPosition);
     g_pLTServer->SetObjectRotation(m_hObject, &state.rRotation);
     if(m_bWaitingNextRound)
