@@ -532,6 +532,15 @@ if($charZipName) {
     Extract-OptionalZipEntry $charZipName "CHARS_M_BODY/ANI_VI_ASSASSIN_CH.LTB" "Characters\infected\body\ANI_VI_ASSASSIN_CH.LTB" | Out-Null
     Extract-OptionalZipEntry $charZipName "CHARS_M_BODY/VIM_F_NM_DF_TANKER_SH.LTB" "Characters\infected\body\VIM_F_NM_DF_TANKER_SH.LTB" | Out-Null
     Extract-OptionalZipEntry $charZipName "CHARS_M_BODY/ANI_VI_TANKER_SH.LTB" "Characters\infected\body\ANI_VI_TANKER_SH.LTB" | Out-Null
+
+    # Verified from the local Chars_Files_Updated.zip central directory.
+    # These are the actual CA Assassin/Tanker material files, not guessed
+    # model-name-to-DTX substitutions. Keep proprietary bytes ignored.
+    Extract-OptionalZipEntry $charZipName "CHARS_T_BODY/CW_VST_ASSAVIRUS_HM.DTX" "Characters\infected\body\CW_VST_ASSAVIRUS_HM.DTX" | Out-Null
+    Extract-OptionalZipEntry $charZipName "CHARS_T_BODY/CW_LG_ASSAVIRUS_HM.DTX" "Characters\infected\body\CW_LG_ASSAVIRUS_HM.DTX" | Out-Null
+    Extract-OptionalZipEntry $charZipName "CHARS_T_BODY/CM_VST_TANKERBLUE_YK.DTX" "Characters\infected\body\CM_VST_TANKERBLUE_YK.DTX" | Out-Null
+    Extract-OptionalZipEntry $charZipName "CHARS_T_BODY/CM_LG_TANKERBLUE_YK.DTX" "Characters\infected\body\CM_LG_TANKERBLUE_YK.DTX" | Out-Null
+    Extract-OptionalZipEntry $charZipName "CHARS_T_BODY/CM_FC_TANKERBLUE_YK.DTX" "Characters\infected\body\CM_FC_TANKERBLUE_YK.DTX" | Out-Null
 } else {
     Write-Host "[SKIP] No supported Combat Arms character archive found."
 }
