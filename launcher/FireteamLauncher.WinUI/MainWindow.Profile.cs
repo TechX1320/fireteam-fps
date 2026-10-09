@@ -92,6 +92,9 @@ public sealed partial class MainWindow
     private void RefreshPlayerProfile()
     {
         var playerName = (PlayerNameBox.Text ?? string.Empty).Trim();
+        // The current multiplayer player-name packet is limited to 31 chars.
+        if(playerName.Length > 31)
+            playerName = playerName[..31];
         if(playerName.Length == 0)
         {
             PlayerProfileStatus.Text = "Enter your player name on HOME first.";
@@ -155,7 +158,8 @@ public sealed partial class MainWindow
                        players.ValueKind != JsonValueKind.Array)
                         continue;
                     if(match.TryGetProperty("status", out var status) &&
-                       status.GetString() != "completed")
+                       (status.ValueKind != JsonValueKind.String ||
+                        status.GetString() != "completed"))
                         continue;
 
                     var identity = match.TryGetProperty("matchId", out var id) &&
@@ -167,6 +171,7 @@ public sealed partial class MainWindow
                     foreach(var player in players.EnumerateArray())
                     {
                         if(!player.TryGetProperty("name", out var name) ||
+                           name.ValueKind != JsonValueKind.String ||
                            !string.Equals(name.GetString(), playerName,
                                StringComparison.OrdinalIgnoreCase))
                             continue;
