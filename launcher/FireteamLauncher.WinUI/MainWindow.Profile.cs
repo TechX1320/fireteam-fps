@@ -14,57 +14,191 @@ namespace FireteamLauncher;
 public sealed partial class MainWindow
 {
     private readonly ScrollViewer PlayerProfileView = new();
-    private readonly TextBlock PlayerProfileTotals = new();
-    private readonly TextBlock PlayerProfileBreakdown = new();
+    private readonly TextBlock PlayerProfileIdentity = new();
     private readonly TextBlock PlayerProfileStatus = new();
+    private readonly StackPanel PlayerProfileRows = new();
 
+    // Inspired by Minecraft's statistics screen: a compact label/value grid
+    // with consistent right-aligned values, instead of giant monospaced blocks.
     private void BuildPlayerProfileView()
     {
-        PlayerProfileView.VerticalScrollBarVisibility =
-            ScrollBarVisibility.Auto;
-        PlayerProfileView.HorizontalScrollBarVisibility =
-            ScrollBarVisibility.Disabled;
+        PlayerProfileView.Visibility = Visibility.Collapsed;
+        PlayerProfileView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+        PlayerProfileView.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
 
-        var page = NewPagePanel(
-            "PLAYER HISTORY",
-            "Player Profile",
-            "Local-first stats for the selected username. No login or central database required.");
-
-        page.Children.Add(CardHeading(
-            "IDENTITY",
-            "Your match history",
-            "The launcher reads periodic checkpoints and final match records, so interrupted games still count toward your local history. Usernames are not authenticated identities."));
-
-        var controls = new StackPanel
+        var page = new StackPanel
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 14
+            Spacing = 12,
+            Margin = new Thickness(24, 16, 24, 32),
+            MaxWidth = 1000,
+            HorizontalAlignment = HorizontalAlignment.Center
         };
-        var refresh = PrimaryButton("REFRESH STATS");
+
+        var toolbar = new Grid { ColumnSpacing = 14 };
+        toolbar.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star)
+        });
+        toolbar.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto
+        });
+
+        PlayerProfileIdentity.Text = "LOCAL MATCH STATISTICS";
+        PlayerProfileIdentity.Foreground = PrimaryTextBrush;
+        PlayerProfileIdentity.FontSize = 18;
+        PlayerProfileIdentity.FontFamily = new FontFamily("Bahnschrift SemiCondensed");
+        PlayerProfileIdentity.VerticalAlignment = VerticalAlignment.Center;
+        toolbar.Children.Add(PlayerProfileIdentity);
+
+        var refresh = SecondaryButton("REFRESH");
         refresh.Click += (sender, args) => RefreshPlayerProfile();
-        controls.Children.Add(refresh);
+        Grid.SetColumn(refresh, 1);
+        toolbar.Children.Add(refresh);
+        page.Children.Add(toolbar);
+
         PlayerProfileStatus.Foreground = SecondaryTextBrush;
+        PlayerProfileStatus.FontSize = 12;
         PlayerProfileStatus.TextWrapping = TextWrapping.Wrap;
-        PlayerProfileStatus.VerticalAlignment = VerticalAlignment.Center;
-        controls.Children.Add(PlayerProfileStatus);
-        page.Children.Add(controls);
+        page.Children.Add(PlayerProfileStatus);
 
-        PlayerProfileTotals.FontFamily = new FontFamily("Bahnschrift SemiCondensed");
-        PlayerProfileTotals.FontSize = 23;
-        PlayerProfileTotals.Foreground = PrimaryTextBrush;
-        PlayerProfileTotals.TextWrapping = TextWrapping.Wrap;
-        page.Children.Add(Card(PlayerProfileTotals));
-
-        PlayerProfileBreakdown.FontFamily =
-            new FontFamily("Bahnschrift SemiCondensed");
-        PlayerProfileBreakdown.FontSize = 17;
-        PlayerProfileBreakdown.Foreground = PrimaryTextBrush;
-        PlayerProfileBreakdown.TextWrapping = TextWrapping.Wrap;
-        page.Children.Add(Card(PlayerProfileBreakdown));
-
+        PlayerProfileRows.Spacing = 14;
+        page.Children.Add(PlayerProfileRows);
         PlayerProfileView.Content = page;
-        PlayerProfileTotals.Text = "Play a match to start building your stats.";
-        PlayerProfileBreakdown.Text = "Kills by zombie type, favorite weapons and power-up history will appear here.";
+        ShowProfileEmpty(
+            "No local matches found yet.",
+            "Play for at least 15 seconds to create your first checkpoint.");
+    }
+
+    private void ShowProfileEmpty(string summary, string instructions)
+    {
+        PlayerProfileRows.Children.Clear();
+        AddProfileSection("LOCAL HISTORY", new[]
+        {
+            (Label: summary, Value: "—"),
+            (Label: instructions, Value: "")
+        });
+    }
+
+    private static string ProfileDisplayName(string id)
+    {
+        var cleaned = (id ?? "").Replace('_', ' ').Replace('-', ' ').Trim();
+        if(cleaned.Length == 0) return "Unknown";
+        return System.Globalization.CultureInfo.InvariantCulture.TextInfo
+            .ToTitleCase(cleaned.ToLowerInvariant());
+    }
+
+    private void AddProfileSection(
+        string section, IEnumerable<(string Label, string Value)> values)
+    {
+        var table = new StackPanel { Spacing = 0 };
+
+        var header = new Grid { Padding = new Thickness(15, 10, 15, 10) };
+        header.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star)
+        });
+        header.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto
+        });
+
+        var sectionLabel = new TextBlock
+        {
+            Text = section,
+            FontFamily = new FontFamily("Bahnschrift SemiCondensed"),
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            FontSize = 13,
+            Foreground = CyanBrush
+        };
+        var totalLabel = new TextBlock
+        {
+            Text = "TOTAL",
+            FontSize = 11,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            Foreground = SecondaryTextBrush,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        header.Children.Add(sectionLabel);
+        Grid.SetColumn(totalLabel, 1);
+        header.Children.Add(totalLabel);
+
+        table.Children.Add(new Border
+        {
+            Background = PanelRaisedBrush,
+            BorderBrush = DividerBrush,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = header
+        });
+
+        var index = 0;
+        foreach(var (label, value) in values)
+        {
+            var row = new Grid
+            {
+                ColumnSpacing = 16,
+                Padding = new Thickness(16, 7, 16, 7),
+                MinHeight = 34
+            };
+            row.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = new GridLength(1, GridUnitType.Star)
+            });
+            row.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = GridLength.Auto
+            });
+
+            var name = new TextBlock
+            {
+                Text = label,
+                FontSize = 14,
+                Foreground = PrimaryTextBrush,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextWrapping = TextWrapping.NoWrap
+            };
+            var amount = new TextBlock
+            {
+                Text = value,
+                FontSize = 14,
+                Foreground = AccentBrush,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            row.Children.Add(name);
+            Grid.SetColumn(amount, 1);
+            row.Children.Add(amount);
+
+            table.Children.Add(new Border
+            {
+                Background = index++ % 2 == 0 ? PanelBrush : PanelRaisedBrush,
+                BorderBrush = BorderBrush,
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Child = row
+            });
+        }
+
+        if(index == 0)
+        {
+            var blank = new TextBlock
+            {
+                Text = "No entries recorded",
+                Foreground = MutedTextBrush,
+                FontSize = 13,
+                Margin = new Thickness(16, 10, 16, 10)
+            };
+            table.Children.Add(blank);
+        }
+
+        PlayerProfileRows.Children.Add(new Border
+        {
+            BorderBrush = BorderBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(3),
+            Child = table
+        });
     }
 
     private static long ReadStat(JsonElement element, string name)
@@ -232,41 +366,57 @@ public sealed partial class MainWindow
 
         if(matches == 0)
         {
-            PlayerProfileTotals.Text =
-                playerName + " — no local match checkpoints recorded yet.";
-            PlayerProfileBreakdown.Text =
-                "Start round 1, play for 15 seconds, then refresh. Checkpoints are saved in BUILT/data/matches and BUILT/Dedicated/data/matches.";
-            PlayerProfileStatus.Text =
-                invalidFiles > 0 ? "Some invalid result files were skipped." :
-                "Awaiting first completed match.";
+            PlayerProfileIdentity.Text = playerName.ToUpperInvariant();
+            ShowProfileEmpty(
+                "No local match checkpoints for this player.",
+                "Start round 1, play 15+ seconds, then refresh. Check BUILT/data/matches.");
+            PlayerProfileStatus.Text = invalidFiles > 0
+                ? $"{invalidFiles} invalid result file(s) were skipped."
+                : "Waiting for a match checkpoint.";
             return;
         }
 
-        PlayerProfileTotals.Text =
-            $"{playerName.ToUpperInvariant()}\n" +
-            $"MATCHES  {matches} ({completedMatches} finished / {interruptedMatches} interrupted)       KILLS  {kills}\n" +
-            $"BEST ROUND  {bestRound}\n" +
-            $"SHOTS  {shots}       CONFIRMED HITSCAN HITS  {hits}       DEATHS  {deaths}\n" +
-            $"HEADSHOT KILLS  {headshotKills}       POWERUPS  {powerups}\n" +
-            $"BEST MATCH KILLS  {bestMatchKills}       DAMAGE TAKEN  {damageTaken}";
+        PlayerProfileIdentity.Text =
+            $"{playerName.ToUpperInvariant()}  /  {matches:N0} MATCHES";
 
-        var detail = new StringBuilder();
-        detail.AppendLine("MOST USED WEAPONS (accepted trigger pulls)");
-        foreach(var item in weaponUsage.OrderByDescending(x => x.Value).Take(8))
-            detail.AppendLine($"  {item.Key} — {item.Value}");
-        detail.AppendLine();
-        detail.AppendLine("ZOMBIES KILLED BY TYPE");
-        foreach(var item in zombieKills.OrderByDescending(x => x.Value).Take(12))
-            detail.AppendLine($"  {item.Key} — {item.Value}");
-        detail.AppendLine();
-        detail.AppendLine("POWERUPS COLLECTED");
-        foreach(var item in powerupTypes.OrderByDescending(x => x.Value).Take(12))
-            detail.AppendLine($"  {item.Key} — {item.Value}");
-        if(zombieKills.Count == 0)
-            detail.AppendLine("  No subtype-tagged kills in these matches.");
-        PlayerProfileBreakdown.Text = detail.ToString();
+        PlayerProfileRows.Children.Clear();
+        AddProfileSection("GENERAL", new (string Label, string Value)[]
+        {
+            ("Matches played", matches.ToString("N0")),
+            ("Finished matches", completedMatches.ToString("N0")),
+            ("Interrupted matches", interruptedMatches.ToString("N0")),
+            ("Best round reached", bestRound.ToString("N0")),
+            ("Zombies eliminated", kills.ToString("N0")),
+            ("Best single-match kills", bestMatchKills.ToString("N0")),
+            ("Deaths", deaths.ToString("N0")),
+            ("Damage taken", damageTaken.ToString("N0")),
+            ("Power-ups collected", powerups.ToString("N0"))
+        });
+
+        AddProfileSection("COMBAT", new (string Label, string Value)[]
+        {
+            ("Accepted weapon shots", shots.ToString("N0")),
+            ("Confirmed hitscan impacts", hits.ToString("N0")),
+            ("Headshot kills", headshotKills.ToString("N0"))
+        });
+
+        AddProfileSection("INFECTED ELIMINATED", zombieKills
+            .OrderByDescending(x => x.Value)
+            .ThenBy(x => x.Key)
+            .Select(x => (ProfileDisplayName(x.Key), x.Value.ToString("N0"))));
+
+        AddProfileSection("WEAPONS / SHOTS FIRED", weaponUsage
+            .OrderByDescending(x => x.Value)
+            .ThenBy(x => x.Key)
+            .Select(x => (ProfileDisplayName(x.Key), x.Value.ToString("N0"))));
+
+        AddProfileSection("POWER-UPS COLLECTED", powerupTypes
+            .OrderByDescending(x => x.Value)
+            .ThenBy(x => x.Key)
+            .Select(x => (ProfileDisplayName(x.Key), x.Value.ToString("N0"))));
+
         PlayerProfileStatus.Text =
-            $"{matches} local match(es) loaded." +
-            (invalidFiles > 0 ? $" {invalidFiles} invalid file(s) skipped." : "");
+            "Local match records • unfinished checkpoints included • unauthenticated player name" +
+            (invalidFiles > 0 ? $" • {invalidFiles} invalid file(s) skipped" : "");
     }
 }
