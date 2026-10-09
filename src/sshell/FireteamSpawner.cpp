@@ -84,6 +84,19 @@ static bool FT_LocalInfectedAssetPresent(const char *pPath)
     return GetFileAttributesA(pPath) != INVALID_FILE_ATTRIBUTES;
 }
 
+static bool FT_SpecialInfectedConfigReady(const char *pSection)
+{
+    FTInfectedDef def;
+    FT_InitInfectedDef(def);
+    return FT_LoadInfectedSection(
+               "config/infected.cfg", pSection, def) &&
+           FT_LoadInfectedSection(
+               "config/characters.cfg", pSection, def) &&
+           def.sId[0] && def.sBodyModel[0] &&
+           def.sAnimationModel[0] &&
+           def.nHealth > 0 && def.fRunSpeed > 0.0f;
+}
+
 static void FT_CheckSpecialInfectedAssets()
 {
     s_bAssassinAssetsReady =
@@ -96,7 +109,8 @@ static void FT_CheckSpecialInfectedAssets()
         FT_LocalInfectedAssetPresent(
             "rez\\Characters\\infected\\body\\CW_LG_ASSAVIRUS_HM.DTX") &&
         FT_LocalInfectedAssetPresent(
-            "rez\\Characters\\infected\\body\\CW_FC_NM_VIRUS_HM.DTX");
+            "rez\\Characters\\infected\\body\\CW_FC_NM_VIRUS_HM.DTX") &&
+        FT_SpecialInfectedConfigReady("infected_assassin");
     s_bTankerAssetsReady =
         FT_LocalInfectedAssetPresent(
             "rez\\Characters\\infected\\body\\VIM_F_NM_DF_TANKER_SH.LTB") &&
@@ -107,7 +121,8 @@ static void FT_CheckSpecialInfectedAssets()
         FT_LocalInfectedAssetPresent(
             "rez\\Characters\\infected\\body\\CM_LG_TANKERBLUE_YK.DTX") &&
         FT_LocalInfectedAssetPresent(
-            "rez\\Characters\\infected\\body\\CM_VST_TANKERBLUE_YK.DTX");
+            "rez\\Characters\\infected\\body\\CM_VST_TANKERBLUE_YK.DTX") &&
+        FT_SpecialInfectedConfigReady("infected_tanker");
     g_pLTServer->CPrint(
         "Fireteam specials: Assassin=%s Tanker=%s (staged body/animation/textures).",
         s_bAssassinAssetsReady ? "READY" : "MISSING; disabled",
