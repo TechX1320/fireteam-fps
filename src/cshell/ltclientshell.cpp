@@ -28,6 +28,7 @@
 #include "FireteamHealthHud.h"
 #include "FireteamWeaponHud.h"
 #include "FireteamRoundHud.h"
+#include "FireteamRadarHud.h"
 #include "FireteamGameGuid.h"
 #include "FireteamCombatFeedback.h"
 #include "FireteamAmbientAudio.h"
@@ -874,6 +875,11 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             FT_RoundHudSetWaitingForNextRound(bWaiting);
         }
         break;
+    case MSG_SC_RADAR:
+        {
+            FT_RadarHudHandleMessage(pMessage);
+        }
+        break;
     case MSG_SC_ROUND_PREP:
         {
             const float fRemaining = pMessage->Readfloat();
@@ -1023,6 +1029,7 @@ void CLTClientShell::Update()
                     &m_rPlayerStartRot);
                 m_pPlayer->SetClientObject(hObject);
                 m_pPlayer->CreatePlayer();
+                FT_RadarHudReset();
                 HLOCALOBJ hPlayer = m_pPlayer->GetPlayerObject();
 
                 if (NULL != hPlayer)
@@ -1224,6 +1231,8 @@ LTRESULT CLTClientShell::Render()
         }
 
         FT_RenderRoundHud();
+        if(!bFreecam && !FT_SettingsIsOpen())
+            FT_RenderRadarHud();
 
         if(m_pPlayer &&
            m_pCamera &&
