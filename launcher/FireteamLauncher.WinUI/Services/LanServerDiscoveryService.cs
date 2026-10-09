@@ -115,7 +115,7 @@ public sealed class LanServerDiscoveryService : IDisposable
     {
         item = default;
         var text = Encoding.UTF8.GetString(data);
-        var fields = text.Split('|', 8);
+        var fields = text.Split(new[] { '|' }, 8, StringSplitOptions.None);
         if(fields.Length != 8 || fields[0] != "FTLAN1" ||
            fields[1].Length != 16 ||
            !fields[1].All(Uri.IsHexDigit) ||
