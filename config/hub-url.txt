@@ -1,0 +1,4 @@
+# FIRETEAM public directory address. Offline/curated mode while blank.
+# After the central hub is deployed, enter its HTTPS base URL on the
+# next non-comment line and distribute this file with the game.
+# https://your-fireteam-hub.example
