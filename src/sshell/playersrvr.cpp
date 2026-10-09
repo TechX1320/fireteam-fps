@@ -1551,8 +1551,10 @@ void CPlayerSrvr::RestoreResumeState(
     // player disconnected, or dying after reconnect would spawn at the quit spot.
     m_vSpawnPos = state.vRespawnAnchor;
     m_rSpawnRot = state.rRespawnAnchor;
-    g_pLTServer->TeleportObject(m_hObject, &state.vPosition);
-    g_pLTServer->SetObjectRotation(m_hObject, &state.rRotation);
+    LTVector vReturn = state.vPosition;
+    LTRotation rReturn = state.rRotation;
+    g_pLTServer->TeleportObject(m_hObject, &vReturn);
+    g_pLTServer->SetObjectRotation(m_hObject, &rReturn);
     if(m_bWaitingNextRound)
         g_pLTSCommon->SetObjectFlags(
             m_hObject, OFT_Flags, 0, FLAG_VISIBLE);
