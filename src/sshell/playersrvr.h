@@ -75,6 +75,7 @@ public:
           m_bQaSpectating(false),
           m_fRespawnTimer(0.0f),
           m_fNextPositionTrace(0.0f),
+          m_fNextRadarTime(0.0f),
           m_fPoisonCarry(0.0f),
           m_nWeaponSlot(1),
           m_bReloading(false),
