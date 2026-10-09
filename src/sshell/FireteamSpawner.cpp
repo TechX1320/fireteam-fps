@@ -1364,6 +1364,24 @@ void Spawner::UpdateRoundController()
             g_pLTServer->CPrint(
                 "Fireteam: CRUSHER spawned %u/%u on round %u.",
                 s_nTankersSpawned, s_nTankersPlanned, s_nRound);
+
+            // One server-authoritative boss warning per wave, not one
+            // intrusive popup for every additional Tanker.
+            if(s_nTankersSpawned == 1)
+            {
+                ILTMessage_Write *pWarning = LTNULL;
+                if(g_pLTSCommon->CreateMessage(pWarning) == LT_OK &&
+                   pWarning)
+                {
+                    pWarning->IncRef();
+                    pWarning->Writeuint8(MSG_SC_POWERUP);
+                    pWarning->WriteString("WARNING: CRUSHER INCOMING");
+                    pWarning->Writefloat(3.5f);
+                    g_pLTServer->SendToClient(
+                        pWarning->Read(), LTNULL, MESSAGE_GUARANTEED);
+                    pWarning->DecRef();
+                }
+            }
         }
         else if(bSpawnAssassin)
         {
