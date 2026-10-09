@@ -46,6 +46,9 @@ struct FTFireFilterData
 {
     HOBJECT hPlayer;
     HOBJECT hWeapon;
+    // Reject oversized movement boxes without blocking farther enemies.
+    HOBJECT aRejected[16];
+    uint32 nRejected;
 };
 
 static bool FTFireFilter(HOBJECT hObject, void *pUserData)
@@ -56,8 +59,11 @@ static bool FTFireFilter(HOBJECT hObject, void *pUserData)
         return true;
     }
 
-    return hObject != pData->hPlayer &&
-           hObject != pData->hWeapon;
+    if(hObject == pData->hPlayer || hObject == pData->hWeapon)
+        return false;
+    for(uint32 i = 0; i < pData->nRejected; ++i)
+        if(hObject == pData->aRejected[i]) return false;
+    return true;
 }
 
 
@@ -383,78 +389,8 @@ enum FTFireteamHitRegion
     FT_HITREGION_GROIN
 };
 
-static FTFireteamHitRegion FT_GetZombieHitRegion(
-    HOBJECT hTarget,
-    const LTVector &vHitPoint)
-{
-    if(!hTarget)
-    {
-        return FT_HITREGION_BODY;
-    }
-
-    LTVector vTargetPos;
-    g_pLTServer->GetObjectPos(
-        hTarget,
-        &vTargetPos);
-
-    LTVector vDims(
-        18.0f,
-        42.0f,
-        18.0f);
-
-    LTVector vModelDims;
-    if(g_pLTSCommon->GetModelAnimUserDims(
-           hTarget,
-           &vModelDims,
-           g_pLTServer->GetModelAnimation(
-               hTarget)) == LT_OK &&
-       vModelDims.y > 10.0f &&
-       vModelDims.y < 200.0f)
-    {
-        vDims =
-            vModelDims;
-    }
-
-    const float fHeight =
-        vDims.y * 2.0f;
-
-    if(fHeight <= 1.0f)
-    {
-        return FT_HITREGION_BODY;
-    }
-
-    const float fBottom =
-        vTargetPos.y -
-        vDims.y;
-
-    float fNormalizedY =
-        (vHitPoint.y -
-         fBottom) /
-        fHeight;
-
-    if(fNormalizedY < 0.0f)
-    {
-        fNormalizedY = 0.0f;
-    }
-    else if(fNormalizedY > 1.0f)
-    {
-        fNormalizedY = 1.0f;
-    }
-
-    // Tighter kill regions: avoid awarding most upper-torso/pelvis hits.
-    if(fNormalizedY >= 0.91f)
-    {
-        return FT_HITREGION_HEAD;
-    }
-
-    if(fNormalizedY >= 0.465f &&
-       fNormalizedY <= 0.485f)
-    {
-        return FT_HITREGION_GROIN;
-    }
-
-    return FT_HITREGION_BODY;
-}
+// Head/body regions now come from the same tight server collision
+// that accepts or rejects the bullet; the model's giant box is NOT damage.
 
 static const char* FT_HitRegionName(
     FTFireteamHitRegion eRegion)
@@ -2371,6 +2307,7 @@ void CPlayerSrvr::TracePrimaryPellet(
     FTFireFilterData filterData;
     filterData.hPlayer = m_hObject;
     filterData.hWeapon = m_hClub;
+    filterData.nRejected = 0;
 
     HCLASS hZombie =
         g_pLTServer->GetClass("FireteamZombie");
@@ -2393,10 +2330,13 @@ void CPlayerSrvr::TracePrimaryPellet(
     // CA's material/surface table is fully mapped.
     const uint32 kMaxPenetrations = 2;
 
-    for(uint32 nPass = 0;
-        nPass <= kMaxPenetrations &&
+    // Missed broad-phase contacts retry this SAME ray with no damage.
+    // Do not consume wall penetration budget for those false hits.
+    uint32 nPass = 0;
+    for(uint32 nQuery = 0;
+        nQuery < 22 && nPass <= kMaxPenetrations &&
         fRemainingRange > 1.0f;
-        ++nPass)
+        ++nQuery)
     {
         IntersectQuery query;
         IntersectInfo info;
@@ -2427,32 +2367,69 @@ void CPlayerSrvr::TracePrimaryPellet(
             return;
         }
 
-        const float fSegmentDistance =
-            (info.m_Point - query.m_From).Mag();
+        HCLASS hTarget = info.m_hObject
+            ? g_pLTServer->GetObjectClass(info.m_hObject) : LTNULL;
+        const bool bZombie = hZombie && hTarget &&
+            g_pLTServer->IsKindOf(hTarget, hZombie);
+        const bool bSeal = hSeal && hTarget &&
+            g_pLTServer->IsKindOf(hTarget, hSeal);
+        const bool bEnemy = bZombie || bSeal;
 
+        LTVector vValidatedImpact = info.m_Point;
+        uint8 nValidatedRegion = (uint8)FT_HITREGION_BODY;
+        if(bZombie)
+        {
+            FireteamZombie *pZombie = (FireteamZombie*)
+                g_pLTServer->HandleToObject(info.m_hObject);
+            bool bTightHit = pZombie && pZombie->TraceTightBulletHit(
+                query.m_From, vDir, fRemainingRange,
+                vValidatedImpact, nValidatedRegion);
+
+            // A giant bounding box may be in front of a REAL wall.
+            // Check world obstruction up to the precise body intersection;
+            // a blocked candidate gets skipped and the same vector is
+            // re-traced, letting ordinary wall penetration run normally.
+            if(bTightHit)
+            {
+                IntersectQuery qWorld;
+                IntersectInfo hitWorld;
+                qWorld.m_From = query.m_From;
+                qWorld.m_To = vValidatedImpact;
+                qWorld.m_Flags =
+                    INTERSECT_OBJECTS | IGNORE_NONSOLID | INTERSECT_HPOLY;
+                qWorld.m_FilterFn = FTPenetrationGeometryFilter;
+                qWorld.m_pUserData = &filterData;
+                if(g_pLTServer->IntersectSegment(&qWorld, &hitWorld))
+                {
+                    const float fBlock =
+                        (hitWorld.m_Point - query.m_From).Mag();
+                    const float fBody =
+                        (vValidatedImpact - query.m_From).Mag();
+                    if(fBlock + 1.5f < fBody)
+                        bTightHit = false;
+                }
+            }
+
+            if(!bTightHit)
+            {
+                // No damage, blood, hit counter, fake penetration or
+                // cross-floor "Doom" hit on a movement-box-only contact.
+                if(filterData.nRejected >=
+                    sizeof(filterData.aRejected) /
+                    sizeof(filterData.aRejected[0]))
+                    return;
+                filterData.aRejected[filterData.nRejected++] = info.m_hObject;
+                continue;
+            }
+        }
+
+        const float fSegmentDistance =
+            (vValidatedImpact - query.m_From).Mag();
+        if(!(fSegmentDistance >= 0.0f &&
+             fSegmentDistance <= fRemainingRange + 1.0f))
+            return;
         fTravelled += fSegmentDistance;
         fRemainingRange -= fSegmentDistance;
-
-        HCLASS hTarget = info.m_hObject
-            ? g_pLTServer->GetObjectClass(
-                info.m_hObject)
-            : LTNULL;
-
-        const bool bZombie =
-            hZombie && hTarget &&
-            g_pLTServer->IsKindOf(
-                hTarget,
-                hZombie);
-
-        const bool bSeal =
-            hSeal && hTarget &&
-            g_pLTServer->IsKindOf(
-                hTarget,
-                hSeal);
-
-        const bool bEnemy =
-            bZombie ||
-            bSeal;
 
         if(bEnemy)
         {
@@ -2483,10 +2460,7 @@ void CPlayerSrvr::TracePrimaryPellet(
 
             if(bZombie)
             {
-                eHitRegion =
-                    FT_GetZombieHitRegion(
-                        info.m_hObject,
-                        info.m_Point);
+                eHitRegion = (FTFireteamHitRegion)nValidatedRegion;
 
                 if(eHitRegion ==
                    FT_HITREGION_HEAD)
@@ -2559,7 +2533,7 @@ void CPlayerSrvr::TracePrimaryPellet(
                 // Shooter-only marker after server collision and damage delivery.
                 if(nFeedbackSent < 2)
                 {
-                    SendCombatFeedback(FT_COMBAT_FEEDBACK_HIT, &info.m_Point);
+                    SendCombatFeedback(FT_COMBAT_FEEDBACK_HIT, &vValidatedImpact);
                     ++nFeedbackSent;
                 }
 
@@ -2663,6 +2637,7 @@ void CPlayerSrvr::TracePrimaryPellet(
         vTraceFrom =
             exitInfo.m_Point +
             (vDir * 3.0f);
+        ++nPass;
 
         g_pLTServer->CPrint(
             "Fireteam weapon: %s penetrated %.1f units.",
