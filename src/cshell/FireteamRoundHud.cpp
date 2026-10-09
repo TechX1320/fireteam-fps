@@ -622,9 +622,11 @@ void FT_RenderRoundHud()
             s_bSoloRetryAllowed
                 ? "R: PLAY AGAIN   TAB: SQUAD STATS   ESC: SETTINGS / QUIT"
                 : "TAB: SQUAD STATS   ESC: SETTINGS / QUIT   WAIT FOR SERVER");
+        // The final squad scoreboard now fills the center of the screen.
+        // Keep the restart/quit shortcut BELOW it, not hidden underneath.
         s_pRespawnStatus->SetPosition(
             ((float)nScreenW - s_pRespawnStatus->GetWidth()) * 0.5f,
-            (float)nScreenH * 0.62f);
+            (float)nScreenH - 52.0f);
         s_pRespawnStatus->Render();
     }
 
