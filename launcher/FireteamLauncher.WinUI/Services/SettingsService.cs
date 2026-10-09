@@ -66,7 +66,8 @@ public sealed class SettingsService
             settings.Gamma,
             settings.Width,
             settings.Height,
-            settings.Windowed ? 1 : 0);
+            settings.Windowed ? 1 : 0,
+            settings.RadarEnabled ? 1 : 0);
 
         File.WriteAllText(Path.Combine(game, "fireteam-settings.cfg"), line);
     }
