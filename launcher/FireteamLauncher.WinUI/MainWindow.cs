@@ -356,6 +356,7 @@ public sealed partial class MainWindow : Window
             : "1920 x 1080";
 
         WindowedToggle.IsOn = settings.Windowed;
+        RadarToggle.IsOn = settings.RadarEnabled;
         SensitivityXBox.Value = settings.SensitivityXMultiplier;
         SensitivityYBox.Value = settings.SensitivityYMultiplier;
         VolumeBox.Value = settings.Volume;
