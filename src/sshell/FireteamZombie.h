@@ -70,6 +70,7 @@ private:
     float m_fStragglerIdleSeconds;
     float m_fTargetMemory;
     float m_fVoiceCooldown;
+    float m_fAttackVoiceCooldown;
     bool m_bHasLastKnownTarget;
     BehaviorState m_eBehaviorState;
     bool m_bDying;
