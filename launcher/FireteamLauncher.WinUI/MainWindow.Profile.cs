@@ -33,7 +33,7 @@ public sealed partial class MainWindow
         page.Children.Add(CardHeading(
             "IDENTITY",
             "Your match history",
-            "The launcher reads completed FIRETEAM matches saved by your local game or dedicated server. Usernames are not yet verified cross-server identities."));
+            "The launcher reads periodic checkpoints and final match records, so interrupted games still count toward your local history. Usernames are not authenticated identities."));
 
         var controls = new StackPanel
         {
@@ -122,7 +122,8 @@ public sealed partial class MainWindow
             StringComparer.OrdinalIgnoreCase);
         var seenMatchIds = new HashSet<string>(
             StringComparer.OrdinalIgnoreCase);
-        long matches = 0, kills = 0, shots = 0, hits = 0;
+        long matches = 0, completedMatches = 0, interruptedMatches = 0;
+        long kills = 0, shots = 0, hits = 0;
         long deaths = 0, powerups = 0, headshotKills = 0;
         long damageTaken = 0, bestRound = 0, bestMatchKills = 0;
         var invalidFiles = 0;
@@ -157,9 +158,13 @@ public sealed partial class MainWindow
                        !match.TryGetProperty("players", out var players) ||
                        players.ValueKind != JsonValueKind.Array)
                         continue;
-                    if(match.TryGetProperty("status", out var status) &&
-                       (status.ValueKind != JsonValueKind.String ||
-                        status.GetString() != "completed"))
+                    // A stable matchId points to the newest checkpoint; do
+                    // not drop earned progress from crashed/unfinished runs.
+                    var matchStatus = match.TryGetProperty("status", out var status) &&
+                                      status.ValueKind == JsonValueKind.String
+                        ? status.GetString() : "completed";
+                    if(matchStatus != "completed" &&
+                       matchStatus != "in_progress")
                         continue;
 
                     var identity = match.TryGetProperty("matchId", out var id) &&
@@ -177,6 +182,10 @@ public sealed partial class MainWindow
                             continue;
 
                         ++matches;
+                        if(matchStatus == "completed")
+                            ++completedMatches;
+                        else
+                            ++interruptedMatches;
                         var matchKills = ReadStat(player, "killsTotal");
                         kills += matchKills;
                         shots += ReadStat(player, "shotsFired");
@@ -224,9 +233,9 @@ public sealed partial class MainWindow
         if(matches == 0)
         {
             PlayerProfileTotals.Text =
-                playerName + " — no completed local matches recorded yet.";
+                playerName + " — no local match checkpoints recorded yet.";
             PlayerProfileBreakdown.Text =
-                "Finish a game, then refresh. Stats are saved under BUILT/data/matches. Dedicated matches are under BUILT/Dedicated/data/matches.";
+                "Start round 1, play for 15 seconds, then refresh. Checkpoints are saved in BUILT/data/matches and BUILT/Dedicated/data/matches.";
             PlayerProfileStatus.Text =
                 invalidFiles > 0 ? "Some invalid result files were skipped." :
                 "Awaiting first completed match.";
@@ -235,7 +244,8 @@ public sealed partial class MainWindow
 
         PlayerProfileTotals.Text =
             $"{playerName.ToUpperInvariant()}\n" +
-            $"MATCHES  {matches}       KILLS  {kills}       BEST ROUND  {bestRound}\n" +
+            $"MATCHES  {matches} ({completedMatches} finished / {interruptedMatches} interrupted)       KILLS  {kills}\n" +
+            $"BEST ROUND  {bestRound}\n" +
             $"SHOTS  {shots}       CONFIRMED HITSCAN HITS  {hits}       DEATHS  {deaths}\n" +
             $"HEADSHOT KILLS  {headshotKills}       POWERUPS  {powerups}\n" +
             $"BEST MATCH KILLS  {bestMatchKills}       DAMAGE TAKEN  {damageTaken}";
@@ -256,7 +266,7 @@ public sealed partial class MainWindow
             detail.AppendLine("  No subtype-tagged kills in these matches.");
         PlayerProfileBreakdown.Text = detail.ToString();
         PlayerProfileStatus.Text =
-            $"{matches} completed local match(es) loaded." +
+            $"{matches} local match(es) loaded." +
             (invalidFiles > 0 ? $" {invalidFiles} invalid file(s) skipped." : "");
     }
 }
