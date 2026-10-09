@@ -50,6 +50,7 @@ private:
     void PlayVoiceSound(
         const char *pFilename);
     void PlayAttackVoice();
+    bool ConfigureInfectedVariant(const char *pSection);
     bool IsMovementStepClear(
         const LTVector &vPos,
         const LTVector &vDirection,
