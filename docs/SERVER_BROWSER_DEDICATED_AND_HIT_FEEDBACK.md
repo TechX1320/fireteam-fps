@@ -1,5 +1,13 @@
 # FIRETEAM hosting, browser, mod handshake and hit confirmation
 
+**Progress after this plan:** Local dedicated servers now advertise over LAN
+UDP 27888 with real occupancy. The client displays shooter-visible blood
+bursts at authoritative bullet impact positions, and special zombies select
+available death clips or use a procedural fall. These are pending a fresh
+Windows build/test. Internet master registration, UPnP, public mod downloads,
+full-squad blood replication and exact CA attack/movement/death clips remain
+unimplemented. See docs/LAN_DISCOVERY_IMPACT_DEATH_QA.md.
+
 Status: committed source changes awaiting Windows build and network smoke test.
 This is an incremental extension of FIRETEAM, not a replacement for the current
 LithTech round controller, stats, launcher or resource layout.
