@@ -42,6 +42,7 @@ struct FTPlayerResumeState
     uint8 nZombieTypes, nPowerupTypes;
     float fMoney, fBottomlessUntil, fOneHitUntil, fGodUntil;
     uint8 nBottomlessStacks, nOneHitStacks, nGodStacks;
+    bool bBottomlessActive, bOneHitActive, bGodActive;
 };
 
 //-----------------------------------------------------------------------------
