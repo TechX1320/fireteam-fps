@@ -20,6 +20,7 @@ public sealed partial class MainWindow
         FireteamServerListing Listing, bool IsLan, int Players, int MaxPlayers,
         int Difficulty);
     private bool _lanDiscoveryInitialized;
+    private bool _curatedDirectoryRequested;
     private IReadOnlyList<FireteamServerListing> _communityServers = [];
 
     private void BuildServerBrowserView()
