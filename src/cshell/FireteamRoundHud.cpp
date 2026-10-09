@@ -28,6 +28,7 @@ static uint16 s_nTarget = 0;
 static uint16 s_nKilled = 0;
 static uint16 s_nAlive = 0;
 static uint8 s_nLives = 3;
+static bool s_bWaitingForNextRound = false;
 static uint8 s_nMaxLives = 3;
 static bool s_bGameOver = false;
 static bool s_bSoloRetryAllowed = false;
