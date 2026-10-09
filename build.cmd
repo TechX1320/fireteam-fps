@@ -166,8 +166,13 @@ copy /y "config\characters.cfg" "%BUILT_DIR%\config\characters.cfg" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\difficulties.cfg" "%BUILT_DIR%\config\difficulties.cfg" >nul
 if errorlevel 1 goto :copyfail
-copy /y "config\session.cfg" "%BUILT_DIR%\config\session.cfg" >nul
-if errorlevel 1 goto :copyfail
+if not exist "%BUILT_DIR%\config\session.cfg" (
+  echo [SEED] Missing session.cfg; copying template once.
+  copy /y "config\session.cfg" "%BUILT_DIR%\config\session.cfg" >nul
+  if errorlevel 1 goto :copyfail
+) else (
+  echo [KEEP] Local session.cfg ^(difficulty and stats tracking^) unchanged.
+)
 copy /y "config\powerups.cfg" "%BUILT_DIR%\config\powerups.cfg" >nul
 if errorlevel 1 goto :copyfail
 if not exist "%BUILT_DIR%\config\loadouts.cfg" (
