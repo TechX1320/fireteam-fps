@@ -2,7 +2,7 @@
 param(
     [ValidateSet("ToRuntime","ToSource","ToDedicated")]
     [string]$Direction = "ToRuntime",
-    [ValidateSet("weapons.cfg","weapon-library.cfg","loadouts.cfg","player.cfg")]
+    [ValidateSet("weapons.cfg","weapon-library.cfg","loadouts.cfg","player.cfg","session.cfg")]
     [string[]]$Files = @("weapons.cfg","weapon-library.cfg","loadouts.cfg","player.cfg"),
     [switch]$ConfirmSync
 )
