@@ -15,16 +15,25 @@ $models = @(
         id = "normal_common"
         body = "MT_AR_BODY.LTB"
         animation = "ST_M_CHILD.LTB"
+        textures = @("MT_AR_BODY.DTX", "MT_MG_LEG.DTX")
     },
     [pscustomobject]@{
         id = "infected_assassin"
         body = "VIW_F_NM_DF_ASSASSIN_CH.LTB"
         animation = "ANI_VI_ASSASSIN_CH.LTB"
+        textures = @(
+            "CW_VST_ASSAVIRUS_HM.DTX",
+            "CW_LG_ASSAVIRUS_HM.DTX",
+            "CW_FC_NM_VIRUS_HM.DTX")
     },
     [pscustomobject]@{
         id = "infected_tanker"
         body = "VIM_F_NM_DF_TANKER_SH.LTB"
         animation = "ANI_VI_TANKER_SH.LTB"
+        textures = @(
+            "CM_FC_TANKERBLUE_YK.DTX",
+            "CM_LG_TANKERBLUE_YK.DTX",
+            "CM_VST_TANKERBLUE_YK.DTX")
     }
 )
 
@@ -37,9 +46,18 @@ $reportModels = foreach($model in $models) {
     $hasBody = Test-Path -LiteralPath $body -PathType Leaf
     $hasAnimation = Test-Path -LiteralPath $animation -PathType Leaf
     $hasCandidateStrings = Test-Path -LiteralPath $report -PathType Leaf
-    Write-Host ("[{0}] {1}: body={2} animation={3} candidate-report={4}" -f
-        $(if($hasBody -and $hasAnimation) {"ASSET"} else {"MISSING"}),
-        $model.id, $hasBody, $hasAnimation, $hasCandidateStrings)
+    $missingTextures = @(
+        foreach($tex in $model.textures) {
+            if(-not (Test-Path -LiteralPath (
+                Join-Path $rez ("Characters\infected\body\" + $tex)) -PathType Leaf)) {
+                $tex
+            }
+        }
+    )
+    $hasTextures = $missingTextures.Count -eq 0
+    Write-Host ("[{0}] {1}: body={2} animation={3} skins={4} candidate-report={5}" -f
+        $(if($hasBody -and $hasAnimation -and $hasTextures) {"READY"} else {"MISSING"}),
+        $model.id, $hasBody, $hasAnimation, $hasTextures, $hasCandidateStrings)
     [pscustomobject]@{
         id = $model.id
         bodyPath = $model.body
@@ -47,7 +65,9 @@ $reportModels = foreach($model in $models) {
         animationBank = $model.animation
         animationPresent = $hasAnimation
         animationCandidateReportPresent = $hasCandidateStrings
+        missingTextures = $missingTextures
         modelAndAnimationStaged = ($hasBody -and $hasAnimation)
+        readyForRuntimeTest = ($hasBody -and $hasAnimation -and $hasTextures)
         # Do not claim a playable zombie before runtime GetAnimIndex, skin,
         # collision dimensions, and hitbox verification.
         runtimeVerified = $false
