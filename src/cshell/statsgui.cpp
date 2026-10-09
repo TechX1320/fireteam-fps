@@ -417,36 +417,36 @@ LTRESULT CStatsGui::RecalcStatsString()
     for(int n = 0; n < 4; ++n)
         if(!m_pStatsString_Extra[n]) return LT_ERROR;
 
-    char sNames[1280] = "PLAYER\\n\\n";
-    char sKills[512] = "KILLS\\n\\n";
-    char sShots[512] = "SHOTS\\n\\n";
-    char sHits[512] = "HITS\\n\\n";
-    char sDeaths[512] = "DEATHS\\n\\n";
-    char sPowerups[512] = "POWERUPS\\n\\n";
-    char sLives[512] = "LIVES\\n\\n";
+    char sNames[1280] = "PLAYER\n\n";
+    char sKills[512] = "KILLS\n\n";
+    char sShots[512] = "SHOTS\n\n";
+    char sHits[512] = "HITS\n\n";
+    char sDeaths[512] = "DEATHS\n\n";
+    char sPowerups[512] = "POWERUPS\n\n";
+    char sLives[512] = "LIVES\n\n";
 
     for(int i = 0; i < m_iNumPlayers && m_pScores; ++i)
     {
         char line[96];
-        _snprintf(line, sizeof(line) - 1, "%s\\n", m_pScores[i].sPlayerName);
+        _snprintf(line, sizeof(line) - 1, "%s\n", m_pScores[i].sPlayerName);
         line[sizeof(line) - 1] = '\0';
         strncat(sNames, line, sizeof(sNames) - strlen(sNames) - 1);
-        _snprintf(line, sizeof(line) - 1, "%u\\n", m_pScores[i].iScore);
+        _snprintf(line, sizeof(line) - 1, "%u\n", m_pScores[i].iScore);
         line[sizeof(line) - 1] = '\0';
         strncat(sKills, line, sizeof(sKills) - strlen(sKills) - 1);
-        _snprintf(line, sizeof(line) - 1, "%u\\n", m_pScores[i].iShotsFired);
+        _snprintf(line, sizeof(line) - 1, "%u\n", m_pScores[i].iShotsFired);
         line[sizeof(line) - 1] = '\0';
         strncat(sShots, line, sizeof(sShots) - strlen(sShots) - 1);
-        _snprintf(line, sizeof(line) - 1, "%u\\n", m_pScores[i].iShotsHit);
+        _snprintf(line, sizeof(line) - 1, "%u\n", m_pScores[i].iShotsHit);
         line[sizeof(line) - 1] = '\0';
         strncat(sHits, line, sizeof(sHits) - strlen(sHits) - 1);
-        _snprintf(line, sizeof(line) - 1, "%u\\n", m_pScores[i].iDeaths);
+        _snprintf(line, sizeof(line) - 1, "%u\n", m_pScores[i].iDeaths);
         line[sizeof(line) - 1] = '\0';
         strncat(sDeaths, line, sizeof(sDeaths) - strlen(sDeaths) - 1);
-        _snprintf(line, sizeof(line) - 1, "%u\\n", m_pScores[i].iPowerups);
+        _snprintf(line, sizeof(line) - 1, "%u\n", m_pScores[i].iPowerups);
         line[sizeof(line) - 1] = '\0';
         strncat(sPowerups, line, sizeof(sPowerups) - strlen(sPowerups) - 1);
-        _snprintf(line, sizeof(line) - 1, "%u\\n", (uint32)m_pScores[i].iLives);
+        _snprintf(line, sizeof(line) - 1, "%u\n", (uint32)m_pScores[i].iLives);
         line[sizeof(line) - 1] = '\0';
         strncat(sLives, line, sizeof(sLives) - strlen(sLives) - 1);
     }
