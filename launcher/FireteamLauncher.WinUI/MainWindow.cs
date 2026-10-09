@@ -204,6 +204,7 @@ public sealed partial class MainWindow : Window
         MiniToolsView.Visibility = tag == "mini-tools" ? Visibility.Visible : Visibility.Collapsed;
         ArsenalView.Visibility = tag == "weapon-editor" ? Visibility.Visible : Visibility.Collapsed;
         ModsView.Visibility = tag == "tools" ? Visibility.Visible : Visibility.Collapsed;
+        PlayerProfileView.Visibility = tag == "profile" ? Visibility.Visible : Visibility.Collapsed;
         SettingsView.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
 
         AppSectionTitleText.Text = tag switch
@@ -216,6 +217,7 @@ public sealed partial class MainWindow : Window
             "mini-tools" => "MINI TOOLS",
             "tools" => "MODS & CONTENT TOOLS",
             "settings" => "SETTINGS",
+            "profile" => "PLAYER PROFILE",
             "servers" => "SERVER BROWSER",
             _ => "READY ROOM"
         };
