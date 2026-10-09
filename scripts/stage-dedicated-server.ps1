@@ -66,6 +66,7 @@ $sessionFile = Join-Path $configDir "session.cfg"
 if(-not (Test-Path -LiteralPath $sessionFile -PathType Leaf)) {
     @(
         "difficulty=4"
+        "map=CABINFEVER"
         "first_round_prep=45"
         "cabin_spawn_guard=1"
     ) | Set-Content -LiteralPath $sessionFile -Encoding ASCII
