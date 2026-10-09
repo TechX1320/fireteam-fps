@@ -144,7 +144,7 @@ public sealed class GameLaunchService
             "CABINFEVER", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         File.WriteAllText(
             Path.Combine(configDir, "session.cfg"),
-            $"difficulty={value}\nfirst_round_prep={(mode == "Single Player" ? 15 : 45)}\ncabin_spawn_guard={cabinGuard}\n");
+            $"difficulty={value}\nmap={mapName}\nfirst_round_prep={(mode == "Single Player" ? 15 : 45)}\ncabin_spawn_guard={cabinGuard}\n");
     }
 
     private static void AddArg(ProcessStartInfo start, string name, string value)
