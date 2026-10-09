@@ -112,8 +112,13 @@ when starting a server. You may also edit it manually before starting.
 - Direct IP:port and local favorites work without accounts.
 - Public directory comes from `config/public-servers.json` and is opt-in,
   manually curated through a GitHub issue. It does not auto-publish home IPs.
-- Live status, ping, automatic port forwarding and NAT traversal are **not
-  implemented**.
+- **Automatic LAN status** is now implemented via dedicated UDP 27888 beacons:
+  browser shows nearby host names, maps, difficulty and actual connected slots.
+  Stop/restart host after building the new dedicated executable. LAN discovery
+  does not require router forwarding but may need Windows Firewall permission.
+- **Internet master registration**, Internet-side ping, automatic router port
+  mapping (UPnP), CGNAT traversal and relay are **not implemented**. See
+  docs/LAN_DISCOVERY_IMPACT_DEATH_QA.md.
 - For external players, allow the game's port through Windows Firewall and
   configure router forwarding if required. LAN/loopback testing needs neither
   a cloud relay nor port forwarding.
