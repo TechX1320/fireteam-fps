@@ -546,15 +546,19 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
                     g_pStatsManager->GetPlayerScores(scoreStruct);
 
 
-                    //Send the stats
-	                ILTMessage_Write *pMsg;
-	                LTRESULT nResult = g_pLTSCommon->CreateMessage(pMsg);
-	                pMsg->IncRef();
-	                pMsg->Writeint8(MSG_SERVER_SCORES);
-                    pMsg->Writeint8(static_cast<uint8>(iNumPlayers));
+                    // Send up to the 24-player room limit. Keep the
+                    // complete allocation until after the message is built.
+                    ILTMessage_Write *pMsg = LTNULL;
+                    const LTRESULT nResult = g_pLTSCommon->CreateMessage(pMsg);
+                    if(nResult == LT_OK && pMsg)
+                    {
+                    pMsg->IncRef();
+                    pMsg->Writeint8(MSG_SERVER_SCORES);
+                    const uint8 nSendCount =
+                        (uint8)(iNumPlayers > 24 ? 24 : iNumPlayers);
+                    pMsg->Writeuint8(nSendCount);
 
-                    //Write each entry to the message
-                    for(uint8 i = 0; i <iNumPlayers; i++)
+                    for(uint8 i = 0; i < nSendCount; ++i)
                     {
                         pMsg->Writeuint32(scoreStruct[i].iClientID);
                         pMsg->WriteString(scoreStruct[i].sPlayerName);
@@ -568,10 +572,12 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
                         pMsg->Writeuint32(scoreStruct[i].iHeadshotKills);
                     }
 
-                    //pMsg->WriteObject(m_hClub);
-	                g_pLTServer->SendToClient(pMsg->Read(), m_hClient,  MESSAGE_GUARANTEED);
-	                pMsg->DecRef();
-                    //Reset the counter
+                    g_pLTServer->SendToClient(
+                        pMsg->Read(), m_hClient, MESSAGE_GUARANTEED);
+                    pMsg->DecRef();
+                    }
+                    delete[] scoreStruct;
+                    // Reset the counter
                     m_iSendStatsCounter = (uint8)(2.0f / 0.25f); //desired delay divided by the update frequency
                 }else
                 {
