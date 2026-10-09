@@ -146,6 +146,13 @@ if errorlevel 1 goto :copyfail
 copy /y "config\run-cabinfever.cmd" "%BUILT_DIR%\run-cabinfever.cmd" >nul
 if errorlevel 1 goto :copyfail
 if not exist "%BUILT_DIR%\config" mkdir "%BUILT_DIR%\config" >nul
+if not exist "%BUILT_DIR%\config\hub-url.txt" (
+  echo [SEED] Optional FIRETEAM Hub URL config ^(offline until set^).
+  copy /y "config\hub-url.txt" "%BUILT_DIR%\config\hub-url.txt" >nul
+  if errorlevel 1 goto :copyfail
+) else (
+  echo [KEEP] Local FIRETEAM Hub address unchanged.
+)
 if not exist "%BUILT_DIR%\config\weapons.cfg" (
   echo [SEED] Missing local weapons.cfg; copying template once.
   copy /y "config\weapons.cfg" "%BUILT_DIR%\config\weapons.cfg" >nul
