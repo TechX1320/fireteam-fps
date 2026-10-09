@@ -206,7 +206,7 @@ public sealed class ServerDirectoryService
             valid.Add(new FireteamServerListing(
                 name, address, NormalizeMap(server.Map),
                 players, maxPlayers, difficulty,
-                server.Verified, server.Source == "Hub" ? "Hub" : "Curated"));
+                server.Verified, server.Source == "Hub" ? "Hub" : source));
         }
 
         return valid;
