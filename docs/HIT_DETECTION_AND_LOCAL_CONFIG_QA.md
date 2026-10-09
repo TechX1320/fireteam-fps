@@ -65,6 +65,7 @@ build.cmd now **seeds only missing files** in BUILT/config for:
 - weapon-library.cfg
 - loadouts.cfg
 - player.cfg (character template, not Player Profile stats)
+- session.cfg (map/difficulty/stat-tracking options)
 
 Once present, these files belong to the LOCAL working installation.
 They are NOT overwritten on every build.
@@ -73,6 +74,9 @@ The dedicated server staging script similarly preserves its own copies.
 Weapon Editor and Weapon Import now read/write BUILT/config/weapons.cfg
 rather than altering tracked repository config/weapons.cfg. Availability
 changes are local in BUILT/config/weapon-library.cfg.
+
+Also, stage-imported-weapons.cmd now stages weapon assets ONLY: it
+never overwrites BUILT/config/weapons.cfg from source behind your back.
 
 Local Weapon QA exclusions remain in
 BUILT/config/weapon-quarantine.txt and the safety copy under
@@ -94,7 +98,8 @@ To sync playable weapons from BUILT into a separate dedicated host:
 
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\sync-local-config.ps1 -Direction ToDedicated -Files weapons.cfg -ConfirmSync
 
-Each overwrite makes a timestamped backup of the destination.
+Each overwrite makes a timestamped backup of the destination. Manual-sync
+backups under config/ are Git-ignored.
 Without -ConfirmSync, the script refuses to copy anything.
 Never put private player stats or local user profiles in repository source.
 
