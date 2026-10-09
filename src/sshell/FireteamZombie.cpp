@@ -92,6 +92,7 @@ FireteamZombie::FireteamZombie() :
     m_fStragglerIdleSeconds(0.0f),
     m_fTargetMemory(0.0f),
     m_fVoiceCooldown(0.0f),
+    m_fAttackVoiceCooldown(0.0f),
     m_bHasLastKnownTarget(false),
     m_eBehaviorState(kBehaviorSearch),
     m_bDying(false),
@@ -1472,6 +1473,8 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
 
     if(m_fVoiceCooldown > 0.0f)
         m_fVoiceCooldown -= kUpdate;
+    if(m_fAttackVoiceCooldown > 0.0f)
+        m_fAttackVoiceCooldown -= kUpdate;
 
     const BehaviorState ePreviousBehavior =
         m_eBehaviorState;
@@ -1697,13 +1700,14 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
                     m_Def.nAttackDamage);
             }
 
-            if(m_fVoiceCooldown <= 0.0f &&
+            // Alert barks must not silence the first melee strike.
+            // Separate rate-limit prevents overlapping attack grunts.
+            if(m_fAttackVoiceCooldown <= 0.0f &&
                (rand() % 100) <
                     (int)m_Def.nVoiceAttackChance)
             {
                 PlayAttackVoice();
-                m_fVoiceCooldown =
-                    1.15f;
+                m_fAttackVoiceCooldown = 1.10f;
             }
 
             m_fAttackCooldown =
