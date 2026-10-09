@@ -295,6 +295,7 @@ void FT_RoundHudTerm()
     s_nAlive = 0;
     s_nLives = 3;
     s_nMaxLives = 3;
+    s_bWaitingForNextRound = false;
     s_bGameOver = false;
     s_bSpectating = false;
     s_bQaSpectating = false;
@@ -510,6 +511,12 @@ bool FT_RoundHudIsBottomlessActive()
     return s_fBottomlessUntil > FT_HudCombatTime();
 }
 
+void FT_RoundHudSetWaitingForNextRound(bool bWaiting)
+{
+    s_bWaitingForNextRound = bWaiting;
+    if(bWaiting) s_fRespawnUntil = 0.0f;
+}
+
 void FT_RoundHudSetRespawnCountdown(float fSeconds)
 {
     s_fRespawnUntil = fSeconds > 0.0f
@@ -628,6 +635,16 @@ void FT_RenderRoundHud()
         s_pRespawnStatus->SetPosition(
             ((float)nScreenW - s_pRespawnStatus->GetWidth()) * 0.5f,
             (float)nScreenH - 52.0f);
+        s_pRespawnStatus->Render();
+    }
+
+    if(s_bWaitingForNextRound && s_pRespawnStatus && !s_bGameOver)
+    {
+        s_pRespawnStatus->SetText(
+            "JOINING AT NEXT ROUND  |  ESC: SETTINGS / QUIT");
+        s_pRespawnStatus->SetPosition(
+            ((float)nScreenW - s_pRespawnStatus->GetWidth()) * 0.5f,
+            (float)nScreenH * 0.48f);
         s_pRespawnStatus->Render();
     }
 
