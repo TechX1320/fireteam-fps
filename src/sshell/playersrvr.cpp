@@ -2198,6 +2198,8 @@ void CPlayerSrvr::FirePrimary(
                 // Counts a confirmed direct hitscan impact, not theoretical
                 // pellet/projectile hits or a client-reported hit marker.
                 ++m_nConfirmedHits;
+                // Shooter-only marker after server collision and damage delivery.
+                SendCombatFeedback(FT_COMBAT_FEEDBACK_HIT);
 
                 g_pLTServer->CPrint(
                     "Fireteam weapon: %s infected hit region=%s damage=%u distance=%.1f penetrations=%u",
