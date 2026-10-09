@@ -18,6 +18,7 @@
 #include <ltbasedefs.h>
 #include <ltengineobjects.h>
 #include "FireteamWeaponDefs.h"
+#include "scoredefs.h"
 
 
 
@@ -30,6 +31,14 @@ public:
 		: m_hClub(NULL),
     	  m_hClient(NULL),
     	  m_iScore(0),
+          m_nAcceptedShots(0),
+          m_nConfirmedHits(0),
+          m_nDeaths(0),
+          m_nPowerups(0),
+          m_nHeadshotKills(0),
+          m_nDamageTaken(0),
+          m_nZombieTypeCount(0),
+          m_nPowerupTypeCount(0),
     	  m_fMoney(0.0f),
 		  m_DebugSphere(NULL),
           m_bSendStats(false),
@@ -61,6 +70,9 @@ public:
           m_nKillFeedbackChain(0)
     {
         FT_LoadWeaponDefs("config/weapons.cfg", m_WeaponDefs);
+        memset(m_aShotsBySlot, 0, sizeof(m_aShotsBySlot));
+        memset(m_aZombieTypes, 0, sizeof(m_aZombieTypes));
+        memset(m_aPowerupTypes, 0, sizeof(m_aPowerupTypes));
 
         for(uint8 nSlot = 0; nSlot < 6; ++nSlot)
         {
@@ -102,6 +114,24 @@ public:
                         { m_vSpawnPos = vPos; m_rSpawnRot = rRot; }
     uint32              GetClientID(){ return m_iClientID; }
     uint32              GetScore(){ return m_iScore; }
+    uint32              GetAcceptedShots() const { return m_nAcceptedShots; }
+    uint32              GetConfirmedHits() const { return m_nConfirmedHits; }
+    uint32              GetMatchDeaths() const { return m_nDeaths; }
+    uint32              GetPowerupCount() const { return m_nPowerups; }
+    uint32              GetHeadshotKills() const { return m_nHeadshotKills; }
+    uint32              GetDamageTaken() const { return m_nDamageTaken; }
+    uint32              GetWeaponShots(uint8 slot) const {
+                            return slot < 6 ? m_aShotsBySlot[slot] : 0;
+                        }
+    const char*         GetWeaponId(uint8 slot) const {
+                            return slot < 6 ? m_WeaponDefs[slot].sId : "";
+                        }
+    const FTNamedCounter* GetZombieKillTypes() const { return m_aZombieTypes; }
+    const FTNamedCounter* GetPowerupTypes() const { return m_aPowerupTypes; }
+    uint8               GetZombieTypeCount() const { return m_nZombieTypeCount; }
+    uint8               GetPowerupTypeCount() const { return m_nPowerupTypeCount; }
+    void                RecordZombieTypeKill(const char *pType);
+    void                RecordPowerupPickup(const char *pType);
     void                SetSendStatsFlag(bool bSend)
                                         { 
                                             m_bSendStats = bSend; 
@@ -189,6 +219,17 @@ private:
 
     // Stats
     uint32              m_iScore;
+    uint32              m_nAcceptedShots;
+    uint32              m_nConfirmedHits;
+    uint32              m_nDeaths;
+    uint32              m_nPowerups;
+    uint32              m_nHeadshotKills;
+    uint32              m_nDamageTaken;
+    uint32              m_aShotsBySlot[6];
+    FTNamedCounter      m_aZombieTypes[FT_MAX_MATCH_CATEGORIES];
+    FTNamedCounter      m_aPowerupTypes[FT_MAX_MATCH_CATEGORIES];
+    uint8               m_nZombieTypeCount;
+    uint8               m_nPowerupTypeCount;
     float               m_fMoney;
     uint32              m_iClientID;
     float               m_fLastKillFeedbackTime;
