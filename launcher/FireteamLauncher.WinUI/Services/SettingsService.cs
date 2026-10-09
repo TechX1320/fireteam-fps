@@ -41,7 +41,8 @@ public sealed class SettingsService
             Math.Clamp(rawSensitivityX / NativeSensitivityBase, 0.01, 4.0),
             Math.Clamp(rawSensitivityY / NativeSensitivityBase, 0.01, 4.0),
             Math.Clamp(volume, 0, 100),
-            Math.Clamp(gamma, 0.50, 6.00));
+            Math.Clamp(gamma, 0.50, 6.00),
+            tokens.Length < 8 || tokens[7] != "0");
     }
 
     public void SaveSettings(LauncherSettings settings)
