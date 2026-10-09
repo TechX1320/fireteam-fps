@@ -44,6 +44,8 @@ struct FTInfectedDef
     char sAnimationModel[128];
     char sBodyTexture0[128];
     char sBodyTexture1[128];
+    // Larger special infected may have a distinct third head/skin material.
+    char sBodyTexture2[128];
     char sBodyRenderStyle0[128];
     char sBodyRenderStyle1[128];
 
@@ -195,6 +197,8 @@ inline void FT_ApplyInfectedValue(
         FT_CopyInfectedString(def.sBodyTexture0, sizeof(def.sBodyTexture0), pValue);
     else if(_stricmp(pKey, "body_texture1") == 0)
         FT_CopyInfectedString(def.sBodyTexture1, sizeof(def.sBodyTexture1), pValue);
+    else if(_stricmp(pKey, "body_texture2") == 0)
+        FT_CopyInfectedString(def.sBodyTexture2, sizeof(def.sBodyTexture2), pValue);
     else if(_stricmp(pKey, "body_renderstyle0") == 0)
         FT_CopyInfectedString(def.sBodyRenderStyle0, sizeof(def.sBodyRenderStyle0), pValue);
     else if(_stricmp(pKey, "body_renderstyle1") == 0)
