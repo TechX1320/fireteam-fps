@@ -30,7 +30,8 @@ m_pStatsString_Moneyearned(NULL),
 m_pScores(NULL),
 m_iNumPlayers(0)
 {
-
+    for(int i = 0; i < 4; ++i)
+        m_pStatsString_Extra[i] = LTNULL;
 }
 
 
@@ -129,6 +130,14 @@ LTRESULT CStatsGui::Init()
     m_pStatsString_Moneyearned->SetText("");
 
 
+    for(int n = 0; n < 4; ++n)
+    {
+        m_pStatsString_Extra[n] =
+            g_pLTCFontManager->CreateFormattedPolyString(m_pFont, "");
+        if(!m_pStatsString_Extra[n])
+            return LT_ERROR;
+    }
+
     /*
     uint32 nFontWidth = static_cast<uint32>(m_pStatsString_Playername->GetWidth());
     uint32 nFontHeight = static_cast<uint32>(m_pStatsString_Playername->GetHeight());
@@ -181,6 +190,15 @@ LTRESULT CStatsGui::Term()
 		g_pLTCFontManager->DestroyPolyString(m_pStatsString_Moneyearned);
 	}
 
+    for(int n = 0; n < 4; ++n)
+    {
+        if(m_pStatsString_Extra[n])
+        {
+            g_pLTCFontManager->DestroyPolyString(m_pStatsString_Extra[n]);
+            m_pStatsString_Extra[n] = LTNULL;
+        }
+    }
+
 	if (LTNULL != m_pScores)
 	{
 		delete[] m_pScores;
@@ -198,13 +216,12 @@ LTRESULT CStatsGui::Term()
 //------------------------------------------------------------------------------
 LTRESULT CStatsGui::Render()
 {
-    if (NULL == m_pStatsString_Title ||
-    	NULL == m_pStatsString_Playername ||
-		NULL == m_pStatsString_Sealswhacked ||
-		NULL == m_pStatsString_Moneyearned)
-	{
-		return LT_ERROR;
-	}
+    if(!m_pStatsString_Title || !m_pStatsString_Playername ||
+       !m_pStatsString_Sealswhacked || !m_pStatsString_Moneyearned)
+        return LT_ERROR;
+    for(int n = 0; n < 4; ++n)
+        if(!m_pStatsString_Extra[n])
+            return LT_ERROR;
 
     // If we haven't created this texture yet, then return.
 	if (!m_hBackDrop)
@@ -217,33 +234,17 @@ LTRESULT CStatsGui::Render()
 	uint32 nScreenW, nScreenH;
 	g_pLTClient->GetSurfaceDims(g_pLTClient->GetScreenSurface(), &nScreenW, &nScreenH);
 
-	// Get texture dims.
-	uint32 nTexW, nTexH;
-	g_pLTCTexInterface->GetTextureDims(m_hBackDrop, nTexW, nTexH);
-	/*
-    if (nWidth > 0)
-	{
-		nTexW = nWidth;
-	}
-	if (nHeight > 0)
-	{
-		nTexH = nHeight;
-	}
-    */
-
-	// Calculate destination rect on the screen.
-	float top 		= 0.0f;
-	float bottom 	= float(nTexH);
-	float left 		= 0.0f;
-	float right 	= float(nTexW);
-
-    // Center on the Y axis
-	top = float(nScreenH/2 - nTexH/2);
-	bottom = float(top + nTexH);
-
-    // Center on the X axis
-	left = float(nScreenW/2 - nTexW/2);
-	right = float(left + nTexW);
+    // The 2003 background was 512x256 regardless of player count.
+    // Use a responsive, centered results panel with proper pixel columns.
+    const float fPanelWidth =
+        nScreenW > 1060 ? 1020.0f : (float)nScreenW - 40.0f;
+    const float fPanelHeight =
+        nScreenH > 700 ? 630.0f : (float)nScreenH - 60.0f;
+    const float left = ((float)nScreenW - fPanelWidth) * 0.5f;
+    const float right = left + fPanelWidth;
+    const float top = ((float)nScreenH - fPanelHeight) * 0.5f;
+    const float bottom = top + fPanelHeight;
+    const float fScale = fPanelWidth / 1020.0f;
 
 	// Set up the verts (clockwise from upper left).
 	LT_POLYFT4 poly;
@@ -275,7 +276,7 @@ LTRESULT CStatsGui::Render()
 	poly.rgba.r = 255;
 	poly.rgba.g = 255;
 	poly.rgba.b = 255;
-	poly.rgba.a = 128;//nAlpha;
+    poly.rgba.a = 210; // Solid readable scoreboard on dark zombie maps.
 
 	// Set which texture to use.
 	g_pLTCDrawPrim->SetTexture(m_hBackDrop);
@@ -294,10 +295,23 @@ LTRESULT CStatsGui::Render()
 	// Draw the Image (just 1 quad).
 	g_pLTCDrawPrim->DrawPrim(&poly, 1);
 
-    // Draw the stats now.
+    // Each data column is positioned independently. Never use spaces to
+    // align proportional-font headings and numbers across resolutions.
+    const float fDataTop = top + 78.0f;
+    m_pStatsString_Title->SetPosition(left + 26.0f, top + 22.0f);
+    m_pStatsString_Playername->SetPosition(left + 26.0f, fDataTop);
+    m_pStatsString_Sealswhacked->SetPosition(left + 350.0f * fScale, fDataTop);
+    m_pStatsString_Extra[0]->SetPosition(left + 455.0f * fScale, fDataTop);
+    m_pStatsString_Extra[1]->SetPosition(left + 570.0f * fScale, fDataTop);
+    m_pStatsString_Extra[2]->SetPosition(left + 665.0f * fScale, fDataTop);
+    m_pStatsString_Extra[3]->SetPosition(left + 770.0f * fScale, fDataTop);
+    m_pStatsString_Moneyearned->SetPosition(left + 918.0f * fScale, fDataTop);
+
     m_pStatsString_Title->Render();
     m_pStatsString_Playername->Render();
     m_pStatsString_Sealswhacked->Render();
+    for(int n = 0; n < 4; ++n)
+        m_pStatsString_Extra[n]->Render();
     m_pStatsString_Moneyearned->Render();
 
     return LT_OK;
@@ -397,89 +411,60 @@ LTRESULT CStatsGui::SortStats()
 //------------------------------------------------------------------------------
 LTRESULT CStatsGui::RecalcStatsString()
 {
-    if(NULL == m_pStatsString_Title ||
-       NULL == m_pStatsString_Playername ||
-       NULL == m_pStatsString_Sealswhacked ||
-       NULL == m_pStatsString_Moneyearned)
-    {
+    if(!m_pStatsString_Title || !m_pStatsString_Playername ||
+       !m_pStatsString_Sealswhacked || !m_pStatsString_Moneyearned)
         return LT_ERROR;
-    }
+    for(int n = 0; n < 4; ++n)
+        if(!m_pStatsString_Extra[n]) return LT_ERROR;
 
-    char sNames[1024];
-    char sKills[512];
-    char sLives[512];
-    sNames[0] = '\0';
-    sKills[0] = '\0';
-    sLives[0] = '\0';
+    char sNames[1280] = "PLAYER\\n\\n";
+    char sKills[512] = "KILLS\\n\\n";
+    char sShots[512] = "SHOTS\\n\\n";
+    char sHits[512] = "HITS\\n\\n";
+    char sDeaths[512] = "DEATHS\\n\\n";
+    char sPowerups[512] = "POWERUPS\\n\\n";
+    char sLives[512] = "LIVES\\n\\n";
 
-    for(int i = 0; i < m_iNumPlayers; ++i)
+    for(int i = 0; i < m_iNumPlayers && m_pScores; ++i)
     {
-        char sNameLine[80];
-        char sKillLine[32];
-        char sLifeLine[32];
-
-        sprintf(
-            sNameLine,
-            "%s\n",
-            m_pScores[i].sPlayerName);
-        strncat(
-            sNames,
-            sNameLine,
-            sizeof(sNames) - strlen(sNames) - 1);
-
-        sprintf(
-            sKillLine,
-            "%u\n",
-            (uint32)m_pScores[i].iScore);
-        strncat(
-            sKills,
-            sKillLine,
-            sizeof(sKills) - strlen(sKills) - 1);
-
-        sprintf(
-            sLifeLine,
-            "%u\n",
-            (uint32)m_pScores[i].iLives);
-        strncat(
-            sLives,
-            sLifeLine,
-            sizeof(sLives) - strlen(sLives) - 1);
+        char line[96];
+        _snprintf(line, sizeof(line) - 1, "%s\\n", m_pScores[i].sPlayerName);
+        line[sizeof(line) - 1] = '\0';
+        strncat(sNames, line, sizeof(sNames) - strlen(sNames) - 1);
+        _snprintf(line, sizeof(line) - 1, "%u\\n", m_pScores[i].iScore);
+        line[sizeof(line) - 1] = '\0';
+        strncat(sKills, line, sizeof(sKills) - strlen(sKills) - 1);
+        _snprintf(line, sizeof(line) - 1, "%u\\n", m_pScores[i].iShotsFired);
+        line[sizeof(line) - 1] = '\0';
+        strncat(sShots, line, sizeof(sShots) - strlen(sShots) - 1);
+        _snprintf(line, sizeof(line) - 1, "%u\\n", m_pScores[i].iShotsHit);
+        line[sizeof(line) - 1] = '\0';
+        strncat(sHits, line, sizeof(sHits) - strlen(sHits) - 1);
+        _snprintf(line, sizeof(line) - 1, "%u\\n", m_pScores[i].iDeaths);
+        line[sizeof(line) - 1] = '\0';
+        strncat(sDeaths, line, sizeof(sDeaths) - strlen(sDeaths) - 1);
+        _snprintf(line, sizeof(line) - 1, "%u\\n", m_pScores[i].iPowerups);
+        line[sizeof(line) - 1] = '\0';
+        strncat(sPowerups, line, sizeof(sPowerups) - strlen(sPowerups) - 1);
+        _snprintf(line, sizeof(line) - 1, "%u\\n", (uint32)m_pScores[i].iLives);
+        line[sizeof(line) - 1] = '\0';
+        strncat(sLives, line, sizeof(sLives) - strlen(sLives) - 1);
     }
 
-    uint32 nWidth = 0;
-    uint32 nHeight = 0;
-    g_pLTClient->GetSurfaceDims(
-        g_pLTClient->GetScreenSurface(),
-        &nWidth,
-        &nHeight);
-
-    m_pStatsString_Title->SetText(
-        "FIRETEAM SQUAD\n\nPLAYER                              KILLS        LIVES");
+    m_pStatsString_Title->SetText("FIRETEAM  /  SQUAD PERFORMANCE");
     m_pStatsString_Title->SetColor(0xFFFFB000);
-    m_pStatsString_Title->SetPosition(
-        (float)nWidth * 0.5f - 245.0f,
-        (float)nHeight * 0.5f - 135.0f);
-
     m_pStatsString_Playername->SetText(sNames);
-    m_pStatsString_Playername->SetColor(0xFFFFFFFF);
-    m_pStatsString_Playername->SetPosition(
-        (float)nWidth * 0.5f - 245.0f,
-        (float)nHeight * 0.5f - 80.0f);
-
     m_pStatsString_Sealswhacked->SetText(sKills);
+    m_pStatsString_Extra[0]->SetText(sShots);
+    m_pStatsString_Extra[1]->SetText(sHits);
+    m_pStatsString_Extra[2]->SetText(sDeaths);
+    m_pStatsString_Extra[3]->SetText(sPowerups);
+    m_pStatsString_Moneyearned->SetText(sLives);
+
+    m_pStatsString_Playername->SetColor(0xFFFFFFFF);
     m_pStatsString_Sealswhacked->SetColor(0xFFFFFFFF);
-    m_pStatsString_Sealswhacked->SetPosition(
-        (float)nWidth * 0.5f + 120.0f,
-        (float)nHeight * 0.5f - 80.0f);
-
-    // Reuse the legacy third column for remaining Fireteam lives.
-    m_pStatsString_Moneyearned->SetText(
-        sLives);
-    m_pStatsString_Moneyearned->SetColor(
-        0xFFFFFFFF);
-    m_pStatsString_Moneyearned->SetPosition(
-        (float)nWidth * 0.5f + 220.0f,
-        (float)nHeight * 0.5f - 80.0f);
-
+    for(int n = 0; n < 4; ++n)
+        m_pStatsString_Extra[n]->SetColor(0xFFFFFFFF);
+    m_pStatsString_Moneyearned->SetColor(0xFFFFFFFF);
     return LT_OK;
 }
