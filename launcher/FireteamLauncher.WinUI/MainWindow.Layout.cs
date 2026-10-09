@@ -3279,6 +3279,10 @@ public sealed partial class MainWindow
                 "GAMMA",
                 GammaBox));
 
+        RadarToggle.OnContent = "On";
+        RadarToggle.OffContent = "Off";
+        display.Children.Add(LabeledControl("TOP-RIGHT RADAR", RadarToggle));
+
         var input =
             CardHeading(
                 "INPUT",
