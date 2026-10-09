@@ -19,6 +19,7 @@ public sealed partial class MainWindow
     private readonly ComboBox DedicatedVisibilityCombo = new();
     private readonly PasswordBox DedicatedPinBox = new();
     private readonly ToggleSwitch DedicatedOnlineToggle = new();
+    private readonly ToggleSwitch DedicatedRouterToggle = new();
     private readonly TextBox DedicatedHubUrlBox = new();
     private readonly ToggleSwitch DedicatedStatsToggle = new();
     private readonly ListView DedicatedModsList = new();
@@ -101,6 +102,9 @@ public sealed partial class MainWindow
         DedicatedOnlineToggle.Header =
             "Advertise server on FIRETEAM Hub (publishes my Internet IP)";
         access.Children.Add(DedicatedOnlineToggle);
+        DedicatedRouterToggle.Header =
+            "Automatically request UPnP for detected game ports (opt-in)";
+        access.Children.Add(DedicatedRouterToggle);
         DedicatedHubUrlBox.PlaceholderText = "https://your-fireteam-hub.example";
         DedicatedHubUrlBox.MaxLength = 240;
         DedicatedHubUrlBox.MinWidth = 400;
@@ -162,6 +166,7 @@ public sealed partial class MainWindow
         DedicatedVisibilityCombo.SelectedIndex = profile.Private ? 1 : 0;
         DedicatedPinBox.Password = "";
         DedicatedOnlineToggle.IsOn = profile.PublishOnline;
+        DedicatedRouterToggle.IsOn = profile.AutoConfigureRouter;
         DedicatedHubUrlBox.Text = string.IsNullOrWhiteSpace(profile.HubUrl)
             ? HubAddressService.Load() ?? ""
             : profile.HubUrl;
@@ -219,7 +224,8 @@ public sealed partial class MainWindow
             ReadDedicatedNumber(DedicatedPrepBox, 0, 120, "Preparation"),
             DedicatedModsList.SelectedItems.OfType<string>().ToArray(),
             DedicatedOnlineToggle.IsOn,
-            DedicatedHubUrlBox.Text?.Trim() ?? "");
+            DedicatedHubUrlBox.Text?.Trim() ?? "",
+            DedicatedRouterToggle.IsOn);
         return profile;
     }
 
@@ -237,23 +243,44 @@ public sealed partial class MainWindow
         }
     }
 
-    private void LaunchDedicatedServer()
+    private async void LaunchDedicatedServer()
     {
         try
         {
-            DedicatedStatus.Text = _dedicatedServer.Start(GetDedicatedProfile());
+            var profile = GetDedicatedProfile();
+            var started = _dedicatedServer.Start(profile);
+            DedicatedStatus.Text = started;
+            if(!profile.AutoConfigureRouter)
+                return;
+
+            DedicatedStatus.Text += "\nChecking actual game listeners and router UPnP...";
+            var outcome = await _dedicatedServer.ConfigureRouterAsync(profile.Port);
+            DedicatedStatus.Text = started + "\n" + outcome;
         }
         catch(Exception ex)
         {
-            DedicatedStatus.Text = "Dedicated launch blocked: " + ex.Message;
+            DedicatedStatus.Text = "Dedicated launch/network setup: " + ex.Message;
         }
     }
 
-    private void StopDedicatedServer()
+    private async void StopDedicatedServer()
     {
         try
         {
-            DedicatedStatus.Text = _dedicatedServer.RequestStop();
+            var status = _dedicatedServer.RequestStop();
+            DedicatedStatus.Text = status;
+            // Keep public mappings until the server really exits.
+            for(var n = 0; n < 16 && _dedicatedServer.IsRunning; ++n)
+                await Task.Delay(500);
+
+            if(_dedicatedServer.IsRunning)
+            {
+                DedicatedStatus.Text +=
+                    "\nServer still stopping; router mapping retained until shutdown.";
+                return;
+            }
+            DedicatedStatus.Text += "\n" +
+                await _dedicatedServer.CleanupRouterAsync();
         }
         catch(Exception ex)
         {

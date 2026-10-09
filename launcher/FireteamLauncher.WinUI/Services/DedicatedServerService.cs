@@ -18,7 +18,8 @@ public sealed record DedicatedHostProfile(
     int FirstRoundPrepSeconds,
     string[] Mods,
     bool PublishOnline = false,
-    string HubUrl = "")
+    string HubUrl = "",
+    bool AutoConfigureRouter = false)
 {
     public static DedicatedHostProfile Default => new(
         "FIRETEAM Dedicated", "CABINFEVER", 4, 27889, 24,
@@ -28,6 +29,7 @@ public sealed record DedicatedHostProfile(
 public sealed class DedicatedServerService
 {
     private Process? _process;
+    private readonly RouterMappingService _routerMappings = new();
 
     private static string PresetPath =>
         Path.Combine(LauncherPaths.SupportRoot, "dedicated-host.json");
@@ -141,8 +143,21 @@ public sealed class DedicatedServerService
                "Check the server console for the READY message before joining. " +
                (profile.PublishOnline
                    ? "Opt-in public heartbeat enabled. Joinability/NAT is NOT verified."
-                   : "LAN/unlisted only; public IP has not been advertised.");
+                   : "LAN/unlisted only; public IP has not been advertised.") +
+               (profile.AutoConfigureRouter
+                   ? " Requested UPnP mapping will be checked next."
+                   : " No automatic router mapping requested.");
     }
+
+    public Task<string> ConfigureRouterAsync(int port)
+    {
+        if(!IsRunning)
+            return Task.FromResult("Dedicated process has stopped; no UPnP changes made.");
+        return _routerMappings.TryMapGamePortAsync(port);
+    }
+
+    public Task<string> CleanupRouterAsync() =>
+        _routerMappings.RemoveOwnedMappingsAsync();
 
     public string RequestStop()
     {
