@@ -453,22 +453,29 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
             char sTicket[48];
             sTicket[0] = '\0';
             pMessage->ReadString(sTicket, sizeof(sTicket));
-            if(pPlayerClass)
+            if(!pPlayerClass || pPlayerClass->HasResumeIdentity())
+                break; // A joined client may NOT rename/impersonate mid-match.
+            if(!FT_ClaimReconnect(pPlayerClass, sTicket, szName))
             {
-                pPlayerClass->SetPlayerName(szName);
-                if(!FT_ClaimReconnect(pPlayerClass, sTicket))
-                    g_pLTServer->CPrint(
-                        "FIRETEAM: reconnect identity not accepted; controls remain locked.");
+                g_pLTServer->CPrint(
+                    "FIRETEAM: reconnect identity rejected; controls locked.");
+                pPlayerClass->NotifyPowerup(
+                    "JOIN REJECTED - IDENTITY ALREADY ACTIVE", 5.0f);
+                break;
             }
-            g_pLTServer->CPrint("%s has entered the game", szName);
 
-	        ILTMessage_Write *pMsg;
-        	LTRESULT nResult = g_pLTSCommon->CreateMessage(pMsg);
-	        pMsg->IncRef();
-            pMsg->Writeuint8(MSG_CS_PLAYERNAME);
-            pMsg->WriteString(szName);
-            g_pLTServer->SetObjectSFXMessage(hPlayer, pMsg->Read());
-            pMsg->DecRef();
+            const char *pAcceptedName = pPlayerClass->GetPlayerName();
+            g_pLTServer->CPrint("%s has entered the game", pAcceptedName);
+            // Send the AUTHORITATIVE name, including any _2 suffix.
+            ILTMessage_Write *pMsg = LTNULL;
+            if(g_pLTSCommon->CreateMessage(pMsg) == LT_OK && pMsg)
+            {
+                pMsg->IncRef();
+                pMsg->Writeuint8(MSG_CS_PLAYERNAME);
+                pMsg->WriteString(pAcceptedName);
+                g_pLTServer->SetObjectSFXMessage(hPlayer, pMsg->Read());
+                pMsg->DecRef();
+            }
         }
         break;
     case MSG_CS_MY_CLUB:
