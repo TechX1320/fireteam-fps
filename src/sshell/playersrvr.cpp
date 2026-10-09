@@ -1498,6 +1498,9 @@ void CPlayerSrvr::CaptureResumeState(FTPlayerResumeState &state) const
     state.nBottomlessStacks = m_nBottomlessStacks;
     state.nOneHitStacks = m_nOneHitStacks;
     state.nGodStacks = m_nGodStacks;
+    state.bBottomlessActive = m_bBottomlessWasActive;
+    state.bOneHitActive = m_bOneHitWasActive;
+    state.bGodActive = m_bGodWasActive;
 }
 
 void CPlayerSrvr::RestoreResumeState(
