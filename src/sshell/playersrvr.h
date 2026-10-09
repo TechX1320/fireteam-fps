@@ -290,6 +290,7 @@ private:
     bool                m_bQaSpectating;
     float               m_fRespawnTimer;
     float               m_fNextPositionTrace;
+    float               m_fNextRadarTime;
     float               m_fPoisonCarry;
     LTVector            m_vSpawnPos;
     LTRotation          m_rSpawnRot;
