@@ -21,6 +21,8 @@ public sealed partial class MainWindow
         int Difficulty);
     private bool _lanDiscoveryInitialized;
     private bool _curatedDirectoryRequested;
+    private bool _directoryRefreshBusy;
+    private DateTime _nextDirectoryRefreshUtc = DateTime.MinValue;
     private IReadOnlyList<FireteamServerListing> _communityServers = [];
 
     private void BuildServerBrowserView()
@@ -40,7 +42,7 @@ public sealed partial class MainWindow
         page.Children.Add(CardHeading(
             "SERVER BROWSER",
             "Community Servers",
-            "Nearby dedicated servers appear automatically on LAN. Internet listings still require an opt-in public directory; unknown ping or population is never fabricated."));
+            "Automatic LAN discovery plus the optional live FIRETEAM Hub. Live heartbeats do not prove a server is reachable."));
 
         var controls = new StackPanel
         {
@@ -131,7 +133,14 @@ public sealed partial class MainWindow
         _lanDiscovery.Start();
         _lanRefreshTimer = DispatcherQueue.CreateTimer();
         _lanRefreshTimer.Interval = TimeSpan.FromSeconds(3);
-        _lanRefreshTimer.Tick += (sender, args) => RefreshServerBrowserList();
+        _lanRefreshTimer.Tick += (sender, args) =>
+        {
+            RefreshServerBrowserList();
+            if(_curatedDirectoryRequested &&
+               !_directoryRefreshBusy &&
+               DateTime.UtcNow >= _nextDirectoryRefreshUtc)
+                _ = RefreshCommunityServersAsync();
+        };
         _lanRefreshTimer.Start();
         Closed += (sender, args) =>
         {
@@ -153,7 +162,9 @@ public sealed partial class MainWindow
                 true, s.Players, s.MaxPlayers, s.Difficulty));
         var saved = _serverDirectory.LoadFavorites()
             .Concat(_communityServers)
-            .Select(s => new ServerBrowserRow(s, false, 0, 0, 0));
+            .Select(s => new ServerBrowserRow(
+                s, false, s.Players ?? 0, s.MaxPlayers ?? 0,
+                s.Difficulty ?? 0));
         var entries = nearby.Concat(saved)
             .GroupBy(row => row.Listing.Address, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.OrderByDescending(item => item.IsLan).First())
@@ -208,24 +219,40 @@ public sealed partial class MainWindow
 
     private static Grid ServerGridRow(ServerBrowserRow row) =>
         ServerColumns(row.Listing.Name, row.Listing.Map,
-            row.IsLan ? $"LAN • D{row.Difficulty}" : "Directory",
-            row.IsLan ? $"{row.Players}/{row.MaxPlayers}" : "—",
-            "—", "Not checked", false);
+            row.IsLan ? $"LAN • D{row.Difficulty}" :
+            row.Listing.Source == "Hub" ? $"HUB • D{row.Difficulty}" : "Curated",
+            row.MaxPlayers > 0 ? $"{row.Players}/{row.MaxPlayers}" : "—",
+            "—", row.Listing.Source == "Hub" ? "Unverified" : "Not checked", false);
 
     private async Task RefreshCommunityServersAsync()
     {
-        ServerBrowserStatus.Text = "Checking the community server directory...";
+        if(_directoryRefreshBusy) return;
+        _directoryRefreshBusy = true;
+        _nextDirectoryRefreshUtc = DateTime.UtcNow.AddSeconds(
+            HubAddressService.Load() is null ? 120 : 20);
         try
         {
             _communityServers = await _serverDirectory.FetchPublicAsync();
             RefreshServerBrowserList();
+            var warning = _serverDirectory.LastDirectoryWarning;
             ServerBrowserStatus.Text = _communityServers.Count == 0
-                ? "No public servers listed yet. Add a favorite or join by IP:port. Public directory registration is curated through GitHub."
-                : $"Directory refreshed: {_communityServers.Count} public listing(s). Server availability is not yet verified.";
+                ? $"No active listings from {_serverDirectory.LastDirectorySource}. " +
+                  "LAN and direct IP still work."
+                : $"{_communityServers.Count} listing(s) from " +
+                  $"{_serverDirectory.LastDirectorySource}. " +
+                  "Heartbeat presence does NOT prove Internet joinability.";
+            if(warning is not null)
+                ServerBrowserStatus.Text += " " + warning;
         }
         catch(Exception ex)
         {
-            ServerBrowserStatus.Text = "Directory unavailable; local favorites still work. " + ex.Message;
+            ServerBrowserStatus.Text =
+                "Online directory unavailable; LAN, favorites and direct IP still work. " +
+                ex.Message;
+        }
+        finally
+        {
+            _directoryRefreshBusy = false;
         }
     }
 
