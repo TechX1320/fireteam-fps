@@ -27,6 +27,8 @@ struct FTPlayerResumeState
 {
     LTVector vPosition;
     LTRotation rRotation;
+    LTVector vRespawnAnchor;
+    LTRotation rRespawnAnchor;
     uint8 nHealth, nMaxHealth, nLives, nMaxLives;
     uint8 nWeaponSlot;
     bool bAlive, bWaitingForRound;
