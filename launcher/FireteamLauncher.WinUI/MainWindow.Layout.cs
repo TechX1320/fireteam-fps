@@ -89,6 +89,7 @@ public sealed partial class MainWindow
         BuildMiniToolsView();
         BuildArsenalView();
         BuildModsView();
+        BuildPlayerProfileView();
         BuildSettingsView();
 
         content.Children.Add(HomeView);
@@ -100,6 +101,7 @@ public sealed partial class MainWindow
         content.Children.Add(MiniToolsView);
         content.Children.Add(ArsenalView);
         content.Children.Add(ModsView);
+        content.Children.Add(PlayerProfileView);
         content.Children.Add(SettingsView);
 
         Grid.SetRow(content, 2);
@@ -330,6 +332,11 @@ public sealed partial class MainWindow
             toolsMenu;
         bar.Children.Add(
             toolsButton);
+
+        bar.Children.Add(
+            NavButton(
+                "PLAYER PROFILE",
+                "profile"));
 
         bar.Children.Add(
             NavButton(
@@ -3407,6 +3414,10 @@ public sealed partial class MainWindow
                     "RezExtract.exe") is null
                     ? "RezExtract.exe not found yet."
                     : "RezExtract.exe detected and ready.";
+        }
+        else if(tag == "profile")
+        {
+            RefreshPlayerProfile();
         }
         else if(tag == "settings")
         {
