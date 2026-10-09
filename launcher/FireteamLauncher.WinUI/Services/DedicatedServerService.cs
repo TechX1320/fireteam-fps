@@ -16,7 +16,9 @@ public sealed record DedicatedHostProfile(
     string Pin,
     bool TrackStats,
     int FirstRoundPrepSeconds,
-    string[] Mods)
+    string[] Mods,
+    bool PublishOnline = false,
+    string HubUrl = "")
 {
     public static DedicatedHostProfile Default => new(
         "FIRETEAM Dedicated", "CABINFEVER", 4, 27889, 24,
@@ -41,7 +43,12 @@ public sealed class DedicatedServerService
                 var loaded = JsonSerializer.Deserialize<DedicatedHostProfile>(
                     File.ReadAllText(PresetPath));
                 if(loaded is not null)
-                    return loaded with { Pin = "", Mods = loaded.Mods ?? [] };
+                    return loaded with
+                    {
+                        Pin = "",
+                        Mods = loaded.Mods ?? [],
+                        HubUrl = loaded.HubUrl ?? ""
+                    };
             }
         }
         catch (Exception)
@@ -54,6 +61,10 @@ public sealed class DedicatedServerService
     public void Save(DedicatedHostProfile profile)
     {
         Validate(profile, forStart: false);
+        // The URL is public configuration, not a credential. Saving it
+        // locally also configures this launcher's Community Servers page.
+        if(!string.IsNullOrWhiteSpace(profile.HubUrl))
+            HubAddressService.Save(profile.HubUrl);
         Directory.CreateDirectory(LauncherPaths.SupportRoot);
         var text = JsonSerializer.Serialize(
             profile with { Pin = "" },
@@ -116,6 +127,11 @@ public sealed class DedicatedServerService
             System.Globalization.CultureInfo.InvariantCulture));
         start.ArgumentList.Add("--name");
         start.ArgumentList.Add(profile.Name.Trim());
+        if(profile.PublishOnline)
+        {
+            start.ArgumentList.Add("--hub-url");
+            start.ArgumentList.Add(HubAddressService.Save(profile.HubUrl));
+        }
 
         _process = Process.Start(start)
             ?? throw new InvalidOperationException("Windows did not start the dedicated process.");
@@ -123,7 +139,9 @@ public sealed class DedicatedServerService
         return $"Dedicated process started (PID {_process.Id}), {map}, " +
                $"{profile.MaxPlayers} slots, port {profile.Port}. " +
                "Check the server console for the READY message before joining. " +
-               "Public discovery requires separate opt-in directory registration.";
+               (profile.PublishOnline
+                   ? "Opt-in public heartbeat enabled. Joinability/NAT is NOT verified."
+                   : "LAN/unlisted only; public IP has not been advertised.");
     }
 
     public string RequestStop()
@@ -186,6 +204,15 @@ public sealed class DedicatedServerService
             if(forStart || profile.Pin.Length > 0)
                 throw new ArgumentException("Private access requires exactly four digits.");
         }
+
+        if(!string.IsNullOrWhiteSpace(profile.HubUrl) &&
+           !HubAddressService.TryNormalize(profile.HubUrl, out _))
+            throw new ArgumentException("Hub URL must be HTTPS (localhost HTTP for tests).");
+        if(forStart && profile.PublishOnline &&
+           (!HubAddressService.TryNormalize(profile.HubUrl, out _) || profile.Private))
+            throw new InvalidOperationException(
+                "Online advertising requires an explicit valid Hub URL and non-private server. " +
+                "The hub will see your public IP; connectivity is not automatically guaranteed.");
 
         if(forStart && profile.Private)
             throw new InvalidOperationException(

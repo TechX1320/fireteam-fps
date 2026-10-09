@@ -18,6 +18,8 @@ public sealed partial class MainWindow
     private readonly NumberBox DedicatedPrepBox = new();
     private readonly ComboBox DedicatedVisibilityCombo = new();
     private readonly PasswordBox DedicatedPinBox = new();
+    private readonly ToggleSwitch DedicatedOnlineToggle = new();
+    private readonly TextBox DedicatedHubUrlBox = new();
     private readonly ToggleSwitch DedicatedStatsToggle = new();
     private readonly ListView DedicatedModsList = new();
     private readonly TextBlock DedicatedModsStatus = new();
@@ -80,7 +82,7 @@ public sealed partial class MainWindow
 
         var access = new StackPanel { Spacing = 12 };
         access.Children.Add(CardHeading("ACCESS", "Visibility & privacy",
-            "Public servers are not automatically registered. Private PIN validation is planned but not yet server-enforced."));
+            "LAN/unlisted by default. Online heartbeat is opt-in; reachability and router mapping remain separate."));
         DedicatedVisibilityCombo.ItemsSource = new[]
         {
             "Public / unlisted", "Private / 4-digit PIN (unavailable)"
@@ -95,6 +97,17 @@ public sealed partial class MainWindow
         DedicatedPinBox.Width = 150;
         DedicatedPinBox.PlaceholderText = "4-digit PIN";
         access.Children.Add(LabeledControl("Private PIN", DedicatedPinBox));
+
+        DedicatedOnlineToggle.Header =
+            "Advertise server on FIRETEAM Hub (publishes my Internet IP)";
+        access.Children.Add(DedicatedOnlineToggle);
+        DedicatedHubUrlBox.PlaceholderText = "https://your-fireteam-hub.example";
+        DedicatedHubUrlBox.MaxLength = 240;
+        DedicatedHubUrlBox.MinWidth = 400;
+        access.Children.Add(LabeledControl("Hub address", DedicatedHubUrlBox));
+        access.Children.Add(BodyText(
+            "Public listing does not open your router port. " +
+            "Other players may see an UNVERIFIED listing until Internet connectivity is solved."));
         page.Children.Add(Card(access));
 
         var mods = new StackPanel { Spacing = 10 };
@@ -148,6 +161,10 @@ public sealed partial class MainWindow
         DedicatedStatsToggle.IsOn = profile.TrackStats;
         DedicatedVisibilityCombo.SelectedIndex = profile.Private ? 1 : 0;
         DedicatedPinBox.Password = "";
+        DedicatedOnlineToggle.IsOn = profile.PublishOnline;
+        DedicatedHubUrlBox.Text = string.IsNullOrWhiteSpace(profile.HubUrl)
+            ? HubAddressService.Load() ?? ""
+            : profile.HubUrl;
         RefreshDedicatedMapOptions(profile.Map);
         RefreshDedicatedModList(profile.Mods);
         DedicatedStatus.Text =
@@ -200,7 +217,9 @@ public sealed partial class MainWindow
             DedicatedPinBox.Password,
             DedicatedStatsToggle.IsOn,
             ReadDedicatedNumber(DedicatedPrepBox, 0, 120, "Preparation"),
-            DedicatedModsList.SelectedItems.OfType<string>().ToArray());
+            DedicatedModsList.SelectedItems.OfType<string>().ToArray(),
+            DedicatedOnlineToggle.IsOn,
+            DedicatedHubUrlBox.Text?.Trim() ?? "");
         return profile;
     }
 
