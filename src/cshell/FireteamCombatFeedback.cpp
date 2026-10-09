@@ -46,7 +46,7 @@ static float s_fActiveStart = 0.0f;
 
 // Short-lived, client-local polygons at a SERVER-VALIDATED zombie impact.
 // No commercial textures or heavyweight particle emitters needed.
-enum { FT_BLOOD_BURST_CAPACITY = 12, FT_BLOOD_DROPLETS = 5 };
+enum { FT_BLOOD_BURST_CAPACITY = 12, FT_BLOOD_DROPLETS = 9 };
 struct FTBloodBurst
 {
     LTVector vPos;
@@ -88,7 +88,7 @@ static void FT_RenderBloodBursts(HOBJECT hCamera)
     {
         if(s_BloodBursts[i].bActive &&
            fNow - s_BloodBursts[i].fStart >= 0.0f &&
-           fNow - s_BloodBursts[i].fStart < 0.33f)
+           fNow - s_BloodBursts[i].fStart < 0.38f)
         {
             bAny = true;
             break;
@@ -113,24 +113,24 @@ static void FT_RenderBloodBursts(HOBJECT hCamera)
         FTBloodBurst &burst = s_BloodBursts[i];
         if(!burst.bActive) continue;
         const float age = fNow - burst.fStart;
-        if(age < 0.0f || age >= 0.33f)
+        if(age < 0.0f || age >= 0.38f)
         {
             burst.bActive = false;
             continue;
         }
-        const float progress = age / 0.33f;
+        const float progress = age / 0.38f;
         const uint8 alpha = (uint8)(210.0f * (1.0f - progress));
         for(uint32 j = 0; j < FT_BLOOD_DROPLETS; ++j)
         {
             const float angle = 6.2831853f *
                 ((float)j / (float)FT_BLOOD_DROPLETS) +
                 (float)(burst.nSeed % 11) * 0.31f;
-            const float travel = 1.5f + progress * (17.0f + 4.0f * (float)j);
+            const float travel = 1.5f + progress * (19.0f + 2.5f * (float)j);
             const float x = cosf(angle) * travel;
             const float y = sinf(angle) * travel - 17.0f * progress * progress;
             const LTVector center = burst.vPos +
                 vRight * x + vUp * y - vCameraForward * 3.0f;
-            const float size = (j % 2 ? 2.4f : 3.5f) *
+            const float size = (j % 3 ? 4.0f : 5.8f) *
                 (1.0f - progress * 0.55f);
             const LTVector corners[4] = {
                 center - vRight * size - vUp * size,
@@ -251,8 +251,6 @@ static const char* FT_TextForFeedback(
             return "UNBELIEVABLE";
         case FT_FEEDBACK_ROUNDSTART:
             return "ROUND START";
-        case FT_COMBAT_FEEDBACK_HIT:
-            return "X";
         default:
             return "";
     }
