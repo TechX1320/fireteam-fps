@@ -66,6 +66,9 @@ static float s_fNextSpawnTime = 0.0f;
 static float s_fNextRoundTime = 0.0f;
 static float s_fSpawnInterval = 1.25f;
 static float s_fMissingInfectedSince = 0.0f;
+// Crash-resilient local match files: overwrite the same record each 15s.
+static const float kMatchCheckpointInterval = 15.0f;
+static float s_fNextMatchCheckpoint = 0.0f;
 static uint32 s_nMissingInfectedRestores = 0;
 static FTDifficultyDef s_Difficulty;
 
@@ -407,6 +410,10 @@ void Spawner::ResetRoundController()
     s_fSpawnInterval = 1.25f;
     s_fMissingInfectedSince = 0.0f;
     s_nMissingInfectedRestores = 0;
+    s_fNextMatchCheckpoint = g_pLTServer->GetTime() +
+        kMatchCheckpointInterval;
+    if(g_pStatsManager)
+        g_pStatsManager->BeginMatch();
     s_bFirstRoundPreparing = false;
     s_nFirstPlayerJoinedTick = 0;
     s_nFirstRoundReadyTick = 0;
@@ -1056,6 +1063,17 @@ void Spawner::UpdateRoundController()
 
     const float fNow = g_pLTServer->GetTime();
 
+    if(s_nRound > 0 && fNow >= s_fNextMatchCheckpoint)
+    {
+        // Save even during a long round. Completed games write a FINAL
+        // snapshot through FT_OnFireteamSquadGameOver separately.
+        s_fNextMatchCheckpoint = fNow + kMatchCheckpointInterval;
+        if(g_pStatsManager)
+            g_pStatsManager->SaveMatchSnapshot(
+                s_nRound, s_Difficulty.sId,
+                FT_GetRoundCombatTime(), false);
+    }
+
     if(s_bRoundActive && s_nRoundAlive > 0 &&
        s_nRoundSpawned > 0 &&
        s_nMissingInfectedRestores < s_nRoundTarget)
@@ -1373,6 +1391,12 @@ void FT_OnFireteamEnemyKilled()
             FT_BroadcastRoundState(2);
 
             FT_SpawnRoundClearMutationBoxes();
+
+            // Survive an early exit/crash immediately after clearing a wave.
+            if(g_pStatsManager)
+                g_pStatsManager->SaveMatchSnapshot(
+                    s_nRound, s_Difficulty.sId,
+                    FT_GetRoundCombatTime(), false);
         }
         else
         {
