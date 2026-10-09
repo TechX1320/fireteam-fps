@@ -56,7 +56,13 @@ $configFiles = @(
 foreach($name in $configFiles) {
     $src = Join-Path $built ("config\" + $name)
     if(Test-Path -LiteralPath $src -PathType Leaf) {
-        Copy-Item -LiteralPath $src -Destination (Join-Path $configDir $name) -Force
+        $dest = Join-Path $configDir $name
+        if($name -in @("weapons.cfg", "player.cfg", "loadouts.cfg", "weapon-library.cfg") -and
+           (Test-Path -LiteralPath $dest -PathType Leaf)) {
+            Write-Host "[KEEP] Dedicated $name (explicit sync only)"
+        } else {
+            Copy-Item -LiteralPath $src -Destination $dest -Force
+        }
     }
 }
 

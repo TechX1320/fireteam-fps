@@ -57,8 +57,7 @@ public sealed class WeaponCatalogService
         bool force = false)
     {
         var path =
-            LauncherPaths.FindEditableConfig(
-                "weapons.cfg")
+            PreferRuntimeConfig("weapons.cfg")
             ?? throw new FileNotFoundException(
                 "Could not locate config\\weapons.cfg.");
 
@@ -158,10 +157,9 @@ public sealed class WeaponCatalogService
                 "weapon-library.cfg");
 
         var destination =
-            paths.Source ??
             paths.Runtime
             ?? throw new FileNotFoundException(
-                "Could not resolve config\\weapon-library.cfg.");
+                "Build FIRETEAM before editing local weapon availability.");
 
         var doc =
             FireteamConfigDocument.Load(
@@ -219,8 +217,8 @@ public sealed class WeaponCatalogService
         if(selected.Length == 0) return;
 
         var paths = ResolveWritableConfigPaths("weapon-library.cfg");
-        var destination = paths.Source ?? paths.Runtime
-            ?? throw new FileNotFoundException("Weapon library unavailable.");
+        var destination = paths.Runtime
+            ?? throw new FileNotFoundException("Build FIRETEAM before editing local weapon availability.");
         var doc = FireteamConfigDocument.Load(destination);
         foreach(var weapon in selected)
             doc.SetValue(weapon.Section, "enabled", enabled ? "1" : "0");
@@ -240,10 +238,9 @@ public sealed class WeaponCatalogService
                 "weapons.cfg");
 
         var sourcePath =
-            paths.Source ??
             paths.Runtime
             ?? throw new FileNotFoundException(
-                "Could not locate config\\weapons.cfg.");
+                "Build FIRETEAM first. Authored source weapons.cfg is read-only.");
 
         var doc =
             FireteamConfigDocument.Load(
@@ -282,10 +279,9 @@ public sealed class WeaponCatalogService
                 "weapons.cfg");
 
         var sourcePath =
-            paths.Source ??
             paths.Runtime
             ?? throw new FileNotFoundException(
-                "Could not locate config\\weapons.cfg.");
+                "Build FIRETEAM first. Authored source weapons.cfg is read-only.");
 
         var doc =
             FireteamConfigDocument.Load(
@@ -574,8 +570,7 @@ public sealed class WeaponCatalogService
     private static Dictionary<string, bool> LoadEnabledOverrides()
     {
         var path =
-            LauncherPaths.FindEditableConfig(
-                "weapon-library.cfg");
+            PreferRuntimeConfig("weapon-library.cfg");
 
         var result =
             new Dictionary<string, bool>(
@@ -619,6 +614,12 @@ public sealed class WeaponCatalogService
             Values = source.Values
         };
 
+    private static string? PreferRuntimeConfig(string name)
+    {
+        var paths = LauncherPaths.FindConfigPaths(name);
+        return paths.Runtime ?? paths.Source;
+    }
+
     private static (
         string? Source,
         string? Runtime) ResolveWritableConfigPaths(
@@ -645,45 +646,15 @@ public sealed class WeaponCatalogService
                     fileName));
     }
 
+    // The repository config/ is a template. Never write it automatically.
+    // Builds will not overwrite these local runtime edits anymore.
     private static void SaveBoth(
         FireteamConfigDocument doc,
         (string? Source, string? Runtime) paths)
     {
-        if(paths.Source is not null)
-        {
-            doc.Save(
-                paths.Source);
-
-            if(paths.Runtime is not null &&
-               !string.Equals(
-                   paths.Runtime,
-                   paths.Source,
-                   StringComparison.OrdinalIgnoreCase))
-            {
-                var parent =
-                    Path.GetDirectoryName(
-                        paths.Runtime);
-
-                if(!string.IsNullOrWhiteSpace(
-                    parent))
-                {
-                    Directory.CreateDirectory(
-                        parent);
-                }
-
-                File.Copy(
-                    paths.Source,
-                    paths.Runtime,
-                    true);
-            }
-
-            return;
-        }
-
-        if(paths.Runtime is not null)
-        {
-            doc.Save(
-                paths.Runtime);
-        }
+        if(paths.Runtime is null)
+            throw new FileNotFoundException(
+                "Build FIRETEAM first; repository configs require manual sync.");
+        doc.Save(paths.Runtime);
     }
 }

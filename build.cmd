@@ -146,12 +146,22 @@ if errorlevel 1 goto :copyfail
 copy /y "config\run-cabinfever.cmd" "%BUILT_DIR%\run-cabinfever.cmd" >nul
 if errorlevel 1 goto :copyfail
 if not exist "%BUILT_DIR%\config" mkdir "%BUILT_DIR%\config" >nul
-copy /y "config\weapons.cfg" "%BUILT_DIR%\config\weapons.cfg" >nul
-if errorlevel 1 goto :copyfail
+if not exist "%BUILT_DIR%\config\weapons.cfg" (
+  echo [SEED] Missing local weapons.cfg; copying template once.
+  copy /y "config\weapons.cfg" "%BUILT_DIR%\config\weapons.cfg" >nul
+  if errorlevel 1 goto :copyfail
+) else (
+  echo [KEEP] Local weapons.cfg unchanged; source sync is MANUAL.
+)
 copy /y "config\infected.cfg" "%BUILT_DIR%\config\infected.cfg" >nul
 if errorlevel 1 goto :copyfail
-copy /y "config\player.cfg" "%BUILT_DIR%\config\player.cfg" >nul
-if errorlevel 1 goto :copyfail
+if not exist "%BUILT_DIR%\config\player.cfg" (
+  echo [SEED] Missing local player.cfg; copying template once.
+  copy /y "config\player.cfg" "%BUILT_DIR%\config\player.cfg" >nul
+  if errorlevel 1 goto :copyfail
+) else (
+  echo [KEEP] Local player.cfg unchanged; source sync is MANUAL.
+)
 copy /y "config\characters.cfg" "%BUILT_DIR%\config\characters.cfg" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\difficulties.cfg" "%BUILT_DIR%\config\difficulties.cfg" >nul
@@ -160,10 +170,20 @@ copy /y "config\session.cfg" "%BUILT_DIR%\config\session.cfg" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\powerups.cfg" "%BUILT_DIR%\config\powerups.cfg" >nul
 if errorlevel 1 goto :copyfail
-copy /y "config\loadouts.cfg" "%BUILT_DIR%\config\loadouts.cfg" >nul
-if errorlevel 1 goto :copyfail
-copy /y "config\weapon-library.cfg" "%BUILT_DIR%\config\weapon-library.cfg" >nul
-if errorlevel 1 goto :copyfail
+if not exist "%BUILT_DIR%\config\loadouts.cfg" (
+  echo [SEED] Missing local loadouts.cfg; copying template once.
+  copy /y "config\loadouts.cfg" "%BUILT_DIR%\config\loadouts.cfg" >nul
+  if errorlevel 1 goto :copyfail
+) else (
+  echo [KEEP] Local loadouts.cfg unchanged; source sync is MANUAL.
+)
+if not exist "%BUILT_DIR%\config\weapon-library.cfg" (
+  echo [SEED] Missing local weapon-library.cfg; copying template once.
+  copy /y "config\weapon-library.cfg" "%BUILT_DIR%\config\weapon-library.cfg" >nul
+  if errorlevel 1 goto :copyfail
+) else (
+  echo [KEEP] Local weapon-library.cfg unchanged; source sync is MANUAL.
+)
 
 echo.
 echo [4/6] Installing freshly built modules...
@@ -194,6 +214,7 @@ echo.
 echo [6/6] BUILD COMPLETE
 echo Output: %BUILT_DIR%
 echo Existing extra files in BUILT were preserved.
+echo [KEEP] Local weapon/loadout/player configuration and profile data preserved.
 echo Launcher: BUILT\FireteamLauncher.exe
 echo Launcher runtime: BUILT\Launcher\App\
 echo Stock test: BUILT\run-normal.cmd

@@ -138,8 +138,7 @@ public static class WeaponQaQuarantineStore
 
             var paths = new List<string> { SavedPath };
             if(RuntimePath is string runtime) paths.Add(runtime);
-            if(OriginalSourcePath is string source && File.Exists(source))
-                paths.Add(source);
+            // A local QA click must not modify tracked source configs.
 
             foreach(var path in paths.Distinct(StringComparer.OrdinalIgnoreCase))
             {
