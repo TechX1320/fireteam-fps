@@ -9,7 +9,8 @@ public static class WeaponQaQuarantineStore
 {
     private static readonly object Gate = new();
     public static string SavedPath => Path.Combine(
-        LauncherPaths.SupportRoot, "weapon-quarantine.saved.txt");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "FIRETEAM", "weapon-quarantine.saved.txt");
 
     private static string? RuntimePath
     {
