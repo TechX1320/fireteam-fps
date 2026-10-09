@@ -18,11 +18,15 @@
 #include <string.h>
 #include <time.h>
 #include <direct.h>
+#include <windows.h>
 
 StatsManager::StatsManager():
-m_iNumPlayers(0)
+m_iNumPlayers(0),
+m_bMatchFinalized(false)
 {
+    m_sMatchId[0] = '\0';
     ResetPlayerList();
+    BeginMatch();
 }
 
 
@@ -146,11 +150,31 @@ static void FT_WriteNamedMatchJson(
     fputc('}', pFile);
 }
 
-bool StatsManager::SaveCompletedMatch(
-    uint32 nRound, const char *pDifficulty, float fCombatSeconds)
+void StatsManager::BeginMatch()
 {
-    if(!GetNumPlayers())
+    // Called whenever a new world controller is created; the ID stays fixed
+    // through all checkpoints AND the final Game Over write.
+    static uint32 s_nMatchSequence = 0;
+    ++s_nMatchSequence;
+    _snprintf(m_sMatchId, sizeof(m_sMatchId) - 1,
+        "match-%lu-%lu-%u",
+        (unsigned long)time(NULL),
+        (unsigned long)GetTickCount(),
+        (unsigned)s_nMatchSequence);
+    m_sMatchId[sizeof(m_sMatchId) - 1] = '\0';
+    m_bMatchFinalized = false;
+}
+
+bool StatsManager::SaveMatchSnapshot(
+    uint32 nRound, const char *pDifficulty, float fCombatSeconds,
+    bool bCompleted)
+{
+    if(!GetNumPlayers() || nRound == 0)
         return false;
+    if(m_bMatchFinalized)
+        return false;
+    if(!m_sMatchId[0])
+        BeginMatch();
 
     // Works in BUILT for solo/host and BUILT/Dedicated for a headless host.
     // Folder-local history is never sent to any third-party API.
@@ -158,11 +182,9 @@ bool StatsManager::SaveCompletedMatch(
     _mkdir("data\\matches");
 
     const unsigned long nNow = (unsigned long)time(NULL);
-    const unsigned long nTick = (unsigned long)clock();
     char sPath[260], sTemp[270];
     _snprintf(sPath, sizeof(sPath) - 1,
-        "data\\matches\\match-%lu-%lu-%u.json",
-        nNow, nTick, (unsigned)nRound);
+        "data\\matches\\%s.json", m_sMatchId);
     sPath[sizeof(sPath) - 1] = '\0';
     _snprintf(sTemp, sizeof(sTemp) - 1, "%s.tmp", sPath);
     sTemp[sizeof(sTemp) - 1] = '\0';
@@ -196,19 +218,18 @@ bool StatsManager::SaveCompletedMatch(
     fprintf(pFile,
         "{\n\"schemaVersion\":1,\n\"source\":\"local-unverified\",\n"
         "\"matchId\":");
-    char sMatchId[128];
-    _snprintf(sMatchId, sizeof(sMatchId) - 1,
-        "match-%lu-%lu-%u", nNow, nTick, (unsigned)nRound);
-    sMatchId[sizeof(sMatchId) - 1] = '\0';
-    FT_WriteMatchJsonText(pFile, sMatchId);
-    fprintf(pFile, ",\n\"endedAtUnix\":%lu,\n\"map\":", nNow);
+    FT_WriteMatchJsonText(pFile, m_sMatchId);
+    fprintf(pFile,
+        ",\n\"lastSavedAtUnix\":%lu,\n\"endedAtUnix\":%lu,\n\"map\":",
+        nNow, bCompleted ? nNow : 0ul);
     FT_WriteMatchJsonText(pFile, sMap);
     fprintf(pFile, ",\n\"difficulty\":");
     FT_WriteMatchJsonText(pFile, pDifficulty);
     fprintf(pFile,
         ",\n\"roundReached\":%u,\n\"combatSeconds\":%.2f,\n"
-        "\"status\":\"completed\",\n\"players\":[\n",
-        nRound, fCombatSeconds > 0.0f ? fCombatSeconds : 0.0f);
+        "\"status\":\"%s\",\n\"players\":[\n",
+        nRound, fCombatSeconds > 0.0f ? fCombatSeconds : 0.0f,
+        bCompleted ? "completed" : "in_progress");
 
     LinkedMember<CPlayerSrvr*> *pMember = m_pPlayers.First();
     bool bFirst = true;
@@ -269,15 +290,23 @@ bool StatsManager::SaveCompletedMatch(
         g_pLTServer->CPrint("Fireteam stats: failed writing %s.", sTemp);
         return false;
     }
-    if(rename(sTemp, sPath) != 0)
+    // Win32 MoveFileEx atomically replaces the prior checkpoint, unlike
+    // CRT rename() which fails when the destination already exists.
+    if(!MoveFileExA(sTemp, sPath,
+        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
     {
+        const DWORD nError = GetLastError();
         remove(sTemp);
-        g_pLTServer->CPrint("Fireteam stats: failed finalizing %s.", sPath);
+        g_pLTServer->CPrint(
+            "Fireteam stats: unable to replace %s (Win32 error %lu).",
+            sPath, (unsigned long)nError);
         return false;
     }
 
+    if(bCompleted)
+        m_bMatchFinalized = true;
     g_pLTServer->CPrint(
-        "Fireteam stats: match round %u saved to %s (local, unsigned).",
-        nRound, sPath);
+        "Fireteam stats: %s round %u -> %s (local, unsigned).",
+        bCompleted ? "FINAL" : "checkpoint", nRound, sPath);
     return true;
 }
