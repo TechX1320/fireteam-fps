@@ -2827,7 +2827,7 @@ public sealed partial class MainWindow
             new ColumnDefinition
             {
                 Width =
-                    new GridLength(280)
+                    new GridLength(345)
             });
         page.ColumnDefinitions.Add(
             new ColumnDefinition
@@ -2851,6 +2851,14 @@ public sealed partial class MainWindow
         left.Children.Add(
             WeaponSearchBox);
 
+        WeaponShowQaDisabled.Content = "SHOW QA-DISABLED";
+        WeaponShowQaDisabled.Foreground = SecondaryTextBrush;
+        WeaponShowQaDisabled.IsChecked = false;
+        WeaponShowQaDisabled.Checked += (sender, args) => ApplyArsenalFilter();
+        WeaponShowQaDisabled.Unchecked += (sender, args) => ApplyArsenalFilter();
+        left.Children.Add(WeaponShowQaDisabled);
+
+        WeaponList.SelectionMode = ListViewSelectionMode.Multiple;
         WeaponList.DisplayMemberPath =
             "DisplayName";
         WeaponList.MinHeight = 430;
@@ -2859,6 +2867,19 @@ public sealed partial class MainWindow
             WeaponList_SelectionChanged;
         left.Children.Add(
             WeaponList);
+
+        var batchButtons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8
+        };
+        var bulkEnable = SecondaryButton("ENABLE SELECTED");
+        bulkEnable.Click += (sender, args) => SetSelectedWeaponsEnabled(true);
+        var bulkDisable = SecondaryButton("DISABLE SELECTED");
+        bulkDisable.Click += (sender, args) => SetSelectedWeaponsEnabled(false);
+        batchButtons.Children.Add(bulkEnable);
+        batchButtons.Children.Add(bulkDisable);
+        left.Children.Add(batchButtons);
 
         var back =
             SecondaryButton(

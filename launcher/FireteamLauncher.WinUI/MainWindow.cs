@@ -97,6 +97,7 @@ public sealed partial class MainWindow : Window
     private readonly ScrollViewer ArsenalView = new();
     private readonly TextBox WeaponSearchBox = new();
     private readonly ListView WeaponList = new();
+    private readonly CheckBox WeaponShowQaDisabled = new();
     private readonly TextBlock WeaponTitleText = new();
     private readonly TextBlock WeaponSectionText = new();
     private readonly TextBox WeaponNameBox = new();
@@ -1465,86 +1466,71 @@ public sealed partial class MainWindow : Window
 
     private void ApplyArsenalFilter()
     {
-        const int RenderLimit = 100;
+        const int RenderLimit = 200;
+        var query = WeaponSearchBox.Text?.Trim() ?? string.Empty;
+        var oldSelection = WeaponList.SelectedItems
+            .OfType<WeaponDefinition>()
+            .Select(w => w.Section)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var query =
-            WeaponSearchBox.Text?
-                .Trim() ??
-            string.Empty;
+        var qaHidden = _arsenal.Count(w => w.IsQaQuarantined);
+        var matches = _arsenal
+            .Where(w => WeaponShowQaDisabled.IsChecked == true ||
+                        !w.IsQaQuarantined)
+            .Where(w => query.Length == 0 ||
+                        w.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                        w.Id.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                        w.Type.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                        w.LoadoutCategory.Contains(query, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(w => w.IsActiveSlot)
+            .ThenByDescending(w => w.Enabled)
+            .ThenBy(w => w.Name)
+            .ToList();
 
-        var matches =
-            _arsenal
-                .Where(w =>
-                    query.Length == 0 ||
-                    w.Name.Contains(
-                        query,
-                        StringComparison.OrdinalIgnoreCase) ||
-                    w.Id.Contains(
-                        query,
-                        StringComparison.OrdinalIgnoreCase) ||
-                    w.Type.Contains(
-                        query,
-                        StringComparison.OrdinalIgnoreCase) ||
-                    w.LoadoutCategory.Contains(
-                        query,
-                        StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(w =>
-                    w.IsActiveSlot)
-                .ThenByDescending(w =>
-                    w.Enabled)
-                .ThenBy(w =>
-                    w.Name)
-                .ToList();
+        var visible = matches.Take(RenderLimit).ToArray();
+        WeaponList.ItemsSource = visible;
 
-        var visible =
-            matches
-                .Take(
-                    RenderLimit)
-                .ToList();
+        // Preserve explicit checkbox selections across search, config refresh,
+        // batch saves, and sort changes instead of selecting row 0 each time.
+        foreach(var weapon in visible.Where(w => oldSelection.Contains(w.Section)))
+            WeaponList.SelectedItems.Add(weapon);
 
-        WeaponList.ItemsSource =
-            visible;
-
-        if(matches.Count > RenderLimit)
-        {
-            ArsenalStatusText.Text =
-                $"Showing first {RenderLimit} of {matches.Count} definitions. Search by name, ID or category to narrow the catalog.";
-        }
-
-        if(visible.Count > 0)
-        {
-            WeaponList.SelectedIndex =
-                0;
-        }
-        else
+        if(WeaponList.SelectedItems.Count == 0)
         {
             _selectedWeapon = null;
-            WeaponTitleText.Text =
-                "No matching weapons";
-            WeaponSectionText.Text =
-                string.Empty;
+            WeaponTitleText.Text = "Select a weapon";
+            WeaponSectionText.Text = "Use the list checkboxes to edit multiple weapons at once.";
         }
+
+        ArsenalStatusText.Text =
+            $"{visible.Length} of {matches.Count} matching weapons • " +
+            $"{qaHidden} QA-disabled " +
+            (WeaponShowQaDisabled.IsChecked == true ? "(visible)" : "(hidden)") +
+            (matches.Count > RenderLimit ? " • refine search for more" : "");
     }
 
-    private void WeaponList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void WeaponList_SelectionChanged(
+        object sender, SelectionChangedEventArgs e)
     {
-        if(WeaponList.SelectedItem is not WeaponDefinition weapon)
+        var weapon = e.AddedItems.OfType<WeaponDefinition>().LastOrDefault()
+            ?? WeaponList.SelectedItems.OfType<WeaponDefinition>().LastOrDefault();
+        if(weapon is null)
         {
+            _selectedWeapon = null;
             return;
         }
 
         _selectedWeapon = weapon;
-
         WeaponTitleText.Text = weapon.Name;
         WeaponSectionText.Text =
             $"{weapon.Section}  •  {weapon.Id}  •  " +
             $"{(weapon.Supported ? "SUPPORTED" : "UNVERIFIED")}  •  " +
+            (weapon.IsQaQuarantined ? "QA DISABLED  •  " : "") +
             weapon.Source;
 
         WeaponNameBox.Text = weapon.Name;
         WeaponIdBox.Text = weapon.Id;
         WeaponTypeCombo.SelectedItem = weapon.Type;
-
         SetWeaponField(DamageBox, weapon, "damage");
         SetWeaponField(ClipBox, weapon, "clip");
         SetWeaponField(ReserveBox, weapon, "reserve");
@@ -1556,9 +1542,44 @@ public sealed partial class MainWindow : Window
         SetWeaponField(AnimAltFireBox, weapon, "anim_alt_fire");
         SetWeaponField(AnimReloadBox, weapon, "anim_reload");
         WeaponEnabledCheckBox.IsChecked =
-            weapon.Enabled || weapon.IsActiveSlot;
-        WeaponEnabledCheckBox.IsEnabled =
-            !weapon.IsActiveSlot;
+            (weapon.Enabled || weapon.IsActiveSlot) && !weapon.IsQaQuarantined;
+        WeaponEnabledCheckBox.IsEnabled = !weapon.IsActiveSlot;
+    }
+
+    private void SetSelectedWeaponsEnabled(bool enabled)
+    {
+        var selected = WeaponList.SelectedItems
+            .OfType<WeaponDefinition>()
+            .Where(w => !w.IsActiveSlot)
+            .ToArray();
+        if(selected.Length == 0)
+        {
+            ArsenalStatusText.Text = "Select one or more non-active weapons first.";
+            return;
+        }
+
+        try
+        {
+            App.Instance.Services.Weapons.SetEnabledBatch(selected, enabled);
+            ReloadArsenal(true);
+            // Restore selected rows when they are still visible, so a QA
+            // session can continue without scrolling/searching from scratch.
+            foreach(var weapon in WeaponList.Items.OfType<WeaponDefinition>()
+                .Where(w => selected.Any(previous => previous.Section.Equals(
+                    w.Section, StringComparison.OrdinalIgnoreCase))))
+            {
+                if(!WeaponList.SelectedItems.Contains(weapon))
+                    WeaponList.SelectedItems.Add(weapon);
+            }
+            ArsenalStatusText.Text = $"{selected.Length} weapons " +
+                (enabled ? "enabled (QA quarantine restored if applicable)." :
+                           "disabled for loadouts.") +
+                " Changes saved in one batch.";
+        }
+        catch(Exception ex)
+        {
+            ArsenalStatusText.Text = "Bulk update failed: " + ex.Message;
+        }
     }
 
     private void SaveWeaponButton_Click(
@@ -1673,6 +1694,7 @@ public sealed partial class MainWindow : Window
                         WeaponTypeCombo.SelectedItem?.ToString()
                         ?? _selectedWeapon.Type,
                     Enabled = enabled,
+                    IsQaQuarantined = _selectedWeapon.IsQaQuarantined,
                     Supported = _selectedWeapon.Supported,
                     IsActiveSlot = _selectedWeapon.IsActiveSlot,
                     Source = _selectedWeapon.Source,
@@ -1683,11 +1705,17 @@ public sealed partial class MainWindow : Window
             {
                 App.Instance.Services.Weapons.SaveDefinition(
                     updated);
+                if(_selectedWeapon.IsQaQuarantined && enabled)
+                    App.Instance.Services.Weapons.SetEnabledBatch(
+                        [_selectedWeapon], true);
+            }
+            else if(_selectedWeapon.IsQaQuarantined && enabled)
+            {
+                App.Instance.Services.Weapons.SetEnabledBatch(
+                    [_selectedWeapon], true);
             }
             else
             {
-                // Enable/disable is launcher library state. Keep it in the
-                // tiny sidecar instead of rewriting the 65k-line CA catalog.
                 App.Instance.Services.Weapons.SetEnabled(
                     updated.Section,
                     updated.Enabled);
