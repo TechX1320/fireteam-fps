@@ -55,7 +55,7 @@ add_library(cshell SHARED ${CSHELL_GAME_SOURCES} ${CSHELL_ENGINE_SOURCES})
 target_compile_definitions(cshell PRIVATE _CLIENTBUILD)
 target_compile_options(cshell PRIVATE /FIfireteamtrace.h)
 target_include_directories(cshell PRIVATE "${CSHELL_ROOT}" "${GAME_SHARED_DIR}" "${SDK_DIR}" "${CLIENTFX_ROOT}" "${CLIENTFX_SHARED_DIR}")
-target_link_libraries(cshell PRIVATE odbc32 odbccp32 xinput9_1_0)
+target_link_libraries(cshell PRIVATE odbc32 odbccp32 xinput9_1_0 bcrypt)
 set_target_properties(cshell PROPERTIES OUTPUT_NAME "cshell" PREFIX "")
 
 file(GLOB SSHELL_GAME_SOURCES CONFIGURE_DEPENDS "${SSHELL_ROOT}/*.cpp" "${SSHELL_ROOT}/*.h")
