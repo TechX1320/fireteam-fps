@@ -2474,6 +2474,13 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                             MAX_CS_FILENAME_LEN,
                             m_Def.sBodyTexture2);
                     }
+                    if(m_Def.sBodyTexture3[0])
+                    {
+                        FT_CopyInfectedString(
+                            pOCS->m_SkinNames[3],
+                            MAX_CS_FILENAME_LEN,
+                            m_Def.sBodyTexture3);
+                    }
 
                     if(m_Def.sBodyRenderStyle0[0])
                     {
@@ -2593,6 +2600,13 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                         modelOCS.m_SkinNames[2],
                         MAX_CS_FILENAME_LEN,
                         m_Def.sBodyTexture2);
+                }
+                if(m_Def.sBodyTexture3[0])
+                {
+                    FT_CopyInfectedString(
+                        modelOCS.m_SkinNames[3],
+                        MAX_CS_FILENAME_LEN,
+                        m_Def.sBodyTexture3);
                 }
 
                 if(m_Def.sBodyRenderStyle0[0])
