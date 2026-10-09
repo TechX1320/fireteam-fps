@@ -44,9 +44,11 @@ Then, with old game processes stopped, rebuild:
 Open the new launcher Dedicated tab. For a local connectivity smoke test,
 set Hub address to http://127.0.0.1:27890, and explicitly enable Advertise
 on FIRETEAM Hub. Leave UPnP OFF for the first loopback test. Start the
-dedicated server and open Community Servers. Expect one HUB entry with actual
-slots and UNVERIFIED. Stop dedicated and it should disappear promptly;
-without graceful stop it expires after 90 seconds.
+dedicated server and open Community Servers. The browser prefers the LAN
+version if a HUB entry has the exact same IP:port; this prevents duplicate
+rows. Query http://127.0.0.1:27890/v1/servers directly to verify HUB
+registration and actual occupancy. Stop dedicated and the entry should
+disappear promptly; without graceful stop it expires after 90 seconds.
 
 If the hub isn't running, public registration fails safely and the game
 should remain available by LAN or direct IP. If Advertise is unchecked,
