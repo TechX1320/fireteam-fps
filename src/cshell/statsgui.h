@@ -46,6 +46,8 @@ private:
 	CUIFormattedPolyString*	    m_pStatsString_Playername;
 	CUIFormattedPolyString*	    m_pStatsString_Sealswhacked;
 	CUIFormattedPolyString*	    m_pStatsString_Moneyearned;
+    // Four additional individually positioned columns; no space-padding.
+    CUIFormattedPolyString*     m_pStatsString_Extra[4];
     SCORESTRUCT*                m_pScores;
     uint8                       m_iNumPlayers;
 };
