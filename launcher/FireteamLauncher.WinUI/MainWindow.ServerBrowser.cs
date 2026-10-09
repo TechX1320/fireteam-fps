@@ -222,7 +222,8 @@ public sealed partial class MainWindow
     private static Grid ServerGridRow(ServerBrowserRow row) =>
         ServerColumns(row.Listing.Name, row.Listing.Map,
             row.IsLan ? $"LAN • D{row.Difficulty}" :
-            row.Listing.Source == "Hub" ? $"HUB • D{row.Difficulty}" : "Curated",
+            row.Listing.Source == "Hub" ? $"HUB • D{row.Difficulty}" :
+            row.Listing.Source,
             row.MaxPlayers > 0 ? $"{row.Players}/{row.MaxPlayers}" : "—",
             "—", row.Listing.Source == "Hub" ? "Unverified" : "Not checked", false);
 
