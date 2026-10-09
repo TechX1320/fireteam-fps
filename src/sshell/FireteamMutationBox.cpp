@@ -459,6 +459,9 @@ uint32 FireteamMutationBox::TouchNotify(
         // receives the effect and HUD timer together.
         FT_GrantTeamWallhack(
             def.fWallhackSeconds);
+        // Attribute the pickup to its actual collector, not all teammates
+        // benefiting from the server-wide effect.
+        pPlayer->RecordPowerupPickup("zombie_wallhack");
     }
 
     m_bConsumed =
