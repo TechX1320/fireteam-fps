@@ -358,6 +358,57 @@ static void FT_AuditZombieAnimationNames(
 }
 
 
+// The candidate animation names in CA LTBs aren't proof that Jupiter can
+// play them. Log validity and texture slots once per special after model
+// composition, so field QA can report the exact broken Assassin/Striker setup.
+static bool s_bAssassinVariantAudit = false;
+static bool s_bTankerVariantAudit = false;
+static void FT_AuditSpecialInfectedVariant(
+    HOBJECT hZombie, const FTInfectedDef &def)
+{
+    bool *pDone = LTNULL;
+    if(_stricmp(def.sId, "infected_assassin") == 0)
+        pDone = &s_bAssassinVariantAudit;
+    else if(_stricmp(def.sId, "infected_tanker") == 0)
+        pDone = &s_bTankerVariantAudit;
+
+    if(!pDone || *pDone || !hZombie)
+        return;
+    *pDone = true;
+
+    g_pLTServer->CPrint(
+        "Fireteam special audit: %s skin0=%s skin1=%s skin2=%s skin3=%s",
+        def.sId, def.sBodyTexture0, def.sBodyTexture1,
+        def.sBodyTexture2, def.sBodyTexture3);
+
+    const char *pNames[] = {
+        def.sIdleAnim, def.sWalkAnim, def.sRunAnim,
+        def.sAttackAnim1, def.sAttackAnim2, def.sAttackAnim3,
+        def.sJumpAnim, def.sDeathAnim
+    };
+    const char *pRoles[] = {
+        "idle", "walk", "run", "attack1", "attack2", "attack3",
+        "jump", "death"
+    };
+    for(uint32 i = 0; i < sizeof(pNames) / sizeof(pNames[0]); ++i)
+    {
+        if(!pNames[i] || !pNames[i][0])
+        {
+            g_pLTServer->CPrint(
+                "Fireteam special audit: %s %s=UNCONFIGURED",
+                def.sId, pRoles[i]);
+            continue;
+        }
+        const HMODELANIM hAnim = g_pLTServer->GetAnimIndex(
+            hZombie, (char*)pNames[i]);
+        g_pLTServer->CPrint(
+            "Fireteam special audit: %s %s=%s %s",
+            def.sId, pRoles[i], pNames[i],
+            hAnim == INVALID_MODEL_ANIM ? "MISSING" : "PRESENT");
+    }
+}
+
+
 static float FT_ZombieWallhackStackSeconds(
     float fBaseSeconds,
     uint8 nStack)
@@ -2696,6 +2747,7 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
 
                 FT_AuditZombieAnimationNames(
                     m_hObject);
+                FT_AuditSpecialInfectedVariant(m_hObject, m_Def);
 
                 SetZombieAnimation(
                     m_Def.sIdleAnim,
