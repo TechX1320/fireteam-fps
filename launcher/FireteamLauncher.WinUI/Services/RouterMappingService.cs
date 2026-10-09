@@ -14,7 +14,8 @@ public sealed class RouterMappingService
     private readonly object _gate = new();
 
     public async Task<string> TryMapGamePortAsync(
-        int gamePort, CancellationToken cancellationToken = default)
+        int gamePort, Func<bool>? hostStillRunning = null,
+        CancellationToken cancellationToken = default)
     {
         if(gamePort is < 1 or > 65535)
             return "Invalid game port. No router changes made.";
@@ -23,6 +24,8 @@ public sealed class RouterMappingService
         for(var attempt = 0; attempt < 5; ++attempt)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if(hostStillRunning is not null && !hostStillRunning())
+                return "Dedicated process stopped; no router changes made.";
             protocols = DetectListeningProtocols(gamePort);
             if(protocols.Length > 0) break;
             await Task.Delay(900, cancellationToken);
@@ -42,6 +45,8 @@ public sealed class RouterMappingService
             var errors = new List<string>();
             foreach(var protocol in protocols)
             {
+                if(hostStillRunning is not null && !hostStillRunning())
+                    return "Dedicated process stopped; router mapping skipped.";
                 try
                 {
                     var owned = MapOne(gamePort, protocol, ipv4);
