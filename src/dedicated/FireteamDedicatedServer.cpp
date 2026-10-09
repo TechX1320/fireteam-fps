@@ -298,6 +298,14 @@ int main(int argc, char **argv)
                 bReady = false;
                 break;
             }
+            // Launcher requests graceful shutdown through a local file.
+            // The server checks it on its normal update loop; no forced kill.
+            if(GetFileAttributesA("data\\server-stop.request") != INVALID_FILE_ATTRIBUTES)
+            {
+                DeleteFileA("data\\server-stop.request");
+                InterlockedExchange(&s_nStopRequested, 1);
+                puts("FIRETEAM: launcher stop requested.");
+            }
             Sleep(15);
         }
         SetConsoleCtrlHandler(OnConsoleControl, FALSE);
