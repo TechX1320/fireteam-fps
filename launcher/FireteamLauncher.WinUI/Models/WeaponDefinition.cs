@@ -7,12 +7,14 @@ public sealed class WeaponDefinition
     public required string Name { get; init; }
     public required string Type { get; init; }
     public required bool Enabled { get; init; }
+    public bool IsQaQuarantined { get; init; }
     public required bool Supported { get; init; }
     public required bool IsActiveSlot { get; init; }
     public required string Source { get; init; }
     public required Dictionary<string, string> Values { get; init; }
 
-    public string DisplayName => Name;
+    public string DisplayName => IsQaQuarantined
+        ? "[QA DISABLED] " + Name : Name;
 
     public string LoadoutCategory
     {

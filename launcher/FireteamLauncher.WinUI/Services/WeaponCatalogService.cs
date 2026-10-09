@@ -126,8 +126,8 @@ public sealed class WeaponCatalogService
 
         foreach(var weapon in all
             .Where(w =>
-                w.IsActiveSlot ||
-                w.Enabled)
+                !w.IsQaQuarantined &&
+                (w.IsActiveSlot || w.Enabled))
             .OrderByDescending(w =>
                 w.IsActiveSlot)
             .ThenBy(w =>
@@ -206,6 +206,30 @@ public sealed class WeaponCatalogService
                     old.IsActiveSlot ||
                     enabled);
         }
+    }
+
+    // One document write for many selected checkboxes.
+    public void SetEnabledBatch(
+        IReadOnlyList<WeaponDefinition> selections, bool enabled)
+    {
+        var selected = selections
+            .Where(w => !w.IsActiveSlot)
+            .GroupBy(w => w.Section, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First()).ToArray();
+        if(selected.Length == 0) return;
+
+        var paths = ResolveWritableConfigPaths("weapon-library.cfg");
+        var destination = paths.Source ?? paths.Runtime
+            ?? throw new FileNotFoundException("Weapon library unavailable.");
+        var doc = FireteamConfigDocument.Load(destination);
+        foreach(var weapon in selected)
+            doc.SetValue(weapon.Section, "enabled", enabled ? "1" : "0");
+        SaveBoth(doc, paths);
+
+        if(enabled && selected.Any(w => w.IsQaQuarantined))
+            WeaponQaQuarantineStore.Unquarantine(
+                selected.Where(w => w.IsQaQuarantined));
+        Invalidate();
     }
 
     public void SaveDefinition(
@@ -464,13 +488,7 @@ public sealed class WeaponCatalogService
                     "id",
                     section);
 
-            if(IsQaQuarantined(
-                   quarantined,
-                   section,
-                   id))
-            {
-                continue;
-            }
+            var qaDisabled = IsQaQuarantined(quarantined, section, id);
 
             var values =
                 new Dictionary<string, string>(
@@ -497,14 +515,15 @@ public sealed class WeaponCatalogService
                     "hitscan");
 
             var enabled =
-                active ||
+                !qaDisabled &&
+                (active ||
                 (enabledOverrides.TryGetValue(
                      section,
                      out var overrideEnabled)
                     ? overrideEnabled
                     : doc.GetBool(
                         section,
-                        "enabled"));
+                        "enabled")));
 
             result.Add(
                 new WeaponDefinition
@@ -514,6 +533,7 @@ public sealed class WeaponCatalogService
                     Name = name,
                     Type = type,
                     Enabled = enabled,
+                    IsQaQuarantined = qaDisabled,
                     Supported =
                         active ||
                         doc.GetBool(
@@ -536,113 +556,20 @@ public sealed class WeaponCatalogService
     }
 
     private static bool IsQaQuarantined(
-        HashSet<string> quarantined,
-        string section,
-        string id)
+        HashSet<string> quarantined, string section, string id)
     {
-        return
-            quarantined.Contains(
-                section) ||
-            quarantined.Contains(
-                "section:" + section) ||
-            (!string.IsNullOrWhiteSpace(
-                 id) &&
-             quarantined.Contains(
-                 "id:" + id));
+        return quarantined.Contains(section) ||
+               quarantined.Contains("section:" + section) ||
+               (!string.IsNullOrWhiteSpace(id) &&
+                (quarantined.Contains("id:" + id) ||
+                 (id.Length > 31 && quarantined.Contains("id:" + id[..31]))));
     }
 
-    private static HashSet<string> LoadQaQuarantinedSections()
-    {
-        var result =
-            new HashSet<string>(
-                StringComparer.OrdinalIgnoreCase);
+    private static HashSet<string> LoadQaQuarantinedSections() =>
+        WeaponQaQuarantineStore.Read();
 
-        var paths =
-            LauncherPaths.FindConfigPaths(
-                "weapon-quarantine.txt");
-
-        var candidates =
-            new[]
-            {
-                paths.Source,
-                paths.Runtime
-            }
-            .Where(path =>
-                !string.IsNullOrWhiteSpace(
-                    path))
-            .Distinct(
-                StringComparer.OrdinalIgnoreCase);
-
-        foreach(var path in candidates)
-        {
-            if(path is null ||
-               !File.Exists(path))
-            {
-                continue;
-            }
-
-            foreach(var raw in File.ReadLines(path))
-            {
-                var line =
-                    raw.Trim();
-
-                if(line.Length == 0 ||
-                   line.StartsWith("#") ||
-                   line.StartsWith(";"))
-                {
-                    continue;
-                }
-
-                result.Add(
-                    line);
-            }
-        }
-
-        return result;
-    }
-
-    private static (
-        long WriteTicks,
-        long Length) GetQaQuarantineSignature()
-    {
-        var paths =
-            LauncherPaths.FindConfigPaths(
-                "weapon-quarantine.txt");
-
-        long ticks = 0;
-        long length = 0;
-
-        foreach(var path in new[]
-        {
-            paths.Source,
-            paths.Runtime
-        }
-        .Where(path =>
-            !string.IsNullOrWhiteSpace(
-                path))
-        .Distinct(
-            StringComparer.OrdinalIgnoreCase))
-        {
-            if(path is null ||
-               !File.Exists(path))
-            {
-                continue;
-            }
-
-            var info =
-                new FileInfo(
-                    path);
-
-            ticks ^=
-                info.LastWriteTimeUtc.Ticks;
-            length +=
-                info.Length;
-        }
-
-        return (
-            ticks,
-            length);
-    }
+    private static (long WriteTicks, long Length) GetQaQuarantineSignature() =>
+        WeaponQaQuarantineStore.Signature();
 
     private static Dictionary<string, bool> LoadEnabledOverrides()
     {
@@ -685,6 +612,7 @@ public sealed class WeaponCatalogService
             Name = source.Name,
             Type = source.Type,
             Enabled = enabled,
+            IsQaQuarantined = source.IsQaQuarantined,
             Supported = source.Supported,
             IsActiveSlot = source.IsActiveSlot,
             Source = source.Source,

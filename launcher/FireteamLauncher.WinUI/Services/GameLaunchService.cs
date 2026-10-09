@@ -38,6 +38,7 @@ public sealed class GameLaunchService
                 mapFile);
         }
 
+        WeaponQaQuarantineStore.RestoreBeforeGameLaunch(gameDir);
         _settings.SaveSettings(settings);
         _settings.SaveProfile(profile);
         WriteSession(gameDir, profile.Difficulty, profile.Mode, mapName);
