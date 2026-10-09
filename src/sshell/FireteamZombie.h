@@ -17,6 +17,7 @@ public:
     // Dead corpses remain in the world for their animation; do not
     // count them as living enemies when repairing a stalled round.
     bool IsAliveForRound() const { return !m_bDying && m_nHealth > 0; }
+    const char* GetInfectedTypeId() const { return m_Def.sId; }
 
 protected:
     uint32 EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData);
