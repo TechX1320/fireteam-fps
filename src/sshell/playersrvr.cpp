@@ -561,6 +561,11 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
                         pMsg->Writeuint32(scoreStruct[i].iScore);
                         pMsg->Writeuint8(scoreStruct[i].iLives);
                         pMsg->Writefloat(scoreStruct[i].fMoney);
+                        pMsg->Writeuint32(scoreStruct[i].iShotsFired);
+                        pMsg->Writeuint32(scoreStruct[i].iShotsHit);
+                        pMsg->Writeuint32(scoreStruct[i].iDeaths);
+                        pMsg->Writeuint32(scoreStruct[i].iPowerups);
+                        pMsg->Writeuint32(scoreStruct[i].iHeadshotKills);
                     }
 
                     //pMsg->WriteObject(m_hClub);
