@@ -153,8 +153,13 @@ static void FT_RenderBloodBursts(HOBJECT hCamera)
         }
     }
     g_pLTCDrawPrim->EndDrawPrim();
+    // Restore the shared draw-primitive state. Round HUD, reticle and weapon
+    // overlays render later in the same frame and must stay screen-space.
     g_pLTCDrawPrim->SetCamera(LTNULL);
     g_pLTCDrawPrim->SetTexture(LTNULL);
+    g_pLTCDrawPrim->SetTransformType(DRAWPRIM_TRANSFORM_SCREEN);
+    g_pLTCDrawPrim->SetZBufferMode(DRAWPRIM_NOZ);
+    g_pLTCDrawPrim->SetColorOp(DRAWPRIM_MODULATE);
 }
 
 
