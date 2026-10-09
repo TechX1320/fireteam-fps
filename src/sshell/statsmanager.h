@@ -30,6 +30,11 @@ public:
     void            RemovePlayer(CPlayerSrvr *_pPlayer);
     uint32          GetNumPlayers();
     LTRESULT        GetPlayerScores(SCORESTRUCT *scores);
+    // Atomically export a completed, server-authoritative local match.
+    // No accounts, global service, signature or ranking claim yet.
+    bool            SaveCompletedMatch(
+                        uint32 nRound, const char *pDifficulty,
+                        float fCombatSeconds);
 
 
 
