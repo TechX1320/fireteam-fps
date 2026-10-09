@@ -7,8 +7,6 @@ $ErrorActionPreference = "Stop"
 $source = Join-Path $RepoRoot "assets-local\WeaponImports\Weapons\ca"
 $built = Join-Path $RepoRoot "BUILT"
 $dest = Join-Path $built "rez\Weapons\ca"
-$sourceConfig = Join-Path $RepoRoot "config\weapons.cfg"
-$runtimeConfig = Join-Path $built "config\weapons.cfg"
 
 if(-not (Test-Path -LiteralPath $source)) {
     Write-Host "[ERROR] No imported weapon asset tree was found:"
@@ -39,11 +37,10 @@ if($sourceFiles.Count -eq 0) {
 Write-Host "[WEAPON] Staging $($sourceFiles.Count) imported Combat Arms asset files..."
 Copy-Item -Path (Join-Path $source "*") -Destination $dest -Recurse -Force
 
-if(Test-Path -LiteralPath $sourceConfig) {
-    New-Item -ItemType Directory -Force -Path (Split-Path $runtimeConfig -Parent) | Out-Null
-    Copy-Item -LiteralPath $sourceConfig -Destination $runtimeConfig -Force
-    Write-Host "[OK] Updated BUILT\config\weapons.cfg"
-}
+# Never overwrite local weapon definitions while staging visual assets.
+# Import/Editor writes to BUILT/config already; promotion of tracked source
+# templates must use scripts/sync-local-config.ps1 with -ConfirmSync.
+Write-Host "[KEEP] BUILT\config\weapons.cfg was not touched."
 
 $destFiles =
     @(Get-ChildItem -LiteralPath $dest -File -Recurse)
