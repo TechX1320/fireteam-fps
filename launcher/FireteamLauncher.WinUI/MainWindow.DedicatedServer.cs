@@ -91,7 +91,7 @@ public sealed partial class MainWindow
         };
         access.Children.Add(LabeledControl("Visibility", DedicatedVisibilityCombo));
         DedicatedPinBox.MaxLength = 4;
-        DedicatedPinBox.PasswordChar = '●';
+        DedicatedPinBox.PasswordChar = "●";
         DedicatedPinBox.Width = 150;
         DedicatedPinBox.PlaceholderText = "4-digit PIN";
         access.Children.Add(LabeledControl("Private PIN", DedicatedPinBox));
