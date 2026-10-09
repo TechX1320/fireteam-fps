@@ -332,6 +332,11 @@ LTRESULT CStatsGui::HandleMessage(ILTMessage_Read* pMessage)
             m_pScores[i].iScore = pMessage->Readuint32();
             m_pScores[i].iLives = pMessage->Readuint8();
             m_pScores[i].fMoney = pMessage->Readfloat();
+            m_pScores[i].iShotsFired = pMessage->Readuint32();
+            m_pScores[i].iShotsHit = pMessage->Readuint32();
+            m_pScores[i].iDeaths = pMessage->Readuint32();
+            m_pScores[i].iPowerups = pMessage->Readuint32();
+            m_pScores[i].iHeadshotKills = pMessage->Readuint32();
             //g_pLTClient->CPrint("(%d) %d - %s - %d - $%.2f", i, iClientID, sName, iScore, fMoney);
         }
 
