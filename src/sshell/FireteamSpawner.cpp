@@ -6,6 +6,7 @@
 #include "FireteamDifficultyDefs.h"
 #include "FireteamMutationBox.h"
 #include "playersrvr.h"
+#include "statsmanager.h"
 #include "FireteamSpawnSafety.h"
 
 #include <iltcommon.h>
@@ -1299,7 +1300,7 @@ void FT_OnFireteamSquadGameOver()
         return;
     }
 
-    FT_GetRoundCombatTime();
+    const float fCombatDuration = FT_GetRoundCombatTime();
     s_bGameOver = true;
     s_bRoundActive = false;
     s_bRoundIntermission = false;
@@ -1309,6 +1310,10 @@ void FT_OnFireteamSquadGameOver()
     g_pLTServer->CPrint(
         "Fireteam: GAME OVER on round %u - squad is out of lives.",
         s_nRound);
+
+    if(g_pStatsManager)
+        g_pStatsManager->SaveCompletedMatch(
+            s_nRound, s_Difficulty.sId, fCombatDuration);
 
     FT_BroadcastRoundState(
         3);
