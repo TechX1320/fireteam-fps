@@ -42,6 +42,7 @@ static uint8 s_nQueueHead = 0;
 static uint8 s_nQueueCount = 0;
 static uint8 s_nActiveFeedback = 0;
 static float s_fActiveStart = 0.0f;
+static float s_fLastConfirmedHit = -10.0f;
 
 static void FT_LoadFeedbackImage(
     FTFeedbackImage &image,
@@ -136,6 +137,8 @@ static const char* FT_TextForFeedback(
             return "UNBELIEVABLE";
         case FT_FEEDBACK_ROUNDSTART:
             return "ROUND START";
+        case FT_COMBAT_FEEDBACK_HIT:
+            return "X";
         default:
             return "";
     }
@@ -499,6 +502,11 @@ void FT_CombatFeedbackHandleMessage(
     const uint8 nFeedback =
         pMessage->Readuint8();
 
+    if(nFeedback == FT_COMBAT_FEEDBACK_HIT)
+    {
+        s_fLastConfirmedHit = g_pLTClient ? g_pLTClient->GetTime() : -10.0f;
+        return;
+    }
     FT_QueueFeedback(nFeedback);
 
     // The supplied CA SND archive does not contain the literal announcer VO.
@@ -527,12 +535,20 @@ void FT_CombatFeedbackShowRoundStart()
 
 void FT_RenderCombatFeedback()
 {
-    if(!g_pLTClient ||
-       !g_pLTCDrawPrim ||
-       !s_nActiveFeedback)
-    {
+    if(!g_pLTClient || !g_pLTCDrawPrim)
         return;
+
+    const float fHitAge = g_pLTClient->GetTime() - s_fLastConfirmedHit;
+    if(fHitAge >= 0.0f && fHitAge < 0.18f && s_pFallback)
+    {
+        uint32 nHitW = 0, nHitH = 0;
+        g_pLTClient->GetSurfaceDims(g_pLTClient->GetScreenSurface(),
+                                     &nHitW, &nHitH);
+        FT_DrawFallback(FT_COMBAT_FEEDBACK_HIT, (float)nHitH * 0.5f,
+            (uint8)(255.0f * (1.0f - fHitAge / 0.18f)));
     }
+    if(!s_nActiveFeedback)
+        return;
 
     const float fAge =
         g_pLTClient->GetTime() -
