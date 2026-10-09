@@ -1342,6 +1342,8 @@ void CPlayerSrvr::CaptureResumeState(FTPlayerResumeState &state) const
 {
     g_pLTServer->GetObjectPos(m_hObject, &state.vPosition);
     g_pLTServer->GetObjectRotation(m_hObject, &state.rRotation);
+    state.vRespawnAnchor = m_vSpawnPos;
+    state.rRespawnAnchor = m_rSpawnRot;
     state.nHealth = m_nHealth;
     state.nMaxHealth = m_nMaxHealth;
     state.nLives = m_nLives;
