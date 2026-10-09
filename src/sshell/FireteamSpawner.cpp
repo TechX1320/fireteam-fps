@@ -326,6 +326,9 @@ static void FT_BroadcastRoundState(uint8 nState)
     FT_SendRoundState(nState, LTNULL);
 }
 
+uint32 FT_GetFireteamCurrentRound() { return s_nRound; }
+bool FT_IsFireteamMatchOver() { return s_bGameOver; }
+
 void FT_OnFireteamPlayerJoined(HCLIENT hClient)
 {
     const ULONGLONG nNow = GetTickCount64();
@@ -1084,6 +1087,22 @@ void Spawner::StartNextRound()
     }
 
     ++s_nRound;
+
+    // Admit first-time connections at round boundaries, not mid-wave.
+    HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
+    if(hPlayerClass)
+    {
+        for(HOBJECT h = g_pLTServer->GetNextObject(LTNULL);
+            h; h = g_pLTServer->GetNextObject(h))
+        {
+            HCLASS type = g_pLTServer->GetObjectClass(h);
+            if(!type || !g_pLTServer->IsKindOf(type, hPlayerClass))
+                continue;
+            CPlayerSrvr *pPlayer = (CPlayerSrvr*)
+                g_pLTServer->HandleToObject(h);
+            if(pPlayer) pPlayer->ActivateForNextRound();
+        }
+    }
 
     s_nRoundTarget =
         s_Difficulty.nRoundBase +
