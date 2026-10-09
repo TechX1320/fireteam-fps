@@ -32,6 +32,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <float.h>
 #include "FireteamPoisonGas.h"
 #include "FireteamExplosiveProjectile.h"
 #include "FireteamDifficultyDefs.h"
@@ -2173,6 +2174,13 @@ void CPlayerSrvr::FirePrimary(
         return;
     }
 
+    // Reject non-finite / fabricated shot origins before passing them to
+    // the LithTech raycast. The client never chooses enemy hitbox sizes.
+    if(!_finite(vFrom.x) || !_finite(vFrom.y) || !_finite(vFrom.z) ||
+       !_finite(vDirection.x) || !_finite(vDirection.y) ||
+       !_finite(vDirection.z))
+        return;
+
     LTVector vDir = vDirection;
     if(vDir.MagSqr() < 0.0001f)
     {
@@ -2206,12 +2214,14 @@ void CPlayerSrvr::FirePrimary(
     LTVector vReportedOffset =
         vFrom - vPlayerPos;
 
-    if(vReportedOffset.x >= -32.0f &&
-       vReportedOffset.x <= 32.0f &&
-       vReportedOffset.z >= -32.0f &&
-       vReportedOffset.z <= 32.0f &&
-       vReportedOffset.y >= -20.0f &&
-       vReportedOffset.y <= 110.0f)
+    // Client first-person eye heights are 65 standing / 42 crouched.
+    // The old -20..110 Y allowance let malicious clients start a shot
+    // far outside their body. Preserve modest camera replication slack.
+    const bool bValidEye =
+        fabsf(vReportedOffset.y - 65.0f) <= 15.0f ||
+        fabsf(vReportedOffset.y - 42.0f) <= 13.0f;
+    if(fabsf(vReportedOffset.x) <= 24.0f &&
+       fabsf(vReportedOffset.z) <= 24.0f && bValidEye)
     {
         vServerFrom = vFrom;
     }
