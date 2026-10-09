@@ -722,6 +722,7 @@ void CLTClientShell::OnEnterWorld()
 //---------------------------------------------------------------------------
 void CLTClientShell::OnExitWorld()
 {
+    m_bShowStats = false;
     FT_RoundHudSetSoloRetry(false);
     FT_RestoreCaptureLight();
     FT_AmbientAudioExitWorld();
@@ -854,6 +855,12 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
     case MSG_SC_ROUND:
         {
             FT_RoundHudHandleMessage(pMessage);
+            if(FT_RoundHudIsGameOver())
+            {
+                // The final squad report should appear without requiring
+                // a TAB hold; keep the server streaming its score snapshot.
+                SetStatsVisible(true);
+            }
         }
         break;
     case MSG_SC_ROUND_PREP:
@@ -1237,7 +1244,7 @@ LTRESULT CLTClientShell::Render()
 
     if(IsInWorld())
     {
-        if(m_bShowStats)
+        if(m_bShowStats || FT_RoundHudIsGameOver())
         {
             assert(m_pStatsGui);
             m_pStatsGui->Render();
@@ -1380,7 +1387,7 @@ void CLTClientShell::OnCommandOn(int command)
 void CLTClientShell::OnCommandOff(int command)
 {
     //
-    if (command == COMMAND_SHOWSTATS)
+    if (command == COMMAND_SHOWSTATS && !FT_RoundHudIsGameOver())
     {
         SetStatsVisible(false);
     }
