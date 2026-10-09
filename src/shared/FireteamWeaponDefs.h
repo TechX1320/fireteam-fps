@@ -248,6 +248,83 @@ inline void FT_AssignWeaponField(
     else if(_stricmp(pKey, "anim_reload") == 0) FT_CopyWeaponString(def.sAnimReload, sizeof(def.sAnimReload), pValue);
 }
 
+// Existing saved loadouts may have been authored before the launcher copied
+// CA pellet metadata into active slots. Resolve their matching catalog ID
+// without modifying the user's loadout, so previously equipped shotguns also
+// get the multi-pellet treatment immediately after the engine update.
+inline void FT_RestoreLegacyShotgunPellets(
+    const char *pFilename, FTWeaponDef aDefs[6])
+{
+    FILE *pFile = fopen(pFilename, "rt");
+    if(!pFile) return;
+
+    bool bCatalog = false;
+    char sCatalogId[80] = "";
+    int nVectors = 1;
+    float fPelletSpread = -1.0f;
+    char sLine[512];
+
+    // Resolve a completed catalog record when the next section starts.
+    while(true)
+    {
+        const bool bRead = fgets(sLine, sizeof(sLine), pFile) != LTNULL;
+        char *pLine = bRead ? FT_TrimWeaponLine(sLine) : LTNULL;
+        if(!bRead || (pLine && pLine[0] == '['))
+        {
+            if(bCatalog && nVectors >= 2 && nVectors <= 12 &&
+               sCatalogId[0])
+            {
+                for(uint32 nSlot = 1; nSlot <= 5; ++nSlot)
+                {
+                    FTWeaponDef &def = aDefs[nSlot];
+                    if(def.nPellets != 1 || !def.sId[0]) continue;
+                    // The legacy FTWeaponDef ID field is 31 chars; tolerate
+                    // a truncated ID while matching its imported catalog.
+                    const uint32 nIdLength = (uint32)strlen(def.sId);
+                    if(_stricmp(def.sId, sCatalogId) == 0 ||
+                       (nIdLength == sizeof(def.sId) - 1 &&
+                        _strnicmp(def.sId, sCatalogId, nIdLength) == 0))
+                    {
+                        def.nPellets = (uint8)nVectors;
+                        if(fPelletSpread >= 0.0f)
+                            def.fPelletSpread = fPelletSpread;
+                    }
+                }
+            }
+
+            if(!bRead) break;
+            bCatalog = pLine && _strnicmp(pLine, "[catalog.", 9) == 0;
+            sCatalogId[0] = '\0';
+            nVectors = 1;
+            fPelletSpread = -1.0f;
+            continue;
+        }
+
+        if(!bCatalog || !pLine[0] || pLine[0] == '#' ||
+           pLine[0] == ';') continue;
+        char *pEquals = strchr(pLine, '=');
+        if(!pEquals) continue;
+        *pEquals = '\0';
+        char *pKey = FT_TrimWeaponLine(pLine);
+        char *pValue = FT_TrimWeaponLine(pEquals + 1);
+        if(_stricmp(pKey, "id") == 0)
+            FT_CopyWeaponString(sCatalogId, sizeof(sCatalogId), pValue);
+        else if(_stricmp(pKey, "ca_vectors_per_round") == 0 ||
+                _stricmp(pKey, "pellets") == 0)
+        {
+            const int n = atoi(pValue);
+            if(n >= 1 && n <= 12) nVectors = n;
+        }
+        else if(_stricmp(pKey, "pellet_spread") == 0)
+        {
+            const float f = (float)atof(pValue);
+            if(f >= 0.0f && f <= 0.40f) fPelletSpread = f;
+        }
+    }
+
+    fclose(pFile);
+}
+
 inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
 {
     FT_InitWeaponDefaults(aDefs);
@@ -306,6 +383,7 @@ inline bool FT_LoadWeaponDefs(const char *pFilename, FTWeaponDef aDefs[6])
     }
 
     fclose(pFile);
+    FT_RestoreLegacyShotgunPellets(pFilename, aDefs);
     return true;
 }
 
