@@ -107,30 +107,6 @@ public sealed partial class MainWindow
 
         page.Children.Add(actions);
 
-        page.Children.Add(CardHeading(
-            "HOSTING",
-            "Dedicated Server",
-            "Runs separately from the game with its own settings. Uses the selected Quick Play map and difficulty."));
-
-        var hostOptions = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 10
-        };
-        DedicatedServerName.PlaceholderText = "Public server name";
-        DedicatedServerName.Text = "FIRETEAM Dedicated";
-        DedicatedServerName.Width = 260;
-        DedicatedServerPort.PlaceholderText = "Port";
-        DedicatedServerPort.Text = "27889";
-        DedicatedServerPort.Width = 110;
-        hostOptions.Children.Add(DedicatedServerName);
-        hostOptions.Children.Add(DedicatedServerPort);
-        page.Children.Add(hostOptions);
-
-        var dedicated = SecondaryButton("START DEDICATED SERVER");
-        dedicated.Click += (sender, args) => LaunchDedicatedServer();
-        page.Children.Add(dedicated);
-
         ServerBrowserStatus.Foreground = SecondaryTextBrush;
         ServerBrowserStatus.TextWrapping = TextWrapping.Wrap;
         ServerBrowserStatus.Text = "Public directory is community-curated. To submit a server, open an issue or pull request on the FIRETEAM GitHub repository.";
@@ -240,86 +216,4 @@ public sealed partial class MainWindow
         }
     }
 
-    private void LaunchDedicatedServer()
-    {
-        var gameDirectory = LauncherPaths.FindGameDirectory();
-        var serverDirectory = gameDirectory is null
-            ? null
-            : Path.Combine(gameDirectory, "Dedicated");
-        var serverPath = serverDirectory is null
-            ? null
-            : Path.Combine(serverDirectory, "FireteamDedicatedServer.exe");
-
-        if(serverPath is null || !File.Exists(serverPath))
-        {
-            ServerBrowserStatus.Text =
-                "Dedicated server is not installed. Run build.cmd, then build-dedicated.cmd.";
-            return;
-        }
-
-        if(!ushort.TryParse(DedicatedServerPort.Text, out var port) || port == 0)
-        {
-            ServerBrowserStatus.Text = "Dedicated port must be between 1 and 65535.";
-            return;
-        }
-
-        var mapName = MapCombo.SelectedItem?.ToString() ?? "CABINFEVER";
-        mapName = Path.GetFileNameWithoutExtension(mapName).ToUpperInvariant();
-        if(mapName.Length == 0 || mapName.Any(ch =>
-            !(char.IsLetterOrDigit(ch) || ch == '_' || ch == '-')))
-        {
-            ServerBrowserStatus.Text = "Invalid map selection.";
-            return;
-        }
-
-        if(!File.Exists(Path.Combine(serverDirectory!, "rez", "Worlds", mapName + ".DAT")))
-        {
-            ServerBrowserStatus.Text =
-                $"The dedicated runtime cannot find {mapName}.DAT. Stage map assets and rebuild.";
-            return;
-        }
-
-        var serverName = (DedicatedServerName.Text ?? "").Trim();
-        if(string.IsNullOrWhiteSpace(serverName))
-            serverName = "FIRETEAM Dedicated";
-        if(serverName.Length > 64)
-            serverName = serverName[..64];
-
-        try
-        {
-            var configDir = Path.Combine(serverDirectory!, "config");
-            Directory.CreateDirectory(configDir);
-
-            // Keep a server-local config: launching a playable client can
-            // rewrite BUILT/config/session.cfg at any time.
-            var difficulty = DifficultyProfileValue();
-            var cabinGuard = mapName == "CABINFEVER" ? 1 : 0;
-            File.WriteAllText(
-                Path.Combine(configDir, "session.cfg"),
-                $"difficulty={difficulty}\nmap={mapName}\nfirst_round_prep=45\ncabin_spawn_guard={cabinGuard}\n");
-
-            var start = new System.Diagnostics.ProcessStartInfo(serverPath)
-            {
-                WorkingDirectory = serverDirectory!,
-                UseShellExecute = false
-            };
-            start.ArgumentList.Add("--map");
-            start.ArgumentList.Add(mapName);
-            start.ArgumentList.Add("--port");
-            start.ArgumentList.Add(port.ToString());
-            start.ArgumentList.Add("--max-players");
-            start.ArgumentList.Add("24");
-            start.ArgumentList.Add("--name");
-            start.ArgumentList.Add(serverName);
-
-            var process = System.Diagnostics.Process.Start(start);
-            ServerBrowserStatus.Text = process is null
-                ? "Unable to start dedicated server."
-                : $"Dedicated server started (PID {process.Id}). Join 127.0.0.1:{port} on this PC. Verify the server console reports 'running' before joining.";
-        }
-        catch(Exception ex)
-        {
-            ServerBrowserStatus.Text = "Dedicated server start failed: " + ex.Message;
-        }
-    }
 }
