@@ -59,7 +59,7 @@ public sealed class SettingsService
 
         var line = string.Format(
             CultureInfo.InvariantCulture,
-            "{0:F6} {1:F6} {2} {3:F3} {4} {5} {6}\n",
+            "{0:F6} {1:F6} {2} {3:F3} {4} {5} {6} {7}\n",
             rawSensitivityX,
             rawSensitivityY,
             settings.Volume,
