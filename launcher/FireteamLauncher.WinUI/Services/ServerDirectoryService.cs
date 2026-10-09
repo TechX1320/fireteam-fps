@@ -178,7 +178,8 @@ public sealed class ServerDirectoryService
         return string.IsNullOrWhiteSpace(clean) ? "CABINFEVER" : clean.ToUpperInvariant();
     }
 
-    private static IReadOnlyList<FireteamServerListing> Validate(IEnumerable<FireteamServerListing>? servers)
+    private static IReadOnlyList<FireteamServerListing> Validate(
+        IEnumerable<FireteamServerListing>? servers, string source = "Favorite")
     {
         if(servers is null)
             return [];
