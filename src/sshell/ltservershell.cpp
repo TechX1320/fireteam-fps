@@ -33,6 +33,7 @@
 #include "playersrvr.h"
 #include "FireteamPlayerDefs.h"
 #include "FireteamSpawner.h"
+#include "FireteamReconnect.h"
 #include "FireteamNavigation.h"
 #include "FireteamZombie.h"
 #include "FireteamSpawnSafety.h"
@@ -333,11 +334,15 @@ LPBASECLASS CLTServerShell::OnClientEnterWorld(HCLIENT hClient)
 //----------------------------------------------------------------------------
 void CLTServerShell::OnClientExitWorld(HCLIENT hClient)
 {
-	g_pLTServer->CPrint("CLTServerShell::OnClientExitWorld(%p)", hClient);
-    CPlayerSrvr *pBaseClass = (CPlayerSrvr *)g_pLTServer->GetClientUserData(hClient);
-	HOBJECT hPlayer = g_pLTServer->ObjectToHandle(pBaseClass);
+    g_pLTServer->CPrint("CLTServerShell::OnClientExitWorld(%p)", hClient);
+    CPlayerSrvr *pPlayer =
+        (CPlayerSrvr*)g_pLTServer->GetClientUserData(hClient);
+    if(!pPlayer) return;
+    // The engine destroys CPlayerSrvr in RemoveObject; park it FIRST.
+    FT_ParkReconnect(pPlayer);
+    if(g_pStatsManager) g_pStatsManager->RemovePlayer(pPlayer);
+    HOBJECT hPlayer = g_pLTServer->ObjectToHandle(pPlayer);
     g_pLTServer->RemoveObject(hPlayer);
-    g_pStatsManager->RemovePlayer(pBaseClass);
 }
 
 
@@ -445,7 +450,16 @@ void CLTServerShell::OnMessage(HCLIENT hSender, ILTMessage_Read *pMessage)
             char szName[16];
             szName[15] = '\0';
             pMessage->ReadString(szName, 16);
-            pPlayerClass->SetPlayerName(szName);
+            char sTicket[48];
+            sTicket[0] = '\0';
+            pMessage->ReadString(sTicket, sizeof(sTicket));
+            if(pPlayerClass)
+            {
+                pPlayerClass->SetPlayerName(szName);
+                if(!FT_ClaimReconnect(pPlayerClass, sTicket))
+                    g_pLTServer->CPrint(
+                        "FIRETEAM: reconnect identity not accepted; controls remain locked.");
+            }
             g_pLTServer->CPrint("%s has entered the game", szName);
 
 	        ILTMessage_Write *pMsg;
@@ -662,6 +676,7 @@ void CLTServerShell::PostStartWorld()
 {
     // World objects have been created. Rebuild the map-local navigation
     // snapshot here rather than accidentally caching an incomplete load.
+    FT_ResetReconnect(); // World changes invalidate all old health/lives.
     FT_ResetNavigationCache();
     const uint32 nNavVolumes = FT_GetNavigationVolumeCount();
     g_pLTServer->CPrint(
