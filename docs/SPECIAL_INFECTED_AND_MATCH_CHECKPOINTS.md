@@ -1,6 +1,6 @@
 # FIRETEAM: Match checkpoints + playable Assassin / Crusher — Windows QA
 
-Status: **code committed to main; real Win11 build, model rendering and gameplay not yet tested.**
+Status: **player has reported running Assassin and Crusher rounds and recorded stats on Windows. Assassin skins/movement still need verification. The latest launcher/profile changes still require a new Windows build.**
 
 ## Build and test once
 
@@ -105,10 +105,11 @@ round's configured enemy target.
 
 ## Assassin
 
-The provided infection wiki does not list an "Assassin" Fireteam zombie
-type. This is **a FIRETEAM-designed fast special variant** based on actual
-`VIW_F_NM_DF_ASSASSIN_CH.LTB` and `ANI_VI_ASSASSIN_CH.LTB`
-assets supplied by the local CA character archive.
+The archived name **Assassin** is shown as a model/gallery label on Combat
+Arms' [Striker page](https://combatarms.fandom.com/wiki/The_Striker).
+FIRETEAM's internal ID remains `infected_assassin` to preserve saved stats.
+This is currently a **Striker-like fast variant** based on actual
+`VIW_F_NM_DF_ASSASSIN_CH.LTB` and `ANI_VI_ASSASSIN_CH.LTB` assets.
 
 - 100 base HP, 9 melee damage, 210 run speed.
 - Randomly appears from round 4 at difficulties 4–6, earlier on hard
@@ -123,6 +124,34 @@ assets supplied by the local CA character archive.
   until validated against the composed runtime LTB objects. This avoids
   putting guessed invalid attack names into live character definitions.
   Normal CA voice-bank sounds are reused until unique special VO is mapped.
+
+### Assassin/Striker texture and animation investigation
+
+A field test reports the currently configured Assassin looks like mixed raw
+red/white flesh rather than the Striker shown on the wiki. The selected DTX
+files are `CW_VST_ASSAVIRUS_HM`, `CW_LG_ASSAVIRUS_HM` and
+`CW_FC_NM_VIRUS_HM` (the face texture occupies both slots 2 and 3).
+The original Striker page shows both Hair and Virus presentations. Texture
+variant selection and material order are **not yet verified**.
+
+On the developer's Windows machine, place an optional `Attributes.zip` in
+`assets-local` (ignored by Git) and run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\audit-assassin-assets.ps1
+```
+
+The report `assets-local/Reports/assassin-material-audit.txt` compares
+archive paths, possible material/animation tokens, references found in
+Attributes text data, and current configuration slots. Send the text report
+rather than sharing proprietary model/texture binaries. At first special
+spawn, the server additionally logs one-time `Fireteam special audit:`
+entries for configured slots and `GetAnimIndex` results for idle/walk/run,
+attack, jump and death. A valid animation index does not prove that its motion
+matches the intended Striker behavior.
+
+Do not randomly exchange virus/hair textures or force new attack animations
+before the matching source and runtime audit identify them.
 
 ## Regression checks
 
