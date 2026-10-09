@@ -71,6 +71,99 @@ static const float kMatchCheckpointInterval = 15.0f;
 static float s_fNextMatchCheckpoint = 0.0f;
 static uint32 s_nMissingInfectedRestores = 0;
 static FTDifficultyDef s_Difficulty;
+static bool s_bAssassinAssetsReady = false;
+static bool s_bTankerAssetsReady = false;
+static uint32 s_nTankersPlanned = 0;
+static uint32 s_nTankersSpawned = 0;
+
+// Only local staged commercial CA assets are used. No files are pushed
+// through a central downloader; missing variants safely become commons.
+static bool FT_LocalInfectedAssetPresent(const char *pPath)
+{
+    return GetFileAttributesA(pPath) != INVALID_FILE_ATTRIBUTES;
+}
+
+static void FT_CheckSpecialInfectedAssets()
+{
+    s_bAssassinAssetsReady =
+        FT_LocalInfectedAssetPresent(
+            "rez\\Characters\\infected\\body\\VIW_F_NM_DF_ASSASSIN_CH.LTB") &&
+        FT_LocalInfectedAssetPresent(
+            "rez\\Characters\\infected\\body\\ANI_VI_ASSASSIN_CH.LTB") &&
+        FT_LocalInfectedAssetPresent(
+            "rez\\Characters\\infected\\body\\CW_VST_ASSAVIRUS_HM.DTX") &&
+        FT_LocalInfectedAssetPresent(
+            "rez\\Characters\\infected\\body\\CW_LG_ASSAVIRUS_HM.DTX") &&
+        FT_LocalInfectedAssetPresent(
+            "rez\\Characters\\infected\\body\\CW_FC_NM_VIRUS_HM.DTX");
+    s_bTankerAssetsReady =
+        FT_LocalInfectedAssetPresent(
+            "rez\\Characters\\infected\\body\\VIM_F_NM_DF_TANKER_SH.LTB") &&
+        FT_LocalInfectedAssetPresent(
+            "rez\\Characters\\infected\\body\\ANI_VI_TANKER_SH.LTB") &&
+        FT_LocalInfectedAssetPresent(
+            "rez\\Characters\\infected\\body\\CM_FC_TANKERBLUE_YK.DTX") &&
+        FT_LocalInfectedAssetPresent(
+            "rez\\Characters\\infected\\body\\CM_LG_TANKERBLUE_YK.DTX") &&
+        FT_LocalInfectedAssetPresent(
+            "rez\\Characters\\infected\\body\\CM_VST_TANKERBLUE_YK.DTX");
+    g_pLTServer->CPrint(
+        "Fireteam specials: Assassin=%s Tanker=%s (staged body/animation/textures).",
+        s_bAssassinAssetsReady ? "READY" : "MISSING; disabled",
+        s_bTankerAssetsReady ? "READY" : "MISSING; disabled");
+}
+
+// Difficulty-6 Crusher schedule requested: 8, 12, 15, 18, 20, 22,
+// 23, 24, then each later round. Boss counts increase at 18/24/32.
+// Easier settings are rarer, Nightmare has early multi-boss waves.
+static uint32 FT_PlannedTankers(uint32 nRound, uint32 nDifficulty)
+{
+    if(nDifficulty < 1) nDifficulty = 1;
+    if(nDifficulty > 10) nDifficulty = 10;
+    if(nDifficulty == 1)
+        return nRound >= 25 && ((nRound - 25) % 20) == 0 ? 1 : 0;
+    if(nDifficulty == 2)
+        return nRound >= 20 && ((nRound - 20) % 16) == 0 ? 1 : 0;
+    if(nDifficulty == 3)
+        return nRound >= 17 && ((nRound - 17) % 12) == 0 ? 1 : 0;
+    if(nDifficulty == 4)
+        return nRound >= 14 && ((nRound - 14) % 10) == 0 ? 1 : 0;
+    if(nDifficulty == 5)
+        return nRound >= 10 && ((nRound - 10) % 8) == 0
+            ? (nRound >= 26 ? 2 : 1) : 0;
+    if(nDifficulty == 6)
+    {
+        if(nRound != 8 && nRound != 12 && nRound != 15 &&
+           nRound != 18 && nRound != 20 && nRound != 22 &&
+           nRound < 23)
+            return 0;
+        return nRound >= 32 ? 4 : nRound >= 24 ? 3 :
+            nRound >= 18 ? 2 : 1;
+    }
+    if(nDifficulty == 7)
+        return (nRound == 6 || nRound == 9 || nRound == 12 ||
+                nRound == 14 || nRound == 16 || nRound >= 18)
+            ? (nRound >= 20 ? 3 : nRound >= 12 ? 2 : 1) : 0;
+    if(nDifficulty == 8)
+        return (nRound == 4 || nRound == 6 || nRound == 8 ||
+                nRound >= 10)
+            ? (nRound >= 14 ? 3 : 2) : 0;
+    if(nDifficulty == 9)
+        return nRound >= 3
+            ? (nRound >= 10 ? 4 : nRound >= 6 ? 3 : 2) : 0;
+    return nRound >= 3
+        ? (nRound >= 8 ? 6 : 3) : 0;
+}
+
+static uint32 FT_AssassinChance(uint32 nRound, uint32 nDifficulty)
+{
+    if(nRound < (nDifficulty >= 7 ? 2u : nDifficulty >= 4 ? 4u : 8u))
+        return 0;
+    return nDifficulty >= 9 ? 25u :
+           nDifficulty >= 7 ? 18u :
+           nDifficulty >= 5 ? 12u :
+           nDifficulty >= 3 ? 8u : 4u;
+}
 
 // Cabin Fever safe-area approximation while we map the DAT's authored
 // Spawner locations. The exact coordinates are logged once per world.
@@ -436,6 +529,9 @@ void Spawner::ResetRoundController()
         s_Difficulty.fSpeedMultiplier,
         s_Difficulty.fDamageMultiplier);
 
+    FT_CheckSpecialInfectedAssets();
+    s_nTankersPlanned = 0;
+    s_nTankersSpawned = 0;
     srand((unsigned int)time(LTNULL));
 }
 
@@ -661,7 +757,7 @@ void Spawner::CollectPerimeterSpawners()
 }
 
 static bool FT_SpawnZombieAt(
-    HOBJECT hSpawnObject)
+    HOBJECT hSpawnObject, const char *pVariantName = LTNULL)
 {
     if(!hSpawnObject)
     {
@@ -699,6 +795,11 @@ static bool FT_SpawnZombieAt(
         100.0f;
     ocs.m_Rotation =
         rBaseRot;
+    if(pVariantName && pVariantName[0])
+    {
+        strncpy(ocs.m_Name, pVariantName, sizeof(ocs.m_Name) - 1);
+        ocs.m_Name[sizeof(ocs.m_Name) - 1] = '\0';
+    }
 
     return g_pLTServer->CreateObject(
         hZombieClass,
@@ -1013,6 +1114,20 @@ void Spawner::StartNextRound()
     s_nRoundKilled = 0;
     s_fMissingInfectedSince = 0.0f;
     s_nMissingInfectedRestores = 0;
+
+    // Bosses consume ordinary wave slots and count toward ALIVE/KILLS.
+    // Missing CA model assets never consume a boss slot or stall a round.
+    const uint32 nDifficulty = (uint32)atoi(s_Difficulty.sId);
+    s_nTankersPlanned = s_bTankerAssetsReady
+        ? FT_PlannedTankers(s_nRound, nDifficulty) : 0;
+    if(s_nTankersPlanned > s_nRoundTarget)
+        s_nTankersPlanned = s_nRoundTarget;
+    s_nTankersSpawned = 0;
+    if(s_nTankersPlanned)
+        g_pLTServer->CPrint(
+            "Fireteam: ROUND %u CRUSHER BOSS WAVE - %u Tanker(s) planned.",
+            s_nRound, s_nTankersPlanned);
+
     FT_GetRoundCombatTime(); // close paused interval first
     s_bRoundActive = true;
     s_bRoundIntermission = false;
@@ -1206,9 +1321,35 @@ void Spawner::UpdateRoundController()
         s_hPerimeterSpawners[
             nChoice];
 
-    if(FT_SpawnZombieAt(
-           hSpawnObject))
+    // Guarantee scheduled Crushers before the round ends; random Assassin
+    // spawns occupy other slots, preserving the existing round target.
+    const uint32 nRemaining = s_nRoundTarget - s_nRoundSpawned;
+    const uint32 nTankersRemaining =
+        s_nTankersPlanned - s_nTankersSpawned;
+    const bool bSpawnTanker = nTankersRemaining > 0 &&
+        (nRemaining <= nTankersRemaining ||
+         s_nRoundSpawned >= (s_nRoundTarget / 2));
+    const bool bSpawnAssassin = !bSpawnTanker &&
+        s_bAssassinAssetsReady &&
+        (uint32)(rand() % 100) <
+            FT_AssassinChance(s_nRound, (uint32)atoi(s_Difficulty.sId));
+    const char *pVariantName = bSpawnTanker
+        ? "FT_TANKER" : bSpawnAssassin ? "FT_ASSASSIN" : LTNULL;
+
+    if(FT_SpawnZombieAt(hSpawnObject, pVariantName))
     {
+        if(bSpawnTanker)
+        {
+            ++s_nTankersSpawned;
+            g_pLTServer->CPrint(
+                "Fireteam: CRUSHER spawned %u/%u on round %u.",
+                s_nTankersSpawned, s_nTankersPlanned, s_nRound);
+        }
+        else if(bSpawnAssassin)
+        {
+            g_pLTServer->CPrint(
+                "Fireteam: Assassin spawned on round %u.", s_nRound);
+        }
         ++s_nRoundSpawned;
         ++s_nRoundAlive;
         s_nLastSpawner = nChoice;
