@@ -833,6 +833,7 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
     case MSG_SC_RESPAWN:
         {
             FT_RoundHudSetRespawnCountdown(0.0f);
+            FT_RoundHudSetWaitingForNextRound(false);
             LTVector vRespawn = pMessage->ReadLTVector();
             LTRotation rRespawn = pMessage->ReadLTRotation();
 
