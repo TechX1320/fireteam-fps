@@ -7,9 +7,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 // The hub is LOCALHOST-ONLY until the operator explicitly configures an
 // HTTPS Kestrel listener and certificate. No exposed unauthenticated HTTP.
-builder.WebHost.UseUrls(
-    Environment.GetEnvironmentVariable("FIRETEAM_HUB_LISTEN")
-    ?? "http://127.0.0.1:27890");
+var listeners = (Environment.GetEnvironmentVariable("FIRETEAM_HUB_LISTEN")
+    ?? "http://127.0.0.1:27890")
+    .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+builder.WebHost.UseUrls(listeners);
 builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = 2048);
 builder.Services.AddSingleton<PresenceRegistry>();
@@ -17,8 +18,8 @@ builder.Services.AddSingleton<PresenceRegistry>();
 var app = builder.Build();
 app.Use(async (context, next) =>
 {
-    context.Response.Headers.CacheControl = "no-store";
-    context.Response.Headers.XContentTypeOptions = "nosniff";
+    context.Response.Headers["Cache-Control"] = "no-store";
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     await next();
 });
 
