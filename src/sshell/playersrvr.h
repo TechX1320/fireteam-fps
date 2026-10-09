@@ -202,6 +202,7 @@ private:
     void                SendHealth();
     void                SendWaitingStatus(bool bWaiting);
     void                SyncResumePosition();
+    void                SendRadarSnapshot();
     void                SendLives();
     void                SendPrimaryAmmo();
     void                CompleteReloadIfReady();
