@@ -312,7 +312,9 @@ static bool FT_AreAllFireteamPlayersOutOfLives()
 
         bFoundPlayer = true;
 
-        if(pPlayer->GetLives() > 0)
+        if(pPlayer->HasResumeIdentity() &&
+           !pPlayer->IsWaitingForNextRound() &&
+           pPlayer->GetLives() > 0)
         {
             return false;
         }
@@ -490,9 +492,14 @@ uint32 CPlayerSrvr::EngineMessageFn(uint32 messageID, void *pData, float fData)
 	case MID_UPDATE:
 		{
 
+            if(!m_bResumeVerified)
+            {
+                g_pLTServer->SetNextUpdate(m_hObject, 0.25f);
+                return 1;
+            }
             if(!m_bAlive)
             {
-                if(m_nLives > 0)
+                if(m_nLives > 0 && !m_bWaitingNextRound)
                 {
                     // Use an absolute server deadline instead of assuming
                     // every object update runs at exactly 250 ms.
@@ -1279,9 +1286,177 @@ void CPlayerSrvr::SetClubID()
 //-----------------------------------------------------------------------------
 // Fireteam player health/death/respawn.
 //-----------------------------------------------------------------------------
+// Reconnection keeps the original authoritative state, including damage
+// and a pending 5s respawn. A client only sends a random lookup capability.
+void CPlayerSrvr::SendWaitingStatus(bool bWait)
+{
+    if(!m_hClient) return;
+    ILTMessage_Write *pMsg = LTNULL;
+    if(g_pLTSCommon->CreateMessage(pMsg) != LT_OK || !pMsg) return;
+    pMsg->IncRef();
+    pMsg->Writeuint8(MSG_SC_JOIN_WAIT);
+    pMsg->Writebool(bWait);
+    g_pLTServer->SendToClient(pMsg->Read(), m_hClient, MESSAGE_GUARANTEED);
+    pMsg->DecRef();
+}
+
+void CPlayerSrvr::SyncResumePosition()
+{
+    if(!m_hClient) return;
+    LTVector v;
+    LTRotation r;
+    g_pLTServer->GetObjectPos(m_hObject, &v);
+    g_pLTServer->GetObjectRotation(m_hObject, &r);
+    ILTMessage_Write *pMsg = LTNULL;
+    if(g_pLTSCommon->CreateMessage(pMsg) != LT_OK || !pMsg) return;
+    pMsg->IncRef();
+    pMsg->Writeuint8(MSG_SC_RESPAWN);
+    pMsg->WriteLTVector(v);
+    pMsg->WriteLTRotation(r);
+    g_pLTServer->SendToClient(pMsg->Read(), m_hClient, MESSAGE_GUARANTEED);
+    pMsg->DecRef();
+}
+
+void CPlayerSrvr::AuthorizeNewSession(const char *pTicket, bool bWait)
+{
+    strncpy(m_sResumeToken, pTicket, 32);
+    m_sResumeToken[32] = '\0';
+    m_bResumeVerified = true;
+    m_bWaitingNextRound = bWait;
+    if(bWait)
+    {
+        m_bAlive = false;
+        m_nHealth = 0;
+        m_fRespawnTimer = 0.0f;
+        // Late joiners are not combatants until the NEXT round.
+        g_pLTSCommon->SetObjectFlags(m_hObject, OFT_Flags, 0, FLAG_VISIBLE);
+    }
+    SendHealth();
+    SendLives();
+    SendWaitingStatus(bWait);
+    if(bWait) NotifyPowerup("WAITING FOR NEXT ROUND", 4.0f);
+    else SendPowerupState();
+}
+
+void CPlayerSrvr::CaptureResumeState(FTPlayerResumeState &state) const
+{
+    g_pLTServer->GetObjectPos(m_hObject, &state.vPosition);
+    g_pLTServer->GetObjectRotation(m_hObject, &state.rRotation);
+    state.nHealth = m_nHealth;
+    state.nMaxHealth = m_nMaxHealth;
+    state.nLives = m_nLives;
+    state.nMaxLives = m_nMaxLives;
+    state.nWeaponSlot = m_nWeaponSlot;
+    state.bAlive = m_bAlive;
+    state.bWaitingForRound = m_bWaitingNextRound;
+    state.fRespawnTime = m_fRespawnTimer;
+    state.fProtectionUntil = m_fRespawnInvulnerableUntil;
+    for(uint8 slot = 0; slot < 6; ++slot)
+    {
+        state.aClip[slot] = m_nWeaponAmmoInClip[slot];
+        state.aReserve[slot] = m_nWeaponAmmoReserve[slot];
+        strncpy(state.aWeaponIDs[slot], m_WeaponDefs[slot].sId, 31);
+        state.aWeaponIDs[slot][31] = '\0';
+        state.aShotsBySlot[slot] = m_aShotsBySlot[slot];
+    }
+    state.nScore = m_iScore;
+    state.nShots = m_nAcceptedShots;
+    state.nHits = m_nConfirmedHits;
+    state.nDeaths = m_nDeaths;
+    state.nPowerups = m_nPowerups;
+    state.nHeadshots = m_nHeadshotKills;
+    state.nDamageTaken = m_nDamageTaken;
+    memcpy(state.aZombieTypes, m_aZombieTypes, sizeof(m_aZombieTypes));
+    memcpy(state.aPowerupTypes, m_aPowerupTypes, sizeof(m_aPowerupTypes));
+    state.nZombieTypes = m_nZombieTypeCount;
+    state.nPowerupTypes = m_nPowerupTypeCount;
+    state.fMoney = m_fMoney;
+    state.fBottomlessUntil = m_fBottomlessUntil;
+    state.fOneHitUntil = m_fOneHitUntil;
+    state.fGodUntil = m_fGodUntil;
+    state.nBottomlessStacks = m_nBottomlessStacks;
+    state.nOneHitStacks = m_nOneHitStacks;
+    state.nGodStacks = m_nGodStacks;
+}
+
+void CPlayerSrvr::RestoreResumeState(
+    const char *pTicket, const FTPlayerResumeState &state)
+{
+    strncpy(m_sResumeToken, pTicket, 32);
+    m_sResumeToken[32] = '\0';
+    m_bResumeVerified = true;
+    m_bWaitingNextRound = state.bWaitingForRound;
+    m_bAlive = state.bAlive;
+    m_nHealth = state.nHealth;
+    m_nMaxHealth = state.nMaxHealth;
+    m_nLives = state.nLives;
+    m_nMaxLives = state.nMaxLives;
+    m_nWeaponSlot = state.nWeaponSlot >= 1 &&
+        state.nWeaponSlot <= 5 ? state.nWeaponSlot : 1;
+    m_fRespawnTimer = state.fRespawnTime;
+    m_fRespawnInvulnerableUntil = state.fProtectionUntil;
+    m_iScore = state.nScore;
+    m_nAcceptedShots = state.nShots;
+    m_nConfirmedHits = state.nHits;
+    m_nDeaths = state.nDeaths;
+    m_nPowerups = state.nPowerups;
+    m_nHeadshotKills = state.nHeadshots;
+    m_nDamageTaken = state.nDamageTaken;
+    memcpy(m_aZombieTypes, state.aZombieTypes, sizeof(m_aZombieTypes));
+    memcpy(m_aPowerupTypes, state.aPowerupTypes, sizeof(m_aPowerupTypes));
+    m_nZombieTypeCount = state.nZombieTypes;
+    m_nPowerupTypeCount = state.nPowerupTypes;
+    m_fMoney = state.fMoney;
+    m_fBottomlessUntil = state.fBottomlessUntil;
+    m_fOneHitUntil = state.fOneHitUntil;
+    m_fGodUntil = state.fGodUntil;
+    m_nBottomlessStacks = state.nBottomlessStacks;
+    m_nOneHitStacks = state.nOneHitStacks;
+    m_nGodStacks = state.nGodStacks;
+    m_bReloading = false;
+    m_fReloadComplete = 0.0f;
+
+    for(uint8 slot = 0; slot < 6; ++slot)
+    {
+        m_aShotsBySlot[slot] = state.aShotsBySlot[slot];
+        // A changed loadout cannot borrow another weapon's ammunition.
+        if(_stricmp(m_WeaponDefs[slot].sId, state.aWeaponIDs[slot]) == 0)
+        {
+            m_nWeaponAmmoInClip[slot] = state.aClip[slot];
+            m_nWeaponAmmoReserve[slot] = state.aReserve[slot];
+        }
+    }
+    m_vSpawnPos = state.vPosition;
+    m_rSpawnRot = state.rRotation;
+    g_pLTServer->TeleportObject(m_hObject, &state.vPosition);
+    g_pLTServer->SetObjectRotation(m_hObject, &state.rRotation);
+    if(m_bWaitingNextRound)
+        g_pLTSCommon->SetObjectFlags(
+            m_hObject, OFT_Flags, 0, FLAG_VISIBLE);
+
+    SendHealth();
+    SendLives();
+    SendPrimaryAmmo();
+    SendPowerupState();
+    SendWaitingStatus(m_bWaitingNextRound);
+    if(m_bAlive)
+        SyncResumePosition();
+}
+
+void CPlayerSrvr::ActivateForNextRound()
+{
+    if(!m_bResumeVerified || !m_bWaitingNextRound) return;
+    m_bWaitingNextRound = false;
+    g_pLTSCommon->SetObjectFlags(
+        m_hObject, OFT_Flags, FLAG_VISIBLE, FLAG_VISIBLE);
+    SendWaitingStatus(false);
+    Respawn();
+}
+
 void CPlayerSrvr::ApplyDamage(uint8 nDamage)
 {
-    if(!m_bAlive ||
+    if(!m_bResumeVerified ||
+       !m_bAlive ||
        m_bQaSpectating ||
        nDamage == 0)
     {
@@ -1365,7 +1540,7 @@ void CPlayerSrvr::UpdateHazards()
 
 void CPlayerSrvr::Respawn()
 {
-    if(m_nLives == 0)
+    if(m_nLives == 0 || m_bWaitingNextRound || !m_bResumeVerified)
     {
         return;
     }
