@@ -89,6 +89,11 @@ LTRESULT StatsManager::GetPlayerScores(SCORESTRUCT *scores)
         scores[i].iScore    = pPlayer->GetScore();
         scores[i].iLives    = pPlayer->GetLives();
         scores[i].fMoney    = pPlayer->GetMoney();
+        scores[i].iShotsFired = pPlayer->GetAcceptedShots();
+        scores[i].iShotsHit = pPlayer->GetConfirmedHits();
+        scores[i].iDeaths = pPlayer->GetMatchDeaths();
+        scores[i].iPowerups = pPlayer->GetPowerupCount();
+        scores[i].iHeadshotKills = pPlayer->GetHeadshotKills();
 
         // Next element
         pMember = pMember->next;
