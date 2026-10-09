@@ -2343,12 +2343,22 @@ void CPlayerSrvr::ReloadWeapon()
 
     m_bReloading = true;
     m_nReloadSlot = m_nWeaponSlot;
+
+    // CA-style reload policy: the player's usual animation and timing are
+    // presentation-side and remain weapon-specific. Authoritative ammo can
+    // never transfer sooner than 125 ms after a validated reload request.
+    // A modified client that fires before this time hits the server's
+    // m_bReloading guard in FirePrimary: the premature shot deals NO damage.
+    // Do not send invented blank bullets or award stats for rejected shots.
+    const float kMinimumReloadSeconds = 0.125f;
     m_fReloadComplete =
-        g_pLTServer->GetTime() + pDef->fReloadSeconds;
+        g_pLTServer->GetTime() + kMinimumReloadSeconds;
 
     g_pLTServer->CPrint(
-        "Fireteam weapon: reloading %s",
-        pDef->sName);
+        "Fireteam weapon: %s reload accepted; server minimum %.0fms (client animation %.2fs).",
+        pDef->sName,
+        kMinimumReloadSeconds * 1000.0f,
+        pDef->fReloadSeconds);
 }
 
 void CPlayerSrvr::CompleteReloadIfReady()
