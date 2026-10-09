@@ -1346,9 +1346,14 @@ void Spawner::UpdateRoundController()
     const uint32 nRemaining = s_nRoundTarget - s_nRoundSpawned;
     const uint32 nTankersRemaining =
         s_nTankersPlanned - s_nTankersSpawned;
+    // Space multiple bosses through the wave instead of dumping three
+    // Tankers together halfway into a later high-difficulty round.
+    const uint32 nNextBossGate =
+        (s_nRoundTarget * (s_nTankersSpawned + 1)) /
+        (s_nTankersPlanned + 1);
     const bool bSpawnTanker = nTankersRemaining > 0 &&
         (nRemaining <= nTankersRemaining ||
-         s_nRoundSpawned >= (s_nRoundTarget / 2));
+         s_nRoundSpawned >= nNextBossGate);
     const bool bSpawnAssassin = !bSpawnTanker &&
         s_bAssassinAssetsReady &&
         (uint32)(rand() % 100) <
