@@ -80,7 +80,7 @@ if($CheckExternalIp) {
     Write-Host ""
     Write-Host "Optional public IP request (contacts api.ipify.org):"
     try {
-        $ip = (Invoke-RestMethod -Uri "https://api.ipify.org" -TimeoutSec 6).Trim()
+        $ip = (Invoke-RestMethod -Uri "https://api4.ipify.org" -TimeoutSec 6).Trim()
         Write-Host "  Internet-observed public IPv4: $ip"
     } catch {
         Write-Host "[WARN] Public-IP request failed: $($_.Exception.Message)"
