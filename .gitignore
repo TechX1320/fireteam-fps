@@ -17,3 +17,6 @@
 *.idb
 *.tlog
 *.lastbuildstate
+# Timestamped manual-sync backups must never be committed.
+/config/*.bak
+/config/*.cfg.*.bak
