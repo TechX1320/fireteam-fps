@@ -22,6 +22,26 @@
 
 
 
+// A per-match server snapshot, never supplied by the client.
+struct FTPlayerResumeState
+{
+    LTVector vPosition;
+    LTRotation rRotation;
+    uint8 nHealth, nMaxHealth, nLives, nMaxLives;
+    uint8 nWeaponSlot;
+    bool bAlive, bWaitingForRound;
+    float fRespawnTime, fProtectionUntil;
+    uint16 aClip[6], aReserve[6];
+    char aWeaponIDs[6][32];
+    uint32 nScore, nShots, nHits, nDeaths, nPowerups, nHeadshots, nDamageTaken;
+    uint32 aShotsBySlot[6];
+    FTNamedCounter aZombieTypes[FT_MAX_MATCH_CATEGORIES];
+    FTNamedCounter aPowerupTypes[FT_MAX_MATCH_CATEGORIES];
+    uint8 nZombieTypes, nPowerupTypes;
+    float fMoney, fBottomlessUntil, fOneHitUntil, fGodUntil;
+    uint8 nBottomlessStacks, nOneHitStacks, nGodStacks;
+};
+
 //-----------------------------------------------------------------------------
 class CPlayerSrvr : public BaseClass
 {
@@ -48,6 +68,8 @@ public:
           m_nLives(3),
           m_nMaxLives(3),
           m_bAlive(true),
+          m_bResumeVerified(false),
+          m_bWaitingNextRound(false),
           m_bQaSpectating(false),
           m_fRespawnTimer(0.0f),
           m_fNextPositionTrace(0.0f),
@@ -69,6 +91,7 @@ public:
           m_fLastKillFeedbackTime(0.0f),
           m_nKillFeedbackChain(0)
     {
+        m_sResumeToken[0] = '\0';
         FT_LoadWeaponDefs("config/weapons.cfg", m_WeaponDefs);
         memset(m_aShotsBySlot, 0, sizeof(m_aShotsBySlot));
         memset(m_aZombieTypes, 0, sizeof(m_aZombieTypes));
@@ -100,7 +123,14 @@ public:
     char*   			GetPlayerName();
 
     void    			PlayAnimation(const char* sAnimName, uint8 nTracker, bool bLooping);
-    void                SetClient(HCLIENT hClient){ m_hClient = hClient; SendHealth(); SendLives(); SendPrimaryAmmo(); SendPowerupState(); }
+    void                SetClient(HCLIENT hClient){ m_hClient = hClient; SendPrimaryAmmo(); }
+    bool                HasResumeIdentity() const { return m_bResumeVerified; }
+    bool                IsWaitingForNextRound() const { return m_bWaitingNextRound; }
+    const char*         GetResumeToken() const { return m_sResumeToken; }
+    void                AuthorizeNewSession(const char *pTicket, bool bWait);
+    void                CaptureResumeState(FTPlayerResumeState &state) const;
+    void                RestoreResumeState(const char *pTicket, const FTPlayerResumeState &state);
+    void                ActivateForNextRound();
     void    			SetClubID();
     void                SetWeaponSlot(uint8 nSlot);
     void                FirePrimary(
@@ -141,8 +171,8 @@ public:
     char*               GetName(){ return m_sName; }
     void                ApplyDamage(uint8 nDamage);
     bool                IsAlive() const { return m_bAlive; }
-    bool                IsTargetable() const { return m_bAlive && !m_bQaSpectating; }
-    bool                CanControlPlayer() const { return m_bAlive && !m_bQaSpectating; }
+    bool                IsTargetable() const { return m_bResumeVerified && m_bAlive && !m_bQaSpectating; }
+    bool                CanControlPlayer() const { return m_bResumeVerified && m_bAlive && !m_bQaSpectating; }
     bool                IsQaSpectating() const { return m_bQaSpectating; }
     void                SetQaSpectating(bool bSpectating);
     uint8               GetLives() const { return m_nLives; }
@@ -167,6 +197,8 @@ private:
     void 				CheckForHit();
     void 				PlaySound(int i);
     void                SendHealth();
+    void                SendWaitingStatus(bool bWaiting);
+    void                SyncResumePosition();
     void                SendLives();
     void                SendPrimaryAmmo();
     void                CompleteReloadIfReady();
@@ -248,6 +280,9 @@ private:
     uint8               m_nLives;
     uint8               m_nMaxLives;
     bool                m_bAlive;
+    bool                m_bResumeVerified;
+    bool                m_bWaitingNextRound;
+    char                m_sResumeToken[33];
     bool                m_bQaSpectating;
     float               m_fRespawnTimer;
     float               m_fNextPositionTrace;
