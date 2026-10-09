@@ -19,6 +19,12 @@ public:
     bool IsAliveForRound() const { return !m_bDying && m_nHealth > 0; }
     const char* GetInfectedTypeId() const { return m_Def.sId; }
 
+    // Physics bounding boxes are broad-phase movement ONLY. Confirm a real
+    // 3D ray-body intersection before server damage or blood FX.
+    bool TraceTightBulletHit(const LTVector &vRayFrom,
+        const LTVector &vRayDir, float fMaxDistance,
+        LTVector &vVerifiedImpact, uint8 &nHitRegion) const;
+
 protected:
     uint32 EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData);
     uint32 ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg);
@@ -97,6 +103,7 @@ private:
     LTVector m_vProgressTarget;
     LTVector m_vStragglerProgressPos;
     LTVector m_vCollisionDims;
+    HMODELNODE m_hHeadHitNode;
     std::vector<LTVector> m_aPath;
 
     HOBJECT m_hFace;

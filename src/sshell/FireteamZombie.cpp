@@ -1,4 +1,5 @@
 #include "FireteamZombie.h"
+#include "FireteamHitMath.h"
 #include "FireteamNavigation.h"
 #include "FireteamSpawner.h"
 #include "FireteamMutationBox.h"
@@ -114,6 +115,7 @@ FireteamZombie::FireteamZombie() :
     m_vStragglerProgressPos.Init(0.0f, 0.0f, 0.0f);
     m_vMotionGoal.Init(0.0f, 0.0f, 0.0f);
     m_vCollisionDims.Init(24.0f, 53.0f, 24.0f);
+    m_hHeadHitNode = INVALID_MODEL_NODE;
     m_sCurrentAnimation[0] = '\0';
 
     m_bDefLoaded =
@@ -2506,6 +2508,114 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
         vNewPos;
 }
 
+// For each broad-phase zombie contact, test the ACTUAL vector against
+// anatomically tighter head/torso/legs volumes, in full X/Y/Z. Dimensions
+// never exceed the server-clamped physics half-extents. This eliminates
+// fake headshots above the visible head and "Doom 2D" floor-to-floor hits.
+//
+// Animated head-node position, when available, improves head alignment;
+// bone data is optional because not all composed CA models share names.
+// The client has no control over these volumes, hit regions or positions.
+bool FireteamZombie::TraceTightBulletHit(
+    const LTVector &vRayFrom, const LTVector &vRayDir,
+    float fMaxDistance, LTVector &vVerifiedImpact, uint8 &nHitRegion) const
+{
+    if(!IsAliveForRound() || fMaxDistance <= 0.0f)
+        return false;
+    const float rx = m_vCollisionDims.x;
+    const float ry = m_vCollisionDims.y;
+    const float rz = m_vCollisionDims.z;
+    if(rx < 8.0f || ry < 18.0f || rz < 8.0f)
+        return false;
+
+    LTVector vOrigin;
+    LTRotation rBody;
+    g_pLTServer->GetObjectPos(m_hObject, &vOrigin);
+    g_pLTServer->GetObjectRotation(m_hObject, &rBody);
+    LTVector vRight = rBody.Right();
+    LTVector vForward = rBody.Forward();
+    vRight.y = 0.0f;
+    vForward.y = 0.0f;
+    if(vRight.MagSqr() < 0.001f || vForward.MagSqr() < 0.001f)
+    {
+        vRight.Init(1.0f, 0.0f, 0.0f);
+        vForward.Init(0.0f, 0.0f, 1.0f);
+    }
+    vRight.Normalize();
+    vForward.Normalize();
+
+    const LTVector vLocal = vRayFrom - vOrigin;
+    const FTHitMath::Vec3 from(vLocal.Dot(vRight), vLocal.y,
+                               vLocal.Dot(vForward));
+    const FTHitMath::Vec3 dir(vRayDir.Dot(vRight), vRayDir.y,
+                              vRayDir.Dot(vForward));
+
+    FTHitMath::Vec3 head(0.0f, ry * 0.76f, 0.0f);
+    if(m_hHeadHitNode != INVALID_MODEL_NODE)
+    {
+        LTransform tHead;
+        if(g_pLTSModel->GetNodeTransform(
+            m_hObject, m_hHeadHitNode, tHead, LTTRUE) == LT_OK)
+        {
+            const LTVector vHeadOffset = tHead.m_Pos - vOrigin;
+            // Bad child-model skeletons can report nodes far from the mesh.
+            // Untrusted node positions must NEVER increase the hitbox cap.
+            if(vHeadOffset.y > ry * 0.56f &&
+               vHeadOffset.y < ry * 0.81f &&
+               fabsf(vHeadOffset.Dot(vRight)) < rx * 0.35f &&
+               fabsf(vHeadOffset.Dot(vForward)) < rz * 0.35f)
+            {
+                head.x = vHeadOffset.Dot(vRight);
+                head.y = vHeadOffset.y;
+                head.z = vHeadOffset.Dot(vForward);
+            }
+        }
+    }
+
+    const FTHitMath::Vec3 centers[3] = {
+        head,
+        FTHitMath::Vec3(0.0f, ry * 0.08f, 0.0f),
+        FTHitMath::Vec3(0.0f, -ry * 0.60f, 0.0f)
+    };
+    const FTHitMath::Vec3 radii[3] = {
+        FTHitMath::Vec3(rx * 0.41f, ry * 0.18f, rz * 0.43f),
+        FTHitMath::Vec3(rx * 0.63f, ry * 0.51f, rz * 0.63f),
+        FTHitMath::Vec3(rx * 0.46f, ry * 0.39f, rz * 0.46f)
+    };
+
+    bool bValid = false;
+    float fClosest = fMaxDistance;
+    uint8 nRegion = 0;
+    for(uint8 nPart = 0; nPart < 3; ++nPart)
+    {
+        float fImpactDistance = 0.0f;
+        if(!FTHitMath::RayEllipsoid(from, dir, centers[nPart],
+               radii[nPart], fMaxDistance, fImpactDistance))
+            continue;
+        if(bValid && fImpactDistance >= fClosest)
+            continue;
+        bValid = true;
+        fClosest = fImpactDistance;
+        nRegion = nPart == 0 ? 1 : 0; // head vs torso/legs
+        if(nPart == 1)
+        {
+            const float fLocalY = from.y + dir.y * fClosest;
+            const float fLocalX = from.x + dir.x * fClosest;
+            // Narrow pelvis-only critical region, not half the abdomen.
+            if(fLocalY >= -ry * 0.34f &&
+               fLocalY <= -ry * 0.13f &&
+               fabsf(fLocalX) <= rx * 0.22f)
+                nRegion = 2;
+        }
+    }
+    if(!bValid)
+        return false;
+
+    vVerifiedImpact = vRayFrom + vRayDir * fClosest;
+    nHitRegion = nRegion;
+    return true;
+}
+
 uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fData)
 {
     switch(messageID)
@@ -2813,32 +2923,56 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                         true);
                 }
 
+                // Strict authoritative limits. The old accepted model
+                // animation half-dims up to 200x300x200 and used them as
+                // shootable physics boxes. Authored dimensions are ceilings,
+                // and fixed server caps survive even a tampered config.
+                const bool bTanker = _stricmp(m_Def.sId, "infected_tanker") == 0;
+                const float maxX = bTanker ? 42.0f : 26.0f;
+                const float maxY = bTanker ? 80.0f : 56.0f;
+                const float maxZ = bTanker ? 42.0f : 26.0f;
                 LTVector vHumanDims(
-                    m_Def.fCollisionX,
-                    m_Def.fCollisionY,
-                    m_Def.fCollisionZ);
+                    m_Def.fCollisionX, m_Def.fCollisionY, m_Def.fCollisionZ);
+                if(!(vHumanDims.x >= 8.0f && vHumanDims.x <= maxX))
+                    vHumanDims.x = maxX;
+                if(!(vHumanDims.y >= 22.0f && vHumanDims.y <= maxY))
+                    vHumanDims.y = maxY;
+                if(!(vHumanDims.z >= 8.0f && vHumanDims.z <= maxZ))
+                    vHumanDims.z = maxZ;
 
-                if(_stricmp(
-                    m_Def.sCollisionMode,
-                    "model") == 0)
+                if(_stricmp(m_Def.sCollisionMode, "model") == 0)
                 {
-                    LTVector vModelDims;
+                    LTVector vModel;
                     if(g_pLTSCommon->GetModelAnimUserDims(
-                        m_hObject,
-                        &vModelDims,
-                        g_pLTServer->GetModelAnimation(m_hObject)) == LT_OK &&
-                       vModelDims.x > 1.0f &&
-                       vModelDims.y > 1.0f &&
-                       vModelDims.z > 1.0f &&
-                       vModelDims.x < 200.0f &&
-                       vModelDims.y < 300.0f &&
-                       vModelDims.z < 200.0f)
+                        m_hObject, &vModel,
+                        g_pLTServer->GetModelAnimation(m_hObject)) == LT_OK)
                     {
-                        vHumanDims = vModelDims;
+                        // A suspiciously huge model is NOT permission to
+                        // make a huge bullet target. Small plausible bounds
+                        // can make collision tighter, never larger.
+                        if(vModel.x >= 8.0f && vModel.x < vHumanDims.x)
+                            vHumanDims.x = vModel.x;
+                        if(vModel.y >= 22.0f && vModel.y < vHumanDims.y)
+                            vHumanDims.y = vModel.y;
+                        if(vModel.z >= 8.0f && vModel.z < vHumanDims.z)
+                            vHumanDims.z = vModel.z;
                     }
                 }
 
                 m_vCollisionDims = vHumanDims;
+                m_hHeadHitNode = INVALID_MODEL_NODE;
+                static const char *const kHeadNodeNames[] = {
+                    "Head", "Bip01 Head", "Bip01_Head"
+                };
+                for(uint32 nHead = 0; nHead <
+                    sizeof(kHeadNodeNames) / sizeof(kHeadNodeNames[0]);
+                    ++nHead)
+                {
+                    if(g_pLTSModel->GetNode(
+                        m_hObject, kHeadNodeNames[nHead],
+                        m_hHeadHitNode) == LT_OK)
+                        break;
+                }
 
                 g_pLTSPhysics->SetObjectDims(
                     m_hObject,
