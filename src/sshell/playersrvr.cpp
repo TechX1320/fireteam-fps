@@ -1537,6 +1537,9 @@ void CPlayerSrvr::RestoreResumeState(
     m_nBottomlessStacks = state.nBottomlessStacks;
     m_nOneHitStacks = state.nOneHitStacks;
     m_nGodStacks = state.nGodStacks;
+    m_bBottomlessWasActive = state.bBottomlessActive;
+    m_bOneHitWasActive = state.bOneHitActive;
+    m_bGodWasActive = state.bGodActive;
     m_bReloading = false;
     m_fReloadComplete = 0.0f;
 
