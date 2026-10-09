@@ -16,7 +16,9 @@ public sealed partial class MainWindow
     private readonly ScrollViewer PlayerProfileView = new();
     private readonly TextBlock PlayerProfileIdentity = new();
     private readonly TextBlock PlayerProfileStatus = new();
-    private readonly StackPanel PlayerProfileRows = new();
+    private readonly Grid PlayerProfileRows = new();
+    private readonly StackPanel PlayerProfileLeft = new() { Spacing = 14 };
+    private readonly StackPanel PlayerProfileRight = new() { Spacing = 14 };
 
     // Inspired by Minecraft's statistics screen: a compact label/value grid
     // with consistent right-aligned values, instead of giant monospaced blocks.
@@ -25,13 +27,14 @@ public sealed partial class MainWindow
         PlayerProfileView.Visibility = Visibility.Collapsed;
         PlayerProfileView.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         PlayerProfileView.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+        PlayerProfileView.HorizontalContentAlignment = HorizontalAlignment.Stretch;
 
         var page = new StackPanel
         {
             Spacing = 12,
             Margin = new Thickness(24, 16, 24, 32),
-            MaxWidth = 1000,
-            HorizontalAlignment = HorizontalAlignment.Center
+            MaxWidth = 1180,
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
 
         var toolbar = new Grid { ColumnSpacing = 14 };
@@ -62,7 +65,18 @@ public sealed partial class MainWindow
         PlayerProfileStatus.TextWrapping = TextWrapping.Wrap;
         page.Children.Add(PlayerProfileStatus);
 
-        PlayerProfileRows.Spacing = 14;
+        PlayerProfileRows.ColumnSpacing = 16;
+        PlayerProfileRows.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star)
+        });
+        PlayerProfileRows.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star)
+        });
+        Grid.SetColumn(PlayerProfileRight, 1);
+        PlayerProfileRows.Children.Add(PlayerProfileLeft);
+        PlayerProfileRows.Children.Add(PlayerProfileRight);
         page.Children.Add(PlayerProfileRows);
         PlayerProfileView.Content = page;
         ShowProfileEmpty(
@@ -72,12 +86,18 @@ public sealed partial class MainWindow
 
     private void ShowProfileEmpty(string summary, string instructions)
     {
-        PlayerProfileRows.Children.Clear();
+        ClearProfileSections();
         AddProfileSection("LOCAL HISTORY", new[]
         {
             (Label: summary, Value: "—"),
             (Label: instructions, Value: "")
         });
+    }
+
+    private void ClearProfileSections()
+    {
+        PlayerProfileLeft.Children.Clear();
+        PlayerProfileRight.Children.Clear();
     }
 
     private static string ProfileDisplayName(string id)
@@ -192,7 +212,12 @@ public sealed partial class MainWindow
             table.Children.Add(blank);
         }
 
-        PlayerProfileRows.Children.Add(new Border
+        // Pair the compact tables side-by-side on desktop. Heavy weapon
+        // breakdowns stay in the right-hand column; small stats on the left.
+        var column = section is "WEAPONS / SHOTS FIRED" or "POWER-UPS COLLECTED"
+            ? PlayerProfileRight
+            : PlayerProfileLeft;
+        column.Children.Add(new Border
         {
             BorderBrush = BorderBrush,
             BorderThickness = new Thickness(1),
@@ -379,7 +404,7 @@ public sealed partial class MainWindow
         PlayerProfileIdentity.Text =
             $"{playerName.ToUpperInvariant()}  /  {matches:N0} MATCHES";
 
-        PlayerProfileRows.Children.Clear();
+        ClearProfileSections();
         AddProfileSection("GENERAL", new (string Label, string Value)[]
         {
             ("Matches played", matches.ToString("N0")),

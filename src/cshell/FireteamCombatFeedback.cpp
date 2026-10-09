@@ -43,7 +43,6 @@ static uint8 s_nQueueHead = 0;
 static uint8 s_nQueueCount = 0;
 static uint8 s_nActiveFeedback = 0;
 static float s_fActiveStart = 0.0f;
-static float s_fLastConfirmedHit = -10.0f;
 
 // Short-lived, client-local polygons at a SERVER-VALIDATED zombie impact.
 // No commercial textures or heavyweight particle emitters needed.
@@ -625,7 +624,6 @@ void FT_CombatFeedbackHandleMessage(
     {
         const LTVector vWorldImpact = pMessage->ReadLTVector();
         FT_SpawnBloodBurst(vWorldImpact);
-        s_fLastConfirmedHit = g_pLTClient ? g_pLTClient->GetTime() : -10.0f;
         return;
     }
     FT_QueueFeedback(nFeedback);
@@ -661,15 +659,8 @@ void FT_RenderCombatFeedback(HOBJECT hCamera)
 
     FT_RenderBloodBursts(hCamera);
 
-    const float fHitAge = g_pLTClient->GetTime() - s_fLastConfirmedHit;
-    if(fHitAge >= 0.0f && fHitAge < 0.18f && s_pFallback)
-    {
-        uint32 nHitW = 0, nHitH = 0;
-        g_pLTClient->GetSurfaceDims(g_pLTClient->GetScreenSurface(),
-                                     &nHitW, &nHitH);
-        FT_DrawFallback(FT_COMBAT_FEEDBACK_HIT, (float)nHitH * 0.5f,
-            (uint8)(255.0f * (1.0f - fHitAge / 0.18f)));
-    }
+    // Ordinary hits use the world-space blood burst only. Do not draw an
+    // intrusive center-screen X over the player's existing crosshair.
     if(!s_nActiveFeedback)
         return;
 
