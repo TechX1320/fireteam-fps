@@ -140,9 +140,10 @@ internal static class HubNetwork
     {
         // Secret is presented only over TLS (or loopback dev HTTP).
         // Compare fixed-length hash bytes in constant time.
+        if(!Hex(b, 64)) return false;
         var first = SHA256.HashData(Encoding.ASCII.GetBytes(a));
-        var second = SHA256.HashData(Encoding.ASCII.GetBytes(b));
-        return CryptographicOperations.FixedTimeEquals(first, second);
+        var stored = Convert.FromHexString(b);
+        return CryptographicOperations.FixedTimeEquals(first, stored);
     }
 }
 
@@ -187,7 +188,7 @@ internal sealed class PresenceRegistry
                 .Select(e => new PublicServer(e.Name,
                     e.SourceIp + ":" + e.Port, e.Map,
                     e.Players, e.MaxPlayers, e.Difficulty,
-                    Verified: false, e.Seen))
+                    false, e.Seen))
                 .ToArray();
         }
     }
