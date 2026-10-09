@@ -55,6 +55,7 @@ enum EMessageID
         MSG_SC_POWERUP_STATE,       // server->client timed buff state
         MSG_SC_COMBAT_FEEDBACK,     // server->client shooter-only hit/kill feedback
         MSG_SC_ROUND_PREP,          // server->client Round 1 preparation seconds remaining
+        MSG_SC_JOIN_WAIT,          // server->client queued new identity
 		MSG_LAST_MESSAGE			//last message marker, do not handle
 		
 };
