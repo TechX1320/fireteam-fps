@@ -153,7 +153,7 @@ public sealed class DedicatedServerService
     {
         if(!IsRunning)
             return Task.FromResult("Dedicated process has stopped; no UPnP changes made.");
-        return _routerMappings.TryMapGamePortAsync(port);
+        return _routerMappings.TryMapGamePortAsync(port, () => IsRunning);
     }
 
     public Task<string> CleanupRouterAsync() =>
