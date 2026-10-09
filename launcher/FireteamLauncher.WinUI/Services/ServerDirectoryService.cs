@@ -136,7 +136,7 @@ public sealed class ServerDirectoryService
         var items = JsonSerializer.Deserialize<List<FireteamServerListing>>(
             text, JsonOptions);
         LastDirectorySource = "Curated";
-        return Validate(items);
+        return Validate(items, "Curated");
     }
 
     public static bool TryNormalizeAddress(string? text, out string address)
