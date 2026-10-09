@@ -97,6 +97,7 @@ FireteamZombie::FireteamZombie() :
     m_eBehaviorState(kBehaviorSearch),
     m_bDying(false),
     m_fDeathTimeRemaining(0.0f),
+    m_bProceduralDeath(false),
     m_fLastServerTick(0.0f),
     m_fDecisionElapsed(0.0f),
     m_nTicksUntilDecision(0),
@@ -1033,6 +1034,57 @@ void FireteamZombie::SetZombieAnimation(
         m_sCurrentAnimation,
         sizeof(m_sCurrentAnimation),
         pAnimation);
+}
+
+// Prefer a configured death animation; otherwise validate conventional CA
+// death names against this *composed runtime model*, not binary string scans.
+// Never attempt a non-existent animation: those left specials standing still.
+const char *FireteamZombie::ResolveDeathAnimation()
+{
+    if(m_Def.sDeathAnim[0] &&
+       g_pLTServer->GetAnimIndex(m_hObject, m_Def.sDeathAnim) !=
+           INVALID_MODEL_ANIM)
+        return m_Def.sDeathAnim;
+
+    // Source LTB names differ by character/animation bank. Only usable
+    // GetAnimIndex names pass; never force an unverified index into the model.
+    static const char *const kCandidates[] = {
+        "VDIE", "VDIE_0", "VDIE1", "VDEAD",
+        "D_DU", "D_DA", "DIE", "DEATH",
+        "Death", "Dead"
+    };
+    for(uint32 n = 0; n < sizeof(kCandidates) / sizeof(kCandidates[0]); ++n)
+    {
+        if(g_pLTServer->GetAnimIndex(m_hObject,
+               (char*)kCandidates[n]) != INVALID_MODEL_ANIM)
+            return kCandidates[n];
+    }
+    return LTNULL;
+}
+
+// If the special's LTB supplies no playable death sequence, visibly topple
+// its non-solid corpse rather than leaving it standing until despawn.
+void FireteamZombie::AdvanceProceduralDeath()
+{
+    if(!m_bProceduralDeath)
+        return;
+
+    const float duration = m_Def.fDeathSeconds > 0.0f
+        ? m_Def.fDeathSeconds : 1.8f;
+    float progress = 1.0f - (m_fDeathTimeRemaining / duration);
+    if(progress < 0.0f) progress = 0.0f;
+    if(progress > 1.0f) progress = 1.0f;
+
+    // Smooth easing, stable start rotation; never accumulate rotations
+    // on the last server frame or interfere with alive locomotion.
+    progress = progress * progress * (3.0f - 2.0f * progress);
+    LTRotation rotation = m_rDeathStartRotation;
+    rotation.Rotate(rotation.Forward(), progress * 1.33f);
+    g_pLTServer->SetObjectRotation(m_hObject, &rotation);
+
+    LTVector position = m_vDeathStartPos;
+    position.y -= progress * m_vCollisionDims.y * 0.48f;
+    g_pLTServer->MoveObject(m_hObject, &position);
 }
 
 struct FTZombieMovementFilterData
@@ -2850,6 +2902,7 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
             {
                 m_nMotionStepsRemaining = 0;
                 m_fDeathTimeRemaining -= fElapsed;
+                AdvanceProceduralDeath();
                 if(m_fDeathTimeRemaining <= 0.0f)
                 {
                     g_pLTServer->RemoveObject(m_hObject);
@@ -2941,9 +2994,33 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
                 0,
                 FLAG2_PLAYERCOLLIDE);
 
-            SetZombieAnimation(
-                m_Def.sDeathAnim,
-                false);
+            const char *pDeathAnimation = ResolveDeathAnimation();
+            if(pDeathAnimation)
+            {
+                SetZombieAnimation(pDeathAnimation, false);
+                // Do not cut an authored death clip off before its end.
+                uint32 nAnimLengthMs = 0;
+                if(g_pLTSModel->GetCurAnimLength(m_hObject, MAIN_TRACKER,
+                       nAnimLengthMs) == LT_OK &&
+                   nAnimLengthMs > 100 && nAnimLengthMs < 4000)
+                {
+                    const float fClipSeconds =
+                        (float)nAnimLengthMs * 0.001f + 0.12f;
+                    if(fClipSeconds > m_fDeathTimeRemaining)
+                        m_fDeathTimeRemaining = fClipSeconds;
+                }
+            }
+            else
+            {
+                m_bProceduralDeath = true;
+                g_pLTServer->GetObjectRotation(
+                    m_hObject, &m_rDeathStartRotation);
+                g_pLTServer->GetObjectPos(
+                    m_hObject, &m_vDeathStartPos);
+                g_pLTServer->CPrint(
+                    "Fireteam: %s has no playable death anim; using visual fall.",
+                    m_Def.sId);
+            }
 
             PlayVoiceSound(
                 m_Def.sVoiceDeath);
@@ -3006,9 +3083,7 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
                 m_bDefLoaded
                     ? m_Def.sId
                     : "unknown",
-                m_Def.sDeathAnim[0]
-                    ? m_Def.sDeathAnim
-                    : "<none>",
+                pDeathAnimation ? pDeathAnimation : "<procedural fall>",
                 m_fDeathTimeRemaining);
 
             return 1;

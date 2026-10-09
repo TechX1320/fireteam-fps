@@ -47,6 +47,8 @@ private:
     void SetZombieAnimation(
         const char *pAnimation,
         bool bLooping);
+    const char *ResolveDeathAnimation();
+    void AdvanceProceduralDeath();
     void PlayVoiceSound(
         const char *pFilename);
     void PlayAttackVoice();
@@ -76,6 +78,9 @@ private:
     BehaviorState m_eBehaviorState;
     bool m_bDying;
     float m_fDeathTimeRemaining;
+    bool m_bProceduralDeath;
+    LTRotation m_rDeathStartRotation;
+    LTVector m_vDeathStartPos;
 
     // Expensive AI stays at fUpdateSeconds; collision movement is spread
     // across 1-4 smaller engine updates for smoother replication.
