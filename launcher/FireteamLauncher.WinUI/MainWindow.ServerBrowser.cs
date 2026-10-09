@@ -12,8 +12,6 @@ public sealed partial class MainWindow
     private readonly ListView ServerBrowserList = new();
     private readonly TextBox ServerBrowserName = new();
     private readonly TextBox ServerBrowserAddress = new();
-    private readonly TextBox DedicatedServerName = new();
-    private readonly TextBox DedicatedServerPort = new();
     private readonly TextBlock ServerBrowserStatus = new();
     private readonly ServerDirectoryService _serverDirectory = new();
     private IReadOnlyList<FireteamServerListing> _communityServers = [];
@@ -35,7 +33,7 @@ public sealed partial class MainWindow
         page.Children.Add(CardHeading(
             "SERVER BROWSER",
             "Community Servers",
-            "Join by IP:port, save favorites, or browse the curated public directory. Public entries are not live ping results."));
+            "Halo CE-style fixed-grid list. Directory entries are not live: unknown population, ping and mod status are shown honestly until a server query protocol exists."));
 
         var controls = new StackPanel
         {
@@ -55,17 +53,18 @@ public sealed partial class MainWindow
         controls.Children.Add(save);
         page.Children.Add(controls);
 
-        ServerBrowserList.MinHeight = 240;
-        ServerBrowserList.MaxHeight = 370;
+        ServerBrowserList.MinHeight = 280;
+        ServerBrowserList.MaxHeight = 500;
         ServerBrowserList.SelectionMode = ListViewSelectionMode.Single;
         ServerBrowserList.SelectionChanged += (sender, args) =>
         {
-            if(ServerBrowserList.SelectedItem is FireteamServerListing entry)
+            if(ServerBrowserList.SelectedItem is ListViewItem { Tag: FireteamServerListing entry })
             {
                 ServerBrowserName.Text = entry.Name;
                 ServerBrowserAddress.Text = entry.Address;
             }
         };
+        page.Children.Add(ServerGridHeader());
         page.Children.Add(ServerBrowserList);
 
         var actions = new StackPanel
@@ -125,8 +124,53 @@ public sealed partial class MainWindow
             .OrderBy(entry => entry.Name)
             .ToList();
 
-        ServerBrowserList.ItemsSource = entries;
+        ServerBrowserList.Items.Clear();
+        foreach(var entry in entries)
+        {
+            var item = new ListViewItem
+            {
+                Tag = entry,
+                Content = ServerGridRow(entry),
+                Padding = new Thickness(5, 7, 5, 7),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
+            };
+            ServerBrowserList.Items.Add(item);
+        }
     }
+
+    // Halo CE-inspired fixed, aligned columns, not variable-length text rows.
+    // A dash means NOT QUERIED: never fabricate player counts or ping.
+    private static Grid ServerColumns(string name, string map, string mode,
+        string players, string ping, string mods, bool header)
+    {
+        var grid = new Grid { ColumnSpacing = 10 };
+        foreach(var width in new[] { 310d, 150d, 130d, 115d, 80d, 125d })
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(width) });
+        var values = new[] { name, map, mode, players, ping, mods };
+        for(var i = 0; i < values.Length; ++i)
+        {
+            var cell = new TextBlock
+            {
+                Text = values[i],
+                FontSize = header ? 12 : 13,
+                FontWeight = header ? Microsoft.UI.Text.FontWeights.Bold : Microsoft.UI.Text.FontWeights.Normal,
+                Foreground = header ? CyanBrush : PrimaryTextBrush,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextWrapping = TextWrapping.NoWrap,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(cell, i);
+            grid.Children.Add(cell);
+        }
+        return grid;
+    }
+
+    private static Grid ServerGridHeader() =>
+        ServerColumns("SERVER NAME / ADDRESS", "MAP", "MODE", "PLAYERS",
+                      "PING", "MODS", true);
+
+    private static Grid ServerGridRow(FireteamServerListing entry) =>
+        ServerColumns(entry.Name, entry.Map, "Survival", "—", "—", "Unknown", false);
 
     private async Task RefreshCommunityServersAsync()
     {
@@ -191,7 +235,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        var selection = ServerBrowserList.SelectedItem as FireteamServerListing;
+        var selection = (ServerBrowserList.SelectedItem as ListViewItem)?.Tag as FireteamServerListing;
         var map = selection is not null &&
                   selection.Address.Equals(address, StringComparison.OrdinalIgnoreCase)
             ? selection.Map
