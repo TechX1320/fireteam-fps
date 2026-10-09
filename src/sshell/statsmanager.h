@@ -30,11 +30,18 @@ public:
     void            RemovePlayer(CPlayerSrvr *_pPlayer);
     uint32          GetNumPlayers();
     LTRESULT        GetPlayerScores(SCORESTRUCT *scores);
-    // Atomically export a completed, server-authoritative local match.
-    // No accounts, global service, signature or ranking claim yet.
+    // One stable match ID from world start through every periodic checkpoint.
+    void            BeginMatch();
+    bool            SaveMatchSnapshot(
+                        uint32 nRound, const char *pDifficulty,
+                        float fCombatSeconds, bool bCompleted);
     bool            SaveCompletedMatch(
                         uint32 nRound, const char *pDifficulty,
-                        float fCombatSeconds);
+                        float fCombatSeconds)
+                    {
+                        return SaveMatchSnapshot(
+                            nRound, pDifficulty, fCombatSeconds, true);
+                    }
 
 
 
@@ -45,6 +52,8 @@ private:
     LinkedList<CPlayerSrvr*> m_pPlayers;
     //CPlayerSrvr*     m_pPlayers[16];
     uint32          m_iNumPlayers;
+    char            m_sMatchId[96];
+    bool            m_bMatchFinalized;
 };
 
 extern StatsManager* g_pStatsManager;
