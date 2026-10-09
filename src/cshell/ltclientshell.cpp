@@ -868,6 +868,12 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             }
         }
         break;
+    case MSG_SC_JOIN_WAIT:
+        {
+            const bool bWaiting = pMessage->Readbool();
+            FT_RoundHudSetWaitingForNextRound(bWaiting);
+        }
+        break;
     case MSG_SC_ROUND_PREP:
         {
             const float fRemaining = pMessage->Readfloat();
