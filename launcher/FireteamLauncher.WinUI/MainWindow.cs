@@ -2224,7 +2224,8 @@ public sealed partial class MainWindow : Window
                     : (int)Math.Round(VolumeBox.Value),
                 double.IsNaN(GammaBox.Value)
                     ? 1.0
-                    : GammaBox.Value);
+                    : GammaBox.Value,
+                RadarToggle.IsOn);
 
             App.Instance.Services.Settings.SaveSettings(settings);
             SettingsStatusText.Text =
