@@ -2199,7 +2199,7 @@ void CPlayerSrvr::FirePrimary(
                 // pellet/projectile hits or a client-reported hit marker.
                 ++m_nConfirmedHits;
                 // Shooter-only marker after server collision and damage delivery.
-                SendCombatFeedback(FT_COMBAT_FEEDBACK_HIT);
+                SendCombatFeedback(FT_COMBAT_FEEDBACK_HIT, &info.m_Point);
 
                 g_pLTServer->CPrint(
                     "Fireteam weapon: %s infected hit region=%s damage=%u distance=%.1f penetrations=%u",
@@ -2311,7 +2311,7 @@ void CPlayerSrvr::FirePrimary(
 
 
 void CPlayerSrvr::SendCombatFeedback(
-    uint8 nFeedback)
+    uint8 nFeedback, const LTVector *pWorldHit)
 {
     if(!m_hClient ||
        nFeedback == 0)
@@ -2332,6 +2332,13 @@ void CPlayerSrvr::SendCombatFeedback(
         MSG_SC_COMBAT_FEEDBACK);
     pMsg->Writeuint8(
         nFeedback);
+    if(nFeedback == FT_COMBAT_FEEDBACK_HIT)
+    {
+        // Only a server-confirmed impact supplies the world-space position.
+        // Older kill banners retain their one-byte payload.
+        LTVector vImpact = pWorldHit ? *pWorldHit : LTVector(0.0f, 0.0f, 0.0f);
+        pMsg->WriteLTVector(vImpact);
+    }
 
     g_pLTServer->SendToClient(
         pMsg->Read(),

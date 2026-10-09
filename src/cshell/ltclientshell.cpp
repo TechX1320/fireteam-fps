@@ -1209,7 +1209,7 @@ LTRESULT CLTClientShell::Render()
         if(!bFreecam)
         {
             FT_RenderHealthHud();
-            FT_RenderCombatFeedback();
+            FT_RenderCombatFeedback(m_hCamera);
         }
 
         FT_RenderRoundHud();

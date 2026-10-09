@@ -178,7 +178,7 @@ private:
     void                UpdateHazards();
     void                UpdatePowerups();
     void                SendPowerupState();
-    void                SendCombatFeedback(uint8 nFeedback);
+    void                SendCombatFeedback(uint8 nFeedback, const LTVector *pWorldHit = LTNULL);
 
 private:
 

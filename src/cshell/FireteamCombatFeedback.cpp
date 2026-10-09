@@ -10,6 +10,7 @@
 #include <ilttexinterface.h>
 
 #include <string.h>
+#include <math.h>
 
 struct FTFeedbackImage
 {
@@ -43,6 +44,120 @@ static uint8 s_nQueueCount = 0;
 static uint8 s_nActiveFeedback = 0;
 static float s_fActiveStart = 0.0f;
 static float s_fLastConfirmedHit = -10.0f;
+
+// Short-lived, client-local polygons at a SERVER-VALIDATED zombie impact.
+// No commercial textures or heavyweight particle emitters needed.
+enum { FT_BLOOD_BURST_CAPACITY = 12, FT_BLOOD_DROPLETS = 5 };
+struct FTBloodBurst
+{
+    LTVector vPos;
+    float fStart;
+    uint32 nSeed;
+    bool bActive;
+};
+static FTBloodBurst s_BloodBursts[FT_BLOOD_BURST_CAPACITY];
+static uint32 s_nNextBloodBurst = 0;
+
+static void FT_SpawnBloodBurst(const LTVector &vImpact)
+{
+    if(!g_pLTClient)
+        return;
+    FTBloodBurst &burst =
+        s_BloodBursts[s_nNextBloodBurst % FT_BLOOD_BURST_CAPACITY];
+    burst.vPos = vImpact;
+    burst.fStart = g_pLTClient->GetTime();
+    burst.nSeed = s_nNextBloodBurst++;
+    burst.bActive = true;
+}
+
+// World-space impact debris: short red droplets, naturally bounded in time
+// and count; no zombie model changes, sockets or external FX assets.
+static void FT_RenderBloodBursts(HOBJECT hCamera)
+{
+    if(!hCamera || !g_pLTClient || !g_pLTCDrawPrim)
+        return;
+
+    LTRotation rCamera;
+    if(g_pLTClient->GetObjectRotation(hCamera, &rCamera) != LT_OK)
+        return;
+    const LTVector vRight = rCamera.Right();
+    const LTVector vUp = rCamera.Up();
+    const LTVector vCameraForward = rCamera.Forward();
+    const float fNow = g_pLTClient->GetTime();
+    bool bAny = false;
+    for(uint32 i = 0; i < FT_BLOOD_BURST_CAPACITY; ++i)
+    {
+        if(s_BloodBursts[i].bActive &&
+           fNow - s_BloodBursts[i].fStart >= 0.0f &&
+           fNow - s_BloodBursts[i].fStart < 0.33f)
+        {
+            bAny = true;
+            break;
+        }
+    }
+    if(!bAny) return;
+
+    g_pLTCDrawPrim->SetCamera(hCamera);
+    g_pLTCDrawPrim->SetTexture(LTNULL);
+    g_pLTCDrawPrim->SetTransformType(DRAWPRIM_TRANSFORM_WORLD);
+    g_pLTCDrawPrim->SetColorOp(DRAWPRIM_NOCOLOROP);
+    g_pLTCDrawPrim->SetAlphaBlendMode(DRAWPRIM_BLEND_MOD_SRCALPHA);
+    g_pLTCDrawPrim->SetZBufferMode(DRAWPRIM_ZRO);
+    g_pLTCDrawPrim->SetAlphaTestMode(DRAWPRIM_NOALPHATEST);
+    g_pLTCDrawPrim->SetClipMode(DRAWPRIM_FULLCLIP);
+    g_pLTCDrawPrim->SetFillMode(DRAWPRIM_FILL);
+    g_pLTCDrawPrim->SetCullMode(DRAWPRIM_CULL_NONE);
+    g_pLTCDrawPrim->BeginDrawPrim();
+
+    for(uint32 i = 0; i < FT_BLOOD_BURST_CAPACITY; ++i)
+    {
+        FTBloodBurst &burst = s_BloodBursts[i];
+        if(!burst.bActive) continue;
+        const float age = fNow - burst.fStart;
+        if(age < 0.0f || age >= 0.33f)
+        {
+            burst.bActive = false;
+            continue;
+        }
+        const float progress = age / 0.33f;
+        const uint8 alpha = (uint8)(210.0f * (1.0f - progress));
+        for(uint32 j = 0; j < FT_BLOOD_DROPLETS; ++j)
+        {
+            const float angle = 6.2831853f *
+                ((float)j / (float)FT_BLOOD_DROPLETS) +
+                (float)(burst.nSeed % 11) * 0.31f;
+            const float travel = 1.5f + progress * (17.0f + 4.0f * (float)j);
+            const float x = cosf(angle) * travel;
+            const float y = sinf(angle) * travel - 17.0f * progress * progress;
+            const LTVector center = burst.vPos +
+                vRight * x + vUp * y - vCameraForward * 3.0f;
+            const float size = (j % 2 ? 2.4f : 3.5f) *
+                (1.0f - progress * 0.55f);
+            const LTVector corners[4] = {
+                center - vRight * size - vUp * size,
+                center + vRight * size - vUp * size,
+                center + vRight * size + vUp * size,
+                center - vRight * size + vUp * size
+            };
+            LT_POLYG4 polygon;
+            for(uint32 k = 0; k < 4; ++k)
+            {
+                polygon.verts[k].x = corners[k].x;
+                polygon.verts[k].y = corners[k].y;
+                polygon.verts[k].z = corners[k].z;
+                polygon.verts[k].rgba.r = (uint8)(j % 2 ? 180 : 120);
+                polygon.verts[k].rgba.g = 12;
+                polygon.verts[k].rgba.b = 18;
+                polygon.verts[k].rgba.a = alpha;
+            }
+            g_pLTCDrawPrim->DrawPrim(&polygon, 1);
+        }
+    }
+    g_pLTCDrawPrim->EndDrawPrim();
+    g_pLTCDrawPrim->SetCamera(LTNULL);
+    g_pLTCDrawPrim->SetTexture(LTNULL);
+}
+
 
 static void FT_LoadFeedbackImage(
     FTFeedbackImage &image,
@@ -459,6 +574,8 @@ void FT_CombatFeedbackInit()
     s_nQueueCount = 0;
     s_nActiveFeedback = 0;
     s_fActiveStart = 0.0f;
+    memset(s_BloodBursts, 0, sizeof(s_BloodBursts));
+    s_nNextBloodBurst = 0;
 }
 
 void FT_CombatFeedbackTerm()
@@ -491,6 +608,8 @@ void FT_CombatFeedbackTerm()
     s_nQueueCount = 0;
     s_nActiveFeedback = 0;
     s_fActiveStart = 0.0f;
+    memset(s_BloodBursts, 0, sizeof(s_BloodBursts));
+    s_nNextBloodBurst = 0;
 }
 
 void FT_CombatFeedbackHandleMessage(
@@ -504,6 +623,8 @@ void FT_CombatFeedbackHandleMessage(
 
     if(nFeedback == FT_COMBAT_FEEDBACK_HIT)
     {
+        const LTVector vWorldImpact = pMessage->ReadLTVector();
+        FT_SpawnBloodBurst(vWorldImpact);
         s_fLastConfirmedHit = g_pLTClient ? g_pLTClient->GetTime() : -10.0f;
         return;
     }
@@ -533,10 +654,12 @@ void FT_CombatFeedbackShowRoundStart()
         FT_FEEDBACK_ROUNDSTART);
 }
 
-void FT_RenderCombatFeedback()
+void FT_RenderCombatFeedback(HOBJECT hCamera)
 {
     if(!g_pLTClient || !g_pLTCDrawPrim)
         return;
+
+    FT_RenderBloodBursts(hCamera);
 
     const float fHitAge = g_pLTClient->GetTime() - s_fLastConfirmedHit;
     if(fHitAge >= 0.0f && fHitAge < 0.18f && s_pFallback)
