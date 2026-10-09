@@ -2063,7 +2063,7 @@ void CPlayerSrvr::FirePrimary(
     const LTVector &vDirection,
     bool bZoomed)
 {
-    if(!m_bAlive ||
+    if(!m_bResumeVerified || !m_bAlive ||
        m_bQaSpectating)
     {
         return;
@@ -2625,7 +2625,7 @@ void CPlayerSrvr::ReloadWeapon()
     if(m_bBottomlessWasActive &&
        FT_GetRoundCombatTime() < m_fBottomlessUntil)
         return;
-    if(!m_bAlive ||
+    if(!m_bResumeVerified || !m_bAlive ||
        m_bQaSpectating)
     {
         return;
