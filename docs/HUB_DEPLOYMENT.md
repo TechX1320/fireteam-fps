@@ -24,6 +24,28 @@ deployment, Windows compilation, or external multiplayer test is completed.
 - Match display names are now case-insensitively unique and reserved with the
   player's reconnect ticket. Renaming after acceptance is ignored.
 
+## One-click localhost Hub and Dedicated controls
+
+The user-facing launcher now has **START LOCAL HUB** (runs the
+self-contained out/hub/win-x64/FireteamHub.exe built with build-hub.cmd)
+and **USE RUNNING LOCAL HUB** buttons. Once built, FIRETEAM Hub is a
+normal clickable EXE; dotnet run is needed only for development.
+
+If Advertise is enabled but Hub URL is empty, START DEDICATED probes
+127.0.0.1:27890/healthz and fills the textbox when a real FIRETEAM Hub
+is running. Otherwise it displays a clear error dialog instead of
+silently failing. Starting a game server is always a separate step from
+starting the directory Hub; the Hub does NOT spawn dedicated game hosts.
+
+Presets and favorites no longer disappear after build.cmd: build-launcher.cmd
+migrates legacy files to BUILT/data/launcher *before* deleting the old
+WinUI publish folder. Startup logs are now under
+BUILT/data/launcher/Logs/startup.log. Game configs and match stats are not
+rewritten by this migration.
+
+For this specific troubleshooting sequence, see
+docs/DEDICATED_LAUNCHER_HUB_UX_QA.md.
+
 ## Quick local test (your existing Windows development PC)
 
 ### What the launcher screenshot means
