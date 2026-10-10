@@ -137,6 +137,36 @@ internal static class HubNetwork
     public static string CleanIp(IPAddress ip) =>
         (ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4() : ip).ToString();
 
+    // Operator-only override for a game on the same Lenovo as the hub.
+    // A regular host cannot specify its own advertised address in JSON.
+    public static bool ValidPublicGameHost(string value)
+    {
+        if(value.Length is < 4 or > 253 ||
+           value.Any(c => !(char.IsAsciiLetterOrDigit(c) ||
+                            c == '-' || c == '.')) ||
+           value.Contains("..") || value.StartsWith('-') ||
+           value.EndsWith('-') || value.EndsWith('.') ||
+           value.EndsWith(".local", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if(IPAddress.TryParse(value, out var ip))
+        {
+            if(ip.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+                return false;
+            var octets = ip.GetAddressBytes();
+            return octets[0] is >= 1 and < 224 and not (10 or 127) &&
+                   !(octets[0] == 169 && octets[1] == 254) &&
+                   !(octets[0] == 172 && octets[1] is >= 16 and <= 31) &&
+                   !(octets[0] == 192 && octets[1] == 168) &&
+                   !(octets[0] == 100 && octets[1] is >= 64 and <= 127);
+        }
+        return value.Contains('.') &&
+               !value.Equals("localhost", StringComparison.OrdinalIgnoreCase) &&
+               value.Split('.').All(label =>
+                   label.Length is >= 1 and <= 63 &&
+                   char.IsAsciiLetterOrDigit(label[0]) &&
+                   char.IsAsciiLetterOrDigit(label[^1]));
+    }
+
     public static bool SameSecret(string a, string b)
     {
         // Secret is presented only over TLS (or loopback dev HTTP).
@@ -152,7 +182,8 @@ internal sealed class PresenceRegistry
 {
     private sealed record Entry(
         string Id, string KeyHash, string Name, string Map,
-        string SourceIp, int Port, int Players, int MaxPlayers,
+        string SourceIp, string AdvertisedHost,
+        int Port, int Players, int MaxPlayers,
         int Difficulty, DateTimeOffset Seen);
     private sealed class RateState
     {
@@ -161,6 +192,21 @@ internal sealed class PresenceRegistry
     }
 
     private readonly object _gate = new();
+    private readonly string? _trustedLocalPublicGameHost;
+
+    public PresenceRegistry()
+    {
+        var host = Environment.GetEnvironmentVariable(
+            "FIRETEAM_HUB_PUBLIC_GAME_HOST")?.Trim();
+        if(!string.IsNullOrWhiteSpace(host))
+        {
+            if(!HubNetwork.ValidPublicGameHost(host))
+                throw new InvalidOperationException(
+                    "Invalid FIRETEAM_HUB_PUBLIC_GAME_HOST: use a public IPv4 or DNS hostname, without a port.");
+            _trustedLocalPublicGameHost = host.ToLowerInvariant();
+        }
+    }
+
     private readonly Dictionary<string, Entry> _entries =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, RateState> _rate =
@@ -187,7 +233,7 @@ internal sealed class PresenceRegistry
             return _entries.Values
                 .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(e => new PublicServer(e.Name,
-                    e.SourceIp + ":" + e.Port, e.Map,
+                    e.AdvertisedHost + ":" + e.Port, e.Map,
                     e.Players, e.MaxPlayers, e.Difficulty,
                     false, e.Seen))
                 .ToArray();
@@ -197,6 +243,11 @@ internal sealed class PresenceRegistry
     public RegistryResult Heartbeat(IPAddress address, HeartbeatRequest body)
     {
         var ip = HubNetwork.CleanIp(address);
+        // Trust only the configured operator override when the host
+        // registers on loopback. External clients cannot spoof this address.
+        var advertisedHost = IPAddress.IsLoopback(address)
+            ? _trustedLocalPublicGameHost ?? ip
+            : ip;
         var now = DateTimeOffset.UtcNow;
         lock(_gate)
         {
@@ -223,6 +274,7 @@ internal sealed class PresenceRegistry
                 {
                     Name = body.Name,
                     Map = body.Map,
+                    AdvertisedHost = advertisedHost,
                     Port = body.Port,
                     Players = body.Players,
                     MaxPlayers = body.MaxPlayers,
@@ -236,7 +288,7 @@ internal sealed class PresenceRegistry
                _entries.Values.Count(e => e.SourceIp == ip) >= PerAddressCap)
                 return RegistryResult.AtCapacity;
             _entries[body.Id] = new Entry(
-                body.Id, keyHash, body.Name, body.Map, ip,
+                body.Id, keyHash, body.Name, body.Map, ip, advertisedHost,
                 body.Port, body.Players, body.MaxPlayers, body.Difficulty, now);
             return RegistryResult.Accepted;
         }
