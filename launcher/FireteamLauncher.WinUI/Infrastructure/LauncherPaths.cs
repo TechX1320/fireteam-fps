@@ -27,7 +27,7 @@ public static class LauncherPaths
             // from bin/ and obj/ which are routinely cleaned by MSBuild.
             return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "FIRETEAM", "Launcher";
+                "FIRETEAM", "Launcher");
         }
     }
 
