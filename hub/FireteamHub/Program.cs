@@ -245,7 +245,9 @@ internal sealed class PresenceRegistry
         var ip = HubNetwork.CleanIp(address);
         // Trust only the configured operator override when the host
         // registers on loopback. External clients cannot spoof this address.
-        var advertisedHost = IPAddress.IsLoopback(address)
+        var normalizedAddress = address.IsIPv4MappedToIPv6
+            ? address.MapToIPv4() : address;
+        var advertisedHost = IPAddress.IsLoopback(normalizedAddress)
             ? _trustedLocalPublicGameHost ?? ip
             : ip;
         var now = DateTimeOffset.UtcNow;
