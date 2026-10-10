@@ -30,6 +30,37 @@ public static class HubAddressService
         catch(UnauthorizedAccessException) { return null; }
     }
 
+    /// <summary>
+    /// Probe the development Hub on loopback only. This never enables public
+    /// hosting and never modifies launcher settings or router configuration.
+    /// </summary>
+    public static async Task<string?> FindRunningLocalHubAsync()
+    {
+        const string localUrl = "http://127.0.0.1:27890";
+        try
+        {
+            using var http = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(2),
+                MaxResponseContentBufferSize = 4096
+            };
+            var json = await http.GetStringAsync(localUrl + "/healthz");
+            using var result = System.Text.Json.JsonDocument.Parse(json);
+            if(result.RootElement.GetProperty("status").GetString() == "ready" &&
+               result.RootElement.GetProperty("name").GetString() == "FIRETEAM Hub")
+                return localUrl;
+        }
+        catch(Exception ex) when(ex is HttpRequestException or
+                                 TaskCanceledException or
+                                 System.Text.Json.JsonException or
+                                 KeyNotFoundException or
+                                 InvalidOperationException)
+        {
+            // No local Hub running. LAN-only hosting must remain possible.
+        }
+        return null;
+    }
+
     public static string Save(string rawUrl)
     {
         if(!TryNormalize(rawUrl, out var url))
