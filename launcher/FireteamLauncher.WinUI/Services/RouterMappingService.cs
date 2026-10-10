@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 
@@ -14,11 +13,12 @@ public sealed class RouterMappingService
     private readonly object _gate = new();
 
     public async Task<string> TryMapGamePortAsync(
-        int gamePort, Func<bool>? hostStillRunning = null,
+        int gamePort, int dedicatedProcessId,
+        Func<bool>? hostStillRunning = null,
         CancellationToken cancellationToken = default)
     {
-        if(gamePort is < 1 or > 65535)
-            return "Invalid game port. No router changes made.";
+        if(gamePort is < 1 or > 65535 || dedicatedProcessId <= 0)
+            return "Invalid dedicated process or game port. No router changes made.";
 
         var protocols = Array.Empty<string>();
         for(var attempt = 0; attempt < 5; ++attempt)
@@ -26,13 +26,17 @@ public sealed class RouterMappingService
             cancellationToken.ThrowIfCancellationRequested();
             if(hostStillRunning is not null && !hostStillRunning())
                 return "Dedicated process stopped; no router changes made.";
-            protocols = DetectListeningProtocols(gamePort);
+            // Only ports owned by the specific dedicated host PID qualify.
+            // A different application listening on that port is NEVER mapped.
+            protocols = OwnedNetworkListeners.ProtocolsAtPort(
+                gamePort, dedicatedProcessId);
             if(protocols.Length > 0) break;
             await Task.Delay(900, cancellationToken);
         }
 
         if(protocols.Length == 0)
-            return "UPnP not attempted: Jupiter's game port is not detected as UDP/TCP listening. " +
+            return "UPnP not attempted: the dedicated process is not listening " +
+                   "on the configured game port using IPv4 UDP/TCP. " +
                    "Run scripts/diagnose-host-connectivity.ps1 while hosting.";
 
         var ipv4 = DiscoverLocalIpv4();
@@ -66,21 +70,6 @@ public sealed class RouterMappingService
                    (errors.Count > 0 ? string.Join("; ", errors) + ". " : "") +
                    "Internet joinability is NOT verified. CGNAT may still prevent joining.";
         }, cancellationToken);
-    }
-
-    private static string[] DetectListeningProtocols(int port)
-    {
-        var protocols = new List<string>();
-        try
-        {
-            var ip = IPGlobalProperties.GetIPGlobalProperties();
-            if(ip.GetActiveUdpListeners().Any(endpoint => endpoint.Port == port))
-                protocols.Add("UDP");
-            if(ip.GetActiveTcpListeners().Any(endpoint => endpoint.Port == port))
-                protocols.Add("TCP");
-        }
-        catch(NetworkInformationException) { }
-        return protocols.ToArray();
     }
 
     private static string? DiscoverLocalIpv4()
