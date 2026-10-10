@@ -351,14 +351,24 @@ public sealed partial class MainWindow
         // The configuration screen is long; text below START can be off
         // screen. Show the actual validation error rather than silently
         // leaving the user with an unchanged LAN list.
-        var dialog = new ContentDialog
+        try
         {
-            Title = "Dedicated server did not start",
-            Content = details,
-            CloseButtonText = "OK",
-            XamlRoot = Content.XamlRoot
-        };
-        await dialog.ShowAsync();
+            var dialog = new ContentDialog
+            {
+                Title = "Dedicated server did not start",
+                Content = details,
+                CloseButtonText = "OK",
+                XamlRoot = Content.XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+        catch(Exception dialogError)
+        {
+            // Keep the visible InfoBar/status as fallback if XAML is still
+            // arranging after an early click.
+            StartupDiagnostics.Write(
+                "Dedicated error dialog unavailable: " + dialogError.Message);
+        }
     }
 
     private void SaveDedicatedPreset()
@@ -432,10 +442,34 @@ public sealed partial class MainWindow
                 SetDedicatedStatus(
                     started + " Checking the game's port ownership and UPnP...",
                     InfoBarSeverity.Informational, "Checking router mapping");
-                var result = await _dedicatedServer.ConfigureRouterAsync(profile.Port);
-                SetDedicatedStatus(
-                    started + "\n" + result,
-                    InfoBarSeverity.Success, "Dedicated process running");
+                try
+                {
+                    var result = await _dedicatedServer.ConfigureRouterAsync(profile.Port);
+                    if(!_dedicatedServer.IsRunning)
+                    {
+                        SetDedicatedStatus(
+                            "Dedicated exited during router setup (code " +
+                            (_dedicatedServer.LastExitCode?.ToString() ?? "unknown") +
+                            "). Check its console.",
+                            InfoBarSeverity.Error, "Dedicated process exited");
+                        return;
+                    }
+                    var mapped = result.Contains("mapped", StringComparison.OrdinalIgnoreCase);
+                    SetDedicatedStatus(
+                        started + "\n" + result,
+                        mapped ? InfoBarSeverity.Success : InfoBarSeverity.Warning,
+                        mapped ? "Dedicated running (UPnP attempted)" :
+                                 "Dedicated running (UPnP unavailable)");
+                }
+                catch(Exception routerError)
+                {
+                    // UPnP is OPTIONAL. Its failure must never be reported as
+                    // failure to launch the actual game server.
+                    SetDedicatedStatus(
+                        started + "\nRouter mapping failed: " + routerError.Message +
+                        ". LAN/direct-IP hosting can still work.",
+                        InfoBarSeverity.Warning, "Dedicated running; router unavailable");
+                }
             }
         }
         catch(Exception ex)
