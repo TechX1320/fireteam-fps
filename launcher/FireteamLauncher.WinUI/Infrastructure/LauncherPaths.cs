@@ -12,17 +12,22 @@ public static class LauncherPaths
                 new DirectoryInfo(
                     AppContext.BaseDirectory);
 
-            // Runtime lives at Launcher/App. Keep writable launcher state one
-            // level up so App stays a clean dependency folder.
-            if(baseDir.Parent is not null &&
-               baseDir.Name.Equals(
-                   "App",
-                   StringComparison.OrdinalIgnoreCase))
+            // BUILT/Launcher/App is replaced on EVERY launcher rebuild.
+            // Save user-owned presets, favorites and logs outside that
+            // disposable tree: BUILT/data/launcher survives build.cmd.
+            if(baseDir.Parent?.Parent is not null &&
+               baseDir.Name.Equals("App", StringComparison.OrdinalIgnoreCase) &&
+               baseDir.Parent.Name.Equals("Launcher", StringComparison.OrdinalIgnoreCase))
             {
-                return baseDir.Parent.FullName;
+                return Path.Combine(
+                    baseDir.Parent.Parent.FullName, "data", "launcher");
             }
 
-            return baseDir.FullName;
+            // Developer/debug builds likewise keep user state separate
+            // from bin/ and obj/ which are routinely cleaned by MSBuild.
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "FIRETEAM", "Launcher";
         }
     }
 

@@ -9,6 +9,7 @@ set "PROJECT=%CD%\launcher\FireteamLauncher.WinUI\FireteamLauncher.WinUI.csproj"
 set "APP_XAML=%CD%\launcher\FireteamLauncher.WinUI\App.xaml"
 set "BUILT_DIR=%CD%\BUILT"
 set "SUPPORT_DIR=%BUILT_DIR%\Launcher"
+set "USER_STATE_DIR=%BUILT_DIR%\data\launcher"
 set "APP_DIR=%SUPPORT_DIR%\App"
 set "ROOT_EXE=%BUILT_DIR%\FireteamLauncher.exe"
 set "BOOTSTRAP_EXE=%CD%\out\build\bin\FireteamLauncher.exe"
@@ -131,9 +132,36 @@ rem runtime DLLs locked. Stop both copies before replacing BUILT\Launcher\App.
 taskkill /IM FireteamLauncher.exe /T /F >nul 2>nul
 timeout /t 1 /nobreak >nul 2>nul
 
-rem Remove the previous raw WinUI publish completely. This cleans the old
-rem DLL/language-folder sprawl that earlier FIRETEAM launcher builds left
-rem directly under BUILT\Launcher.
+rem Migrate old launcher state BEFORE deleting the disposable publish tree.
+rem A rebuild used to delete dedicated-host.json and server-favorites.json
+rem because they were incorrectly stored under BUILT/Launcher.
+if not exist "%USER_STATE_DIR%" mkdir "%USER_STATE_DIR%" >nul 2>nul
+if not exist "%USER_STATE_DIR%" (
+  echo [ERROR] Cannot create stable launcher user-state directory.
+  echo [ERROR] Refusing to delete your old launcher folder.
+  goto :fail
+)
+for %%F in (dedicated-host.json server-favorites.json) do (
+  if exist "%SUPPORT_DIR%\%%F" (
+    if not exist "%USER_STATE_DIR%\%%F" (
+      copy /y "%SUPPORT_DIR%\%%F" "%USER_STATE_DIR%\%%F" >nul
+      if errorlevel 1 (
+        echo [ERROR] Could not preserve %%F - launcher runtime will NOT be deleted.
+        goto :fail
+      )
+      echo [MIGRATE] %%F moved to stable BUILT\data\launcher state.
+    ) else (
+      echo [KEEP] Existing stable %%F preserved ^(old source not overwritten^).
+    )
+  )
+)
+if exist "%SUPPORT_DIR%\Logs\startup.log" (
+  if not exist "%USER_STATE_DIR%\Logs" mkdir "%USER_STATE_DIR%\Logs" >nul 2>nul
+  if not exist "%USER_STATE_DIR%\Logs\startup.log" (
+    copy /y "%SUPPORT_DIR%\Logs\startup.log" "%USER_STATE_DIR%\Logs\startup.log" >nul
+  )
+)
+rem Remove only the disposable WinUI program/DLL/language files.
 if exist "%SUPPORT_DIR%" rmdir /s /q "%SUPPORT_DIR%"
 
 if exist "%SUPPORT_DIR%" (
@@ -143,7 +171,7 @@ if exist "%SUPPORT_DIR%" (
 )
 
 mkdir "%APP_DIR%" >nul 2>nul
-mkdir "%SUPPORT_DIR%\Logs" >nul 2>nul
+if not exist "%USER_STATE_DIR%\Logs" mkdir "%USER_STATE_DIR%\Logs" >nul 2>nul
 
 xcopy "%SHORT_OUTPUT%\*" "%APP_DIR%\" /E /I /Y /Q >nul
 if errorlevel 1 (
@@ -151,7 +179,7 @@ if errorlevel 1 (
   goto :fail
 )
 
-if not exist "%SUPPORT_DIR%\Logs" mkdir "%SUPPORT_DIR%\Logs" >nul
+if not exist "%USER_STATE_DIR%\Logs" mkdir "%USER_STATE_DIR%\Logs" >nul
 if not exist "%BUILT_DIR%\Mods" mkdir "%BUILT_DIR%\Mods" >nul
 if not exist "%BUILT_DIR%\modTools" mkdir "%BUILT_DIR%\modTools" >nul
 
@@ -188,8 +216,10 @@ echo [OK] FIRETEAM Launcher:
 echo      BUILT\FireteamLauncher.exe
 echo [OK] WinUI/.NET runtime:
 echo      BUILT\Launcher\App\
+echo [OK] Permanent launcher user presets / favorites / logs:
+echo      BUILT\data\launcher\
 echo [OK] Startup diagnostics:
-echo      BUILT\Launcher\Logs\startup.log
+echo      BUILT\data\launcher\Logs\startup.log
 echo.
 if "%NO_PAUSE%"=="0" pause
 exit /b 0
