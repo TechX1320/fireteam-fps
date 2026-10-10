@@ -9,6 +9,10 @@ public sealed partial class MainWindow
 {
     private readonly ScrollViewer DedicatedServerView = new();
     private readonly DedicatedServerService _dedicatedServer = new();
+    private readonly LocalHubService _localHub = new();
+    private readonly InfoBar DedicatedBanner = new();
+    private Button? DedicatedStartButton;
+    private bool _dedicatedLaunchBusy;
     private readonly TextBox DedicatedNameBox = new();
     private readonly NumberBox DedicatedPortBox = new();
     private readonly NumberBox DedicatedPlayersBox = new();
@@ -37,6 +41,23 @@ public sealed partial class MainWindow
             "FIRETEAM / HOSTING",
             "Dedicated Server",
             "Independent headless hosting. Server settings do not overwrite your Quick Play profile.");
+
+        // Hosting state must be visible even when the normal status text
+        // is below the controls. A blocked launch cannot be silent.
+        DedicatedBanner.IsOpen = true;
+        DedicatedBanner.IsClosable = false;
+        DedicatedBanner.Title = "Dedicated server";
+        DedicatedBanner.Severity = InfoBarSeverity.Informational;
+        DedicatedBanner.Message = "Not started by this launcher.";
+        page.Children.Add(DedicatedBanner);
+
+        _dedicatedServer.ProcessExited += code =>
+            DispatcherQueue.TryEnqueue(() =>
+                SetDedicatedStatus(
+                    $"Dedicated server process exited (code {code}). " +
+                    "See the server console for details.",
+                    code == 0 ? InfoBarSeverity.Informational : InfoBarSeverity.Error,
+                    "Dedicated process exited"));
 
         var basics = new StackPanel { Spacing = 12 };
         basics.Children.Add(CardHeading("IDENTITY & NETWORK", "Server setup",
@@ -100,15 +121,38 @@ public sealed partial class MainWindow
         access.Children.Add(LabeledControl("Private PIN", DedicatedPinBox));
 
         DedicatedOnlineToggle.Header =
-            "Advertise server on FIRETEAM Hub (publishes my Internet IP)";
+            "Advertise server on FIRETEAM Hub (may publish my Internet IP)";
+        DedicatedOnlineToggle.Toggled += async (sender, args) =>
+        {
+            if(!DedicatedOnlineToggle.IsOn ||
+               !string.IsNullOrWhiteSpace(DedicatedHubUrlBox.Text))
+                return;
+            var local = await HubAddressService.FindRunningLocalHubAsync();
+            if(local is not null &&
+               string.IsNullOrWhiteSpace(DedicatedHubUrlBox.Text))
+                DedicatedHubUrlBox.Text = local;
+        };
         access.Children.Add(DedicatedOnlineToggle);
         DedicatedRouterToggle.Header =
             "Automatically request UPnP for detected game ports (opt-in)";
         access.Children.Add(DedicatedRouterToggle);
-        DedicatedHubUrlBox.PlaceholderText = "https://your-fireteam-hub.example";
+        DedicatedHubUrlBox.PlaceholderText =
+            "Not configured — use the LOCAL HUB button or enter HTTPS URL";
         DedicatedHubUrlBox.MaxLength = 240;
         DedicatedHubUrlBox.MinWidth = 400;
         access.Children.Add(LabeledControl("Hub address", DedicatedHubUrlBox));
+        var localHubActions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10
+        };
+        var selectLocalHub = SecondaryButton("USE RUNNING LOCAL HUB");
+        selectLocalHub.Click += async (sender, args) => await SelectLocalHubAsync();
+        localHubActions.Children.Add(selectLocalHub);
+        var launchLocalHub = SecondaryButton("START LOCAL HUB");
+        launchLocalHub.Click += async (sender, args) => await LaunchLocalHubAsync();
+        localHubActions.Children.Add(launchLocalHub);
+        access.Children.Add(localHubActions);
         access.Children.Add(BodyText(
             "Public listing does not open your router port. " +
             "Other players may see an UNVERIFIED listing until Internet connectivity is solved."));
@@ -140,9 +184,9 @@ public sealed partial class MainWindow
         var save = SecondaryButton("SAVE SERVER PRESET");
         save.Click += (s, e) => SaveDedicatedPreset();
         actions.Children.Add(save);
-        var start = PrimaryButton("START DEDICATED");
-        start.Click += (s, e) => LaunchDedicatedServer();
-        actions.Children.Add(start);
+        DedicatedStartButton = PrimaryButton("START DEDICATED");
+        DedicatedStartButton.Click += (s, e) => LaunchDedicatedServer();
+        actions.Children.Add(DedicatedStartButton);
         var stop = SecondaryButton("REQUEST STOP");
         stop.Click += (s, e) => StopDedicatedServer();
         actions.Children.Add(stop);
@@ -172,9 +216,10 @@ public sealed partial class MainWindow
             : profile.HubUrl;
         RefreshDedicatedMapOptions(profile.Map);
         RefreshDedicatedModList(profile.Mods);
-        DedicatedStatus.Text =
-            "Hosting is experimental until build-dedicated.cmd passes Windows and LAN join testing. " +
-            "Use public/unlisted without mods for the first smoke test.";
+        SetDedicatedStatus(
+            "Preset loaded. Start Dedicated launches a separate game server; " +
+            "the Hub only provides the directory. Local Hub advertising is optional.",
+            InfoBarSeverity.Informational, "Dedicated server ready");
     }
 
     private void RefreshDedicatedMapOptions(string? preferred = null)
@@ -229,37 +274,179 @@ public sealed partial class MainWindow
         return profile;
     }
 
+    private void SetDedicatedStatus(
+        string message, InfoBarSeverity severity = InfoBarSeverity.Informational,
+        string title = "Dedicated server")
+    {
+        DedicatedStatus.Text = message;
+        DedicatedBanner.Title = title;
+        DedicatedBanner.Message = message;
+        DedicatedBanner.Severity = severity;
+        DedicatedBanner.IsOpen = true;
+    }
+
+    private void SetLocalHubAddress(string url)
+    {
+        DedicatedHubUrlBox.Text = url;
+        ServerBrowserHubUrl.Text = url;
+        HubAddressService.Save(url);
+    }
+
+    private async Task SelectLocalHubAsync()
+    {
+        try
+        {
+            var url = await HubAddressService.FindRunningLocalHubAsync();
+            if(url is null)
+            {
+                SetDedicatedStatus(
+                    "Local Hub is not running. Click START LOCAL HUB after building " +
+                    "the standalone EXE with build-hub.cmd, or run dotnet run once " +
+                    "for a development test.",
+                    InfoBarSeverity.Warning, "Local Hub not found");
+                return;
+            }
+
+            SetLocalHubAddress(url);
+            SetDedicatedStatus(
+                "Connected to the running local Hub at " + url +
+                ". The Hub is not automatically published to the Internet. " +
+                "Check Advertise on FIRETEAM Hub to list your dedicated server.",
+                InfoBarSeverity.Success, "Local Hub selected");
+        }
+        catch(Exception ex)
+        {
+            SetDedicatedStatus(
+                "Cannot save local Hub endpoint: " + ex.Message,
+                InfoBarSeverity.Error, "Hub configuration error");
+        }
+    }
+
+    private async Task LaunchLocalHubAsync()
+    {
+        SetDedicatedStatus("Starting localhost FIRETEAM Hub...",
+            InfoBarSeverity.Informational, "Starting local Hub");
+        try
+        {
+            var result = await _localHub.StartAsync();
+            var url = await HubAddressService.FindRunningLocalHubAsync();
+            if(url is not null)
+                SetLocalHubAddress(url);
+            SetDedicatedStatus(result,
+                url is not null ? InfoBarSeverity.Success : InfoBarSeverity.Warning,
+                url is not null ? "Local Hub ready" : "Local Hub starting");
+        }
+        catch(Exception ex)
+        {
+            SetDedicatedStatus(ex.Message, InfoBarSeverity.Error,
+                "Cannot start local Hub");
+        }
+    }
+
+    private async Task ShowDedicatedStartErrorAsync(string details)
+    {
+        SetDedicatedStatus(details, InfoBarSeverity.Error,
+            "Dedicated server did not start");
+        StartupDiagnostics.Write("Dedicated launch blocked: " + details);
+        // The configuration screen is long; text below START can be off
+        // screen. Show the actual validation error rather than silently
+        // leaving the user with an unchanged LAN list.
+        var dialog = new ContentDialog
+        {
+            Title = "Dedicated server did not start",
+            Content = details,
+            CloseButtonText = "OK",
+            XamlRoot = Content.XamlRoot
+        };
+        await dialog.ShowAsync();
+    }
+
     private void SaveDedicatedPreset()
     {
         try
         {
             _dedicatedServer.Save(GetDedicatedProfile());
-            DedicatedStatus.Text =
-                "Server preset saved locally. Private PIN values are never saved.";
+            SetDedicatedStatus(
+                "Server preset saved locally. Private PIN values are never saved.",
+                InfoBarSeverity.Success, "Preset saved");
         }
         catch(Exception ex)
         {
-            DedicatedStatus.Text = "Preset not saved: " + ex.Message;
+            SetDedicatedStatus("Preset not saved: " + ex.Message,
+                InfoBarSeverity.Error, "Preset save failed");
         }
     }
 
     private async void LaunchDedicatedServer()
     {
+        if(_dedicatedLaunchBusy) return;
+        _dedicatedLaunchBusy = true;
+        if(DedicatedStartButton is not null)
+            DedicatedStartButton.IsEnabled = false;
         try
         {
             var profile = GetDedicatedProfile();
-            var started = _dedicatedServer.Start(profile);
-            DedicatedStatus.Text = started;
-            if(!profile.AutoConfigureRouter)
-                return;
+            // A blank Hub address is not an invitation to send player data
+            // to a placeholder domain. Use only an ACTUALLY running local
+            // first-party Hub when online listing was explicitly selected.
+            if(profile.PublishOnline && string.IsNullOrWhiteSpace(profile.HubUrl))
+            {
+                var local = await HubAddressService.FindRunningLocalHubAsync();
+                if(local is not null)
+                {
+                    SetLocalHubAddress(local);
+                    profile = profile with { HubUrl = local };
+                }
+            }
 
-            DedicatedStatus.Text += "\nChecking actual game listeners and router UPnP...";
-            var outcome = await _dedicatedServer.ConfigureRouterAsync(profile.Port);
-            DedicatedStatus.Text = started + "\n" + outcome;
+            // Save the chosen configuration even if the subsequent start is
+            // blocked by an invalid URL or a missing dedicated executable.
+            _dedicatedServer.Save(profile);
+            if(profile.PublishOnline &&
+               !HubAddressService.TryNormalize(profile.HubUrl, out _))
+                throw new InvalidOperationException(
+                    "Advertise is ON, but no valid Hub address is configured. " +
+                    "Click USE RUNNING LOCAL HUB, then START DEDICATED. " +
+                    "Or turn Advertise OFF to host on LAN only.");
+
+            SetDedicatedStatus("Launching dedicated server...",
+                InfoBarSeverity.Informational, "Starting dedicated");
+            var started = _dedicatedServer.Start(profile);
+
+            // Process.Start only establishes that Windows created a child,
+            // not that Jupiter has loaded the world or opened the game port.
+            await Task.Delay(900);
+            if(!_dedicatedServer.IsRunning)
+                throw new InvalidOperationException(
+                    $"Dedicated executable exited immediately (code " +
+                    $"{_dedicatedServer.LastExitCode?.ToString() ?? "unknown"}). " +
+                    "Check its console. The port may already be in use by a manually started server.");
+
+            SetDedicatedStatus(
+                started + " Process still running; wait for Jupiter's " +
+                "world initialization and verify the LAN listing before joining.",
+                InfoBarSeverity.Success, "Dedicated process running");
+
+            if(profile.AutoConfigureRouter)
+            {
+                SetDedicatedStatus(
+                    started + " Checking the game's port ownership and UPnP...",
+                    InfoBarSeverity.Informational, "Checking router mapping");
+                var result = await _dedicatedServer.ConfigureRouterAsync(profile.Port);
+                SetDedicatedStatus(
+                    started + "\n" + result,
+                    InfoBarSeverity.Success, "Dedicated process running");
+            }
         }
         catch(Exception ex)
         {
-            DedicatedStatus.Text = "Dedicated launch/network setup: " + ex.Message;
+            await ShowDedicatedStartErrorAsync(ex.Message);
+        }
+        finally
+        {
+            _dedicatedLaunchBusy = false;
+            if(DedicatedStartButton is not null)
+                DedicatedStartButton.IsEnabled = true;
         }
     }
 
@@ -268,23 +455,28 @@ public sealed partial class MainWindow
         try
         {
             var status = _dedicatedServer.RequestStop();
-            DedicatedStatus.Text = status;
-            // Keep public mappings until the server really exits.
+            SetDedicatedStatus(status, InfoBarSeverity.Informational,
+                "Shutdown requested");
             for(var n = 0; n < 16 && _dedicatedServer.IsRunning; ++n)
                 await Task.Delay(500);
 
             if(_dedicatedServer.IsRunning)
             {
-                DedicatedStatus.Text +=
-                    "\nServer still stopping; router mapping retained until shutdown.";
+                SetDedicatedStatus(
+                    "Dedicated is still stopping; router mapping retained " +
+                    "until the process exits.",
+                    InfoBarSeverity.Warning, "Awaiting shutdown");
                 return;
             }
-            DedicatedStatus.Text += "\n" +
-                await _dedicatedServer.CleanupRouterAsync();
+
+            var cleanup = await _dedicatedServer.CleanupRouterAsync();
+            SetDedicatedStatus(status + "\n" + cleanup,
+                InfoBarSeverity.Informational, "Dedicated stopped");
         }
         catch(Exception ex)
         {
-            DedicatedStatus.Text = "Cannot request stop: " + ex.Message;
+            SetDedicatedStatus("Cannot request stop: " + ex.Message,
+                InfoBarSeverity.Error, "Stop failed");
         }
     }
 }
