@@ -341,14 +341,16 @@ public sealed partial class MainWindow
             _nextDirectoryRefreshUtc = DateTime.MinValue;
             await RefreshCommunityServersAsync();
             ServerBrowserStatus.Text +=
-                " Hub connected. To advertise YOUR game, enable it separately in Dedicated.";
+                " Hub endpoint saved. To list YOUR game, enable Advertise on FIRETEAM Hub in Dedicated.";
         }
         catch(Exception ex) when(ex is HttpRequestException or
                                  TaskCanceledException or
                                  System.Text.Json.JsonException or
                                  KeyNotFoundException or
                                  InvalidOperationException or
-                                 InvalidDataException)
+                                 InvalidDataException or
+                                 IOException or
+                                 UnauthorizedAccessException)
         {
             ServerBrowserStatus.Text =
                 "Hub not connected; previous configuration kept. " +
