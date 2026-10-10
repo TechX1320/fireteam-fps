@@ -89,10 +89,12 @@ public sealed class LanServerDiscoveryService : IDisposable
                 continue;
 
             var address = $"{from}:{item.Port}";
+            bool meaningfulChange;
             lock(_lock)
             {
-                if(_servers.TryGetValue(item.Id, out var earlier) &&
-                   earlier.Address.StartsWith("127.", StringComparison.Ordinal) &&
+                var wasKnown = _servers.TryGetValue(item.Id, out var earlier);
+                if(wasKnown && earlier!.Address.StartsWith(
+                       "127.", StringComparison.Ordinal) &&
                    !IPAddress.IsLoopback(from))
                 {
                     // Do not replace a working localhost target with a LAN
@@ -100,12 +102,23 @@ public sealed class LanServerDiscoveryService : IDisposable
                     address = earlier.Address;
                 }
 
+                meaningfulChange = !wasKnown ||
+                    earlier!.Name != item.Name ||
+                    earlier.Address != address ||
+                    earlier.Map != item.Map ||
+                    earlier.Difficulty != item.Difficulty ||
+                    earlier.Players != item.Players ||
+                    earlier.MaxPlayers != item.MaxPlayers;
+
                 _servers[item.Id] = new FireteamLanServer(
                     item.Id, item.Name, address, item.Map,
                     item.Difficulty, item.Players, item.MaxPlayers,
                     DateTime.UtcNow);
             }
-            Changed?.Invoke();
+            // LastSeenUtc is housekeeping, not a UI update. The 3s sweep
+            // already expires hosts when heartbeats stop.
+            if(meaningfulChange)
+                Changed?.Invoke();
         }
     }
 

@@ -15,6 +15,12 @@ public sealed partial class MainWindow
     private readonly TextBlock ServerBrowserStatus = new();
     private readonly ServerDirectoryService _serverDirectory = new();
     private readonly LanServerDiscoveryService _lanDiscovery = new();
+    // Live rows remain intact across heartbeat refreshes; rebuilding the
+    // ListView every 2-3 seconds made it blink and erased selection.
+    private readonly Dictionary<string, ListViewItem> _visibleServerRows =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _visibleServerSignatures =
+        new(StringComparer.OrdinalIgnoreCase);
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _lanRefreshTimer;
     private sealed record ServerBrowserRow(
         FireteamServerListing Listing, bool IsLan, int Players, int MaxPlayers,
@@ -174,17 +180,64 @@ public sealed partial class MainWindow
             .ThenBy(item => item.Listing.Name)
             .ToList();
 
-        ServerBrowserList.Items.Clear();
-        foreach(var entry in entries)
+        // Reconcile by canonical address rather than replacing every row.
+        // A routine LAN heartbeat only updates LastSeenUtc, not this view.
+        // This also keeps the selected item and current scroll position.
+        var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for(var i = 0; i < entries.Count; ++i)
         {
-            var item = new ListViewItem
+            var entry = entries[i];
+            var address = entry.Listing.Address;
+            wanted.Add(address);
+            var signature = string.Join("|",
+                entry.Listing.Name, entry.Listing.Map, entry.Listing.Source,
+                entry.Listing.Verified, entry.IsLan, entry.Players,
+                entry.MaxPlayers, entry.Difficulty);
+
+            if(!_visibleServerRows.TryGetValue(address, out var item))
             {
-                Tag = entry,
-                Content = ServerGridRow(entry),
-                Padding = new Thickness(5, 7, 5, 7),
-                HorizontalContentAlignment = HorizontalAlignment.Stretch
-            };
-            ServerBrowserList.Items.Add(item);
+                item = new ListViewItem
+                {
+                    Tag = entry,
+                    Content = ServerGridRow(entry),
+                    Padding = new Thickness(5, 7, 5, 7),
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch
+                };
+                _visibleServerRows[address] = item;
+                _visibleServerSignatures[address] = signature;
+                ServerBrowserList.Items.Insert(i, item);
+                continue;
+            }
+
+            if(!_visibleServerSignatures.TryGetValue(address, out var previous) ||
+               !string.Equals(previous, signature, StringComparison.Ordinal))
+            {
+                // Only recreate changed row content, never the entire grid.
+                item.Tag = entry;
+                item.Content = ServerGridRow(entry);
+                _visibleServerSignatures[address] = signature;
+            }
+
+            var currentIndex = ServerBrowserList.Items.IndexOf(item);
+            if(currentIndex != i && currentIndex >= 0)
+            {
+                // An actual sort/order change, not a routine heartbeat.
+                ServerBrowserList.Items.RemoveAt(currentIndex);
+                ServerBrowserList.Items.Insert(i, item);
+            }
+        }
+
+        // Expired hosts disappear without clearing unaffected selections.
+        for(var i = ServerBrowserList.Items.Count - 1; i >= 0; --i)
+        {
+            if(ServerBrowserList.Items[i] is not ListViewItem item ||
+               item.Tag is not ServerBrowserRow row ||
+               wanted.Contains(row.Listing.Address))
+                continue;
+            var address = row.Listing.Address;
+            ServerBrowserList.Items.RemoveAt(i);
+            _visibleServerRows.Remove(address);
+            _visibleServerSignatures.Remove(address);
         }
     }
 
