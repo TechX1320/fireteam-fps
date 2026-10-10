@@ -26,6 +26,29 @@ deployment, Windows compilation, or external multiplayer test is completed.
 
 ## Quick local test (your existing Windows development PC)
 
+### What the launcher screenshot means
+
+If the Community Servers grid displays FIRETEAM Dedicated / CABINFEVER /
+LAN / 0/24, that means LAN discovery is WORKING. The local PowerShell hub
+smoke test creates its own temporary TEST_HOST listing and removes it after
+success, so a PASS does not leave a server in the hub directory. The hub
+never launches game servers; the game must run separately (via START DEDICATED,
+or later as a Windows startup task on the Lenovo).
+
+If the browser says "Hub URL not configured", use SERVERS >
+LOCAL HUB TEST (while the Hub process is running). This checks
+http://127.0.0.1:27890/healthz and saves the known-local endpoint. The
+CONNECT HUB button accepts an approved HTTPS address for later deployments.
+Neither button advertises your IP automatically; the Dedicated tab still
+requires "Advertise server on FIRETEAM Hub" to be switched ON.
+
+The server browser now maintains its existing ListViewItems and only
+changes rows when fields actually change. It never clears all rows merely
+because a 2-second LAN heartbeat arrived. Selection and scroll location
+should remain stable.
+
+
+
 Run these two commands in separate terminals:
 
     dotnet run --project hub\FireteamHub\FireteamHub.csproj
@@ -63,6 +86,23 @@ Copy it to the Lenovo. A separately installed Caddy, Node, Python or .NET
 runtime is not required on the player's machine OR on the Lenovo for this
 self-contained hub build.
 
+### Public address for the Lenovo's own game server
+
+When the hub and a dedicated game server run on the SAME Lenovo, a loopback
+heartbeat normally has address 127.0.0.1. Remote players must NEVER receive
+that as an Internet join address. Before publishing the central hub, set
+FIRETEAM_HUB_PUBLIC_GAME_HOST on the Lenovo to an operator-controlled PUBLIC
+IPv4 address or DNS hostname pointing to your home Internet address:
+
+    $env:FIRETEAM_HUB_PUBLIC_GAME_HOST = "game.example.net"
+
+The hub then substitutes this hostname ONLY for loopback-sourced
+registrations, while retaining the actual source address and private
+registration key for authentication. No remote player host can supply its
+own advertised IP/hostname in heartbeat JSON. This address substitution
+does NOT create NAT mappings or prove that the game port works externally.
+Do not use private 192.168.x.x / localhost addresses for this public value.
+
 For PUBLIC access, obtain a domain name, valid TLS certificate and an
 Internet-reachable endpoint. The built-in Kestrel server can serve HTTPS
 directly; no third-party reverse proxy is necessary.
@@ -94,7 +134,9 @@ silently overwriting it.
 
 FIRETEAM now offers a first attempt at UPnP IGD automatic mapping. It still
 needs testing on a compatible router and does NOT guarantee public joins.
-- It detects the actual configured game port's local UDP/TCP listener.
+- It detects a UDP/TCP socket specifically owned by the running
+  FireteamDedicatedServer.exe PID (Windows IP Helper API). A port listened
+  on by any OTHER process is never exposed accidentally.
 - It requests only detected protocol(s) through Windows NATUPnP.
 - It refuses to overwrite an existing mapping for another address/port.
 - Request Stop cleans up only mappings created by that launcher, after the
