@@ -31,6 +31,19 @@ public sealed class DedicatedServerService
     private Process? _process;
     private readonly RouterMappingService _routerMappings = new();
 
+    // The launcher can distinguish "clicked Start" from "process is alive".
+    // The engine's READY state is still independent and must be validated.
+    public event Action<int>? ProcessExited;
+    public int? LastExitCode
+    {
+        get
+        {
+            if(_process is null) return null;
+            try { return _process.HasExited ? _process.ExitCode : null; }
+            catch(InvalidOperationException) { return null; }
+        }
+    }
+
     private static string PresetPath =>
         Path.Combine(LauncherPaths.SupportRoot, "dedicated-host.json");
 
@@ -117,7 +130,9 @@ public sealed class DedicatedServerService
         var start = new ProcessStartInfo(exe)
         {
             WorkingDirectory = hostDir,
-            UseShellExecute = false
+            UseShellExecute = false,
+            CreateNoWindow = false,
+            WindowStyle = ProcessWindowStyle.Normal
         };
         start.ArgumentList.Add("--map");
         start.ArgumentList.Add(map);
@@ -135,9 +150,25 @@ public sealed class DedicatedServerService
             start.ArgumentList.Add(HubAddressService.Save(profile.HubUrl));
         }
 
+        // Save BEFORE creating a separate process. A preset write failure
+        // must not leave a running host which the UI reports as "failed".
+        Save(profile);
         _process = Process.Start(start)
             ?? throw new InvalidOperationException("Windows did not start the dedicated process.");
-        Save(profile);
+        var launched = _process;
+        launched.EnableRaisingEvents = true;
+        launched.Exited += (_, _) =>
+        {
+            int exitCode;
+            try { exitCode = launched.ExitCode; }
+            catch(InvalidOperationException) { return; }
+            StartupDiagnostics.Write(
+                $"Dedicated process {launched.Id} exited with code {exitCode}.");
+            ProcessExited?.Invoke(exitCode);
+        };
+        StartupDiagnostics.Write(
+            $"Dedicated process started. PID={launched.Id}, Map={map}, " +
+            $"Port={profile.Port}, HubPublishing={profile.PublishOnline}.");
         return $"Dedicated process started (PID {_process.Id}), {map}, " +
                $"{profile.MaxPlayers} slots, port {profile.Port}. " +
                "Check the server console for the READY message before joining. " +
