@@ -12,6 +12,7 @@ public sealed partial class MainWindow
     private readonly ListView ServerBrowserList = new();
     private readonly TextBox ServerBrowserName = new();
     private readonly TextBox ServerBrowserAddress = new();
+    private readonly TextBox ServerBrowserHubUrl = new();
     private readonly TextBlock ServerBrowserStatus = new();
     private readonly ServerDirectoryService _serverDirectory = new();
     private readonly LanServerDiscoveryService _lanDiscovery = new();
@@ -67,6 +68,32 @@ public sealed partial class MainWindow
         save.Click += (sender, args) => SaveServerFavorite();
         controls.Children.Add(save);
         page.Children.Add(controls);
+
+        // Configures which directory we READ, not whether we publicly
+        // advertise the game. Public hosting remains an explicit opt-in in
+        // the separate Dedicated tab.
+        var hubControls = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10
+        };
+        ServerBrowserHubUrl.Width = 335;
+        ServerBrowserHubUrl.MaxLength = 240;
+        ServerBrowserHubUrl.PlaceholderText =
+            "Hub HTTPS URL (local test: http://127.0.0.1:27890)";
+        ServerBrowserHubUrl.Text = HubAddressService.Load() ?? "";
+        hubControls.Children.Add(ServerBrowserHubUrl);
+        var connectHub = SecondaryButton("CONNECT HUB");
+        connectHub.Click += async (sender, args) => await ConnectBrowserHubAsync();
+        hubControls.Children.Add(connectHub);
+        var localHub = SecondaryButton("LOCAL HUB TEST");
+        localHub.Click += async (sender, args) =>
+        {
+            ServerBrowserHubUrl.Text = "http://127.0.0.1:27890";
+            await ConnectBrowserHubAsync();
+        };
+        hubControls.Children.Add(localHub);
+        page.Children.Add(hubControls);
 
         ServerBrowserList.MinHeight = 280;
         ServerBrowserList.MaxHeight = 500;
@@ -279,6 +306,55 @@ public sealed partial class MainWindow
             row.Listing.Source,
             row.MaxPlayers > 0 ? $"{row.Players}/{row.MaxPlayers}" : "—",
             "—", row.Listing.Source == "Hub" ? "Unverified" : "Not checked", false);
+
+    private async Task ConnectBrowserHubAsync()
+    {
+        if(!HubAddressService.TryNormalize(
+            ServerBrowserHubUrl.Text, out var url))
+        {
+            ServerBrowserStatus.Text =
+                "Invalid Hub URL. Use HTTPS, or local HTTP only on localhost.";
+            return;
+        }
+
+        ServerBrowserStatus.Text = "Checking FIRETEAM Hub...";
+        try
+        {
+            using var http = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(5),
+                MaxResponseContentBufferSize = 16 * 1024
+            };
+            var raw = await http.GetStringAsync(url + "/healthz");
+            using var json = System.Text.Json.JsonDocument.Parse(raw);
+            var status = json.RootElement.GetProperty("status").GetString();
+            var name = json.RootElement.GetProperty("name").GetString();
+            if(status != "ready" || name != "FIRETEAM Hub")
+                throw new InvalidDataException(
+                    "The endpoint did not identify itself as a FIRETEAM Hub.");
+
+            HubAddressService.Save(url);
+            // Share a single approved directory URL between Servers and
+            // Dedicated without turning on public hosting automatically.
+            DedicatedHubUrlBox.Text = url;
+            _curatedDirectoryRequested = true;
+            _nextDirectoryRefreshUtc = DateTime.MinValue;
+            await RefreshCommunityServersAsync();
+            ServerBrowserStatus.Text +=
+                " Hub connected. To advertise YOUR game, enable it separately in Dedicated.";
+        }
+        catch(Exception ex) when(ex is HttpRequestException or
+                                 TaskCanceledException or
+                                 System.Text.Json.JsonException or
+                                 KeyNotFoundException or
+                                 InvalidOperationException or
+                                 InvalidDataException)
+        {
+            ServerBrowserStatus.Text =
+                "Hub not connected; previous configuration kept. " +
+                ex.Message;
+        }
+    }
 
     private async Task RefreshCommunityServersAsync()
     {
