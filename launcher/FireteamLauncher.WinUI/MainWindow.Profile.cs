@@ -19,6 +19,7 @@ public sealed partial class MainWindow
     private readonly Grid PlayerProfileRows = new();
     private readonly StackPanel PlayerProfileLeft = new() { Spacing = 14 };
     private readonly StackPanel PlayerProfileRight = new() { Spacing = 14 };
+    private bool _profileNarrowLayout;
 
     // Inspired by Minecraft's statistics screen: a compact label/value grid
     // with consistent right-aligned values, instead of giant monospaced blocks.
@@ -29,13 +30,23 @@ public sealed partial class MainWindow
         PlayerProfileView.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
         PlayerProfileView.HorizontalContentAlignment = HorizontalAlignment.Stretch;
 
-        var page = new StackPanel
+        // ScrollViewer + a vertical StackPanel with MaxWidth measured the
+        // profile content at its desired width, NOT the visible viewport.
+        // The old centered single-column origin survived: first column
+        // began near x=470 and the second column was cut off on the right.
+        //
+        // A fixed-width Grid, sized from the ScrollViewer viewport, keeps
+        // BOTH columns together and centers the full page as one unit.
+        var page = new Grid
         {
-            Spacing = 12,
-            Margin = new Thickness(24, 16, 24, 32),
-            MaxWidth = 1180,
-            HorizontalAlignment = HorizontalAlignment.Stretch
+            RowSpacing = 12,
+            Margin = new Thickness(0, 16, 0, 32),
+            Width = 1120,
+            HorizontalAlignment = HorizontalAlignment.Center
         };
+        page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         var toolbar = new Grid { ColumnSpacing = 14 };
         toolbar.ColumnDefinitions.Add(new ColumnDefinition
@@ -58,14 +69,22 @@ public sealed partial class MainWindow
         refresh.Click += (sender, args) => RefreshPlayerProfile();
         Grid.SetColumn(refresh, 1);
         toolbar.Children.Add(refresh);
+        Grid.SetRow(toolbar, 0);
         page.Children.Add(toolbar);
 
         PlayerProfileStatus.Foreground = SecondaryTextBrush;
         PlayerProfileStatus.FontSize = 12;
         PlayerProfileStatus.TextWrapping = TextWrapping.Wrap;
+        Grid.SetRow(PlayerProfileStatus, 1);
         page.Children.Add(PlayerProfileStatus);
 
+        PlayerProfileRows.HorizontalAlignment = HorizontalAlignment.Stretch;
         PlayerProfileRows.ColumnSpacing = 16;
+        PlayerProfileRows.RowSpacing = 0;
+        PlayerProfileRows.RowDefinitions.Add(
+            new RowDefinition { Height = GridLength.Auto });
+        PlayerProfileRows.RowDefinitions.Add(
+            new RowDefinition { Height = GridLength.Auto });
         PlayerProfileRows.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = new GridLength(1, GridUnitType.Star)
@@ -77,8 +96,35 @@ public sealed partial class MainWindow
         Grid.SetColumn(PlayerProfileRight, 1);
         PlayerProfileRows.Children.Add(PlayerProfileLeft);
         PlayerProfileRows.Children.Add(PlayerProfileRight);
+        Grid.SetRow(PlayerProfileRows, 2);
         page.Children.Add(PlayerProfileRows);
         PlayerProfileView.Content = page;
+
+        // No horizontal scrolling or clipped values. Two equal-width
+        // columns on desktop; stack them on narrow windows.
+        PlayerProfileView.SizeChanged += (_, args) =>
+        {
+            var viewport = args.NewSize.Width;
+            if(viewport < 1) return;
+
+            // Reserve 24 px at both edges inside the available viewport.
+            // Width is explicit because ScrollViewer may otherwise measure
+            // a vertical StackPanel's child Grid with infinite width.
+            var width = Math.Max(1, Math.Min(1320, viewport - 48));
+            if(Math.Abs(page.Width - width) > 0.5)
+                page.Width = width;
+
+            var narrow = width < 860;
+            if(narrow == _profileNarrowLayout) return;
+
+            _profileNarrowLayout = narrow;
+            PlayerProfileRows.ColumnDefinitions[1].Width =
+                narrow ? new GridLength(0) :
+                new GridLength(1, GridUnitType.Star);
+            Grid.SetColumn(PlayerProfileRight, narrow ? 0 : 1);
+            Grid.SetRow(PlayerProfileRight, narrow ? 1 : 0);
+            PlayerProfileRows.RowSpacing = narrow ? 16 : 0;
+        };
         ShowProfileEmpty(
             "No local matches found yet.",
             "Play for at least 15 seconds to create your first checkpoint.");
