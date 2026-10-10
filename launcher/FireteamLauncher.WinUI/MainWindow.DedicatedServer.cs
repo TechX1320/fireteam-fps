@@ -53,11 +53,14 @@ public sealed partial class MainWindow
 
         _dedicatedServer.ProcessExited += code =>
             DispatcherQueue.TryEnqueue(() =>
+            {
+                UpdateDedicatedStartButton();
                 SetDedicatedStatus(
                     $"Dedicated server process exited (code {code}). " +
                     "See the server console for details.",
                     code == 0 ? InfoBarSeverity.Informational : InfoBarSeverity.Error,
-                    "Dedicated process exited"));
+                    "Dedicated process exited");
+            });
 
         var basics = new StackPanel { Spacing = 12 };
         basics.Children.Add(CardHeading("IDENTITY & NETWORK", "Server setup",
@@ -274,6 +277,16 @@ public sealed partial class MainWindow
         return profile;
     }
 
+    private void UpdateDedicatedStartButton()
+    {
+        if(DedicatedStartButton is null) return;
+        var running = _dedicatedServer.IsRunning;
+        DedicatedStartButton.IsEnabled = !running && !_dedicatedLaunchBusy;
+        DedicatedStartButton.Content = running
+            ? "DEDICATED RUNNING"
+            : _dedicatedLaunchBusy ? "STARTING..." : "START DEDICATED";
+    }
+
     private void SetDedicatedStatus(
         string message, InfoBarSeverity severity = InfoBarSeverity.Informational,
         string title = "Dedicated server")
@@ -391,8 +404,7 @@ public sealed partial class MainWindow
     {
         if(_dedicatedLaunchBusy) return;
         _dedicatedLaunchBusy = true;
-        if(DedicatedStartButton is not null)
-            DedicatedStartButton.IsEnabled = false;
+        UpdateDedicatedStartButton();
         try
         {
             var profile = GetDedicatedProfile();
@@ -479,8 +491,7 @@ public sealed partial class MainWindow
         finally
         {
             _dedicatedLaunchBusy = false;
-            if(DedicatedStartButton is not null)
-                DedicatedStartButton.IsEnabled = true;
+            UpdateDedicatedStartButton();
         }
     }
 
@@ -504,6 +515,7 @@ public sealed partial class MainWindow
             }
 
             var cleanup = await _dedicatedServer.CleanupRouterAsync();
+            UpdateDedicatedStartButton();
             SetDedicatedStatus(status + "\n" + cleanup,
                 InfoBarSeverity.Informational, "Dedicated stopped");
         }
