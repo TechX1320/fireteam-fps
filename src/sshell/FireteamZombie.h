@@ -3,6 +3,7 @@
 
 #include <ltengineobjects.h>
 #include "FireteamInfectedDefs.h"
+#include "FireteamMeleeRules.h"
 #include <vector>
 
 class FireteamZombie : public BaseClass
@@ -40,6 +41,7 @@ private:
 
     HOBJECT FindNearestPlayer();
     void UpdateZombie(float fDeltaSeconds);
+    void ResolveMeleeStrike(HOBJECT hTarget, uint32 nInstance, uint32 nDeaths);
     void AdvanceSmoothMotion();
     void RebuildPath(const LTVector &vTarget);
     bool HasDirectPathToTarget(
@@ -70,6 +72,12 @@ private:
 
     uint16 m_nHealth;
     float m_fAttackCooldown;
+    FTMeleeRules::StrikeClock m_StrikeClock;
+    HOBJECT m_hPendingAttackTarget;
+    uint32 m_nAttackTargetInstance;
+    uint32 m_nAttackTargetDeaths;
+    HOBJECT m_hChaseTarget;
+    uint32 m_nChaseTargetInstance;
     float m_fAttackAnimationTime;
     float m_fJumpAnimationTime;
     float m_fRepathCooldown;

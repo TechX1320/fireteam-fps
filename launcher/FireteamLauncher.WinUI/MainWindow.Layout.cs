@@ -3282,6 +3282,14 @@ public sealed partial class MainWindow
         RadarToggle.OnContent = "On";
         RadarToggle.OffContent = "Off";
         display.Children.Add(LabeledControl("TOP-RIGHT RADAR", RadarToggle));
+        SetupNumberBox(RadarScaleBox, 0.75, 1.75, 0.05);
+        display.Children.Add(LabeledControl("RADAR SIZE (1.00 = NORMAL)", RadarScaleBox));
+        DamageFeedbackToggle.OnContent = "Direction + health warning";
+        DamageFeedbackToggle.OffContent = "Health bar only";
+        display.Children.Add(LabeledControl("DAMAGE FEEDBACK", DamageFeedbackToggle));
+        ReducedEffectsToggle.OnContent = "Reduced";
+        ReducedEffectsToggle.OffContent = "Normal";
+        display.Children.Add(LabeledControl("BLOOD / BANNER MOTION", ReducedEffectsToggle));
 
         var input =
             CardHeading(

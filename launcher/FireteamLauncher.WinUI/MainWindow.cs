@@ -124,6 +124,9 @@ public sealed partial class MainWindow : Window
     private readonly ComboBox ResolutionCombo = new();
     private readonly ToggleSwitch WindowedToggle = new();
     private readonly ToggleSwitch RadarToggle = new();
+    private readonly NumberBox RadarScaleBox = new();
+    private readonly ToggleSwitch DamageFeedbackToggle = new();
+    private readonly ToggleSwitch ReducedEffectsToggle = new();
     private readonly NumberBox SensitivityXBox = new();
     private readonly NumberBox SensitivityYBox = new();
     private readonly NumberBox VolumeBox = new();
@@ -357,6 +360,9 @@ public sealed partial class MainWindow : Window
 
         WindowedToggle.IsOn = settings.Windowed;
         RadarToggle.IsOn = settings.RadarEnabled;
+        RadarScaleBox.Value = settings.RadarScale;
+        DamageFeedbackToggle.IsOn = settings.DamageFeedback;
+        ReducedEffectsToggle.IsOn = settings.ReducedEffects;
         SensitivityXBox.Value = settings.SensitivityXMultiplier;
         SensitivityYBox.Value = settings.SensitivityYMultiplier;
         VolumeBox.Value = settings.Volume;
@@ -2225,7 +2231,10 @@ public sealed partial class MainWindow : Window
                 double.IsNaN(GammaBox.Value)
                     ? 1.0
                     : GammaBox.Value,
-                RadarToggle.IsOn);
+                RadarToggle.IsOn,
+                double.IsFinite(RadarScaleBox.Value) ? Math.Clamp(RadarScaleBox.Value, 0.75, 1.75) : 1.0,
+                DamageFeedbackToggle.IsOn,
+                ReducedEffectsToggle.IsOn);
 
             App.Instance.Services.Settings.SaveSettings(settings);
             SettingsStatusText.Text =

@@ -39,6 +39,8 @@ public:
     void        		Update();
     void        		UpdateMoveFlags(uint8 flags)							{ m_dwInputFlags |= flags; }
     void        		UpdateRotation(float yaw, float pitch, float roll);
+    void                SyncLookRotation(); // Current input before weapon fire ray
+
     void                SetControllerMoveAxes(float fForward, float fRight);
     void                UpdateWeaponView(bool bFirstPerson);
     bool                AltAttack();
@@ -123,6 +125,8 @@ private:
     HLOCALOBJ           m_hViewWeaponObject;
     bool                m_bViewWeaponAction;
     uint32              m_nViewAttackVariant;
+    float               m_fViewWeaponKick;
+    float               m_fLastViewWeaponKickTime;
     uint8               m_nWeaponSlot;
     float               m_fNextPrimaryClientShot;
     bool                m_bSemiAutoTriggerHeld;

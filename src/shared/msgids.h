@@ -57,6 +57,8 @@ enum EMessageID
         MSG_SC_ROUND_PREP,          // server->client Round 1 preparation seconds remaining
         MSG_SC_JOIN_WAIT,          // server->client queued new identity
         MSG_SC_RADAR,              // server->client bounded nearby teammate/infected dots
+        MSG_SC_DAMAGE_DIRECTION,   // source position + actual damage, victim only
+        MSG_SC_INTERMISSION,       // round + server time remaining; no round authority
 		MSG_LAST_MESSAGE			//last message marker, do not handle
 		
 };

@@ -50,8 +50,7 @@ if(-not (Test-Path -LiteralPath (Join-Path $rezLink "object.lto") -PathType Leaf
 $configDir = Join-Path $dedicated "config"
 New-Item -ItemType Directory -Path $configDir -Force | Out-Null
 $configFiles = @(
-    "weapons.cfg", "infected.cfg", "player.cfg", "characters.cfg",
-    "difficulties.cfg", "powerups.cfg", "loadouts.cfg", "weapon-library.cfg"
+    "weapons.cfg", "player.cfg", "loadouts.cfg", "weapon-library.cfg"
 )
 foreach($name in $configFiles) {
     $src = Join-Path $built ("config\" + $name)
@@ -65,6 +64,16 @@ foreach($name in $configFiles) {
         }
     }
 }
+
+# Seed from the live host's choices once, then preserve independent server
+# values. Apply additive timing defaults from source, never copy over tuning.
+foreach($name in @('infected.cfg','characters.cfg','difficulties.cfg','powerups.cfg')) {
+    $dest = Join-Path $configDir $name
+    if(-not (Test-Path -LiteralPath $dest)) {
+        Copy-Item -LiteralPath (Join-Path $built ("config\" + $name)) -Destination $dest
+    }
+}
+& (Join-Path $repo 'scripts\sync-gameplay-config.ps1') -SourceConfig (Join-Path $repo 'config') -DestinationConfig $configDir
 
 # The server's gameplay settings MUST NOT change when a player launches
 # Lithtech.exe from BUILT (GameLaunchService writes BUILT/config/session.cfg).

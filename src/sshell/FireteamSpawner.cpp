@@ -65,6 +65,7 @@ static uint32 s_nMaxAlive = 0;
 static float s_fNextSpawnTime = 0.0f;
 static float s_fNextRoundTime = 0.0f;
 static float s_fSpawnInterval = 1.25f;
+static float s_fRoundStartedAt = 0.0f;
 static float s_fMissingInfectedSince = 0.0f;
 // Crash-resilient local match files: overwrite the same record each 15s.
 static const float kMatchCheckpointInterval = 15.0f;
@@ -319,6 +320,20 @@ static void FT_SendRoundState(uint8 nState, HCLIENT hClient)
         MESSAGE_GUARANTEED);
 
     pMsg->DecRef();
+    // A separate appended message preserves all existing packet layouts.
+    if(nState == 0 && !hClient) return;
+    ILTMessage_Write *pBreak = LTNULL;
+    if(g_pLTSCommon->CreateMessage(pBreak) == LT_OK && pBreak)
+    {
+        const float remaining = s_bRoundIntermission
+            ? s_fNextRoundTime - g_pLTServer->GetTime() : 0.0f;
+        pBreak->IncRef();
+        pBreak->Writeuint8(MSG_SC_INTERMISSION);
+        pBreak->Writeuint16((uint16)s_nRound);
+        pBreak->Writefloat(remaining > 0.0f ? remaining : 0.0f);
+        g_pLTServer->SendToClient(pBreak->Read(), hClient, MESSAGE_GUARANTEED);
+        pBreak->DecRef();
+    }
 }
 
 static void FT_BroadcastRoundState(uint8 nState)
@@ -1087,6 +1102,7 @@ void Spawner::StartNextRound()
     }
 
     ++s_nRound;
+    s_fRoundStartedAt = g_pLTServer->GetTime();
 
     // Admit first-time connections at round boundaries, not mid-wave.
     HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
@@ -1591,6 +1607,10 @@ void FT_OnFireteamEnemyKilled()
                 s_nRound,
                 s_Difficulty.fIntermissionSeconds);
 
+            g_pLTServer->CPrint(
+                "Fireteam pacing: round=%u seconds=%.2f target=%u peak_limit=%u bosses=%u restores=%u.",
+                s_nRound, g_pLTServer->GetTime() - s_fRoundStartedAt,
+                s_nRoundTarget, s_nMaxAlive, s_nTankersSpawned, s_nMissingInfectedRestores);
             FT_BroadcastRoundState(2);
 
             FT_SpawnRoundClearMutationBoxes();

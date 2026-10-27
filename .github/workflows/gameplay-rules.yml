@@ -1,0 +1,76 @@
+name: Gameplay validation
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "config/**"
+      - "launcher/**"
+      - "tests/**"
+      - "scripts/**"
+      - ".github/workflows/gameplay-rules.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "config/**"
+      - "launcher/**"
+      - "tests/**"
+      - "scripts/**"
+      - ".github/workflows/gameplay-rules.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-rules:
+    name: Portable rules (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure portable tests (no proprietary SDK, native Win32 on Windows)
+        shell: pwsh
+        run: |
+          if ($IsWindows) { cmake -S tests -B out/portable -A Win32 }
+          else { cmake -S tests -B out/portable -DCMAKE_BUILD_TYPE=Debug }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compile
+        run: cmake --build out/portable --config Debug
+      - name: Run regression tests
+        run: ctest --test-dir out/portable -C Debug --output-on-failure
+      - name: Package exact tracked source snapshot
+        if: matrix.os == 'ubuntu-latest' && github.event_name != 'pull_request'
+        run: |
+          mkdir -p out/review
+          git archive --format=zip --output=out/review/fireteam-source.zip HEAD
+          git rev-parse HEAD > out/review/SOURCE_COMMIT.txt
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest' && github.event_name != 'pull_request'
+        with:
+          name: fireteam-source-${{ github.sha }}
+          path: out/review/
+          retention-days: 14
+          if-no-files-found: error
+
+  launcher:
+    name: Windows launcher and settings
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test actual settings service without UI
+        run: dotnet run --project tests/LauncherSettings.Tests/LauncherSettings.Tests.csproj -c Release
+      - name: Publish actual WinUI launcher (no proprietary game SDK)
+        run: dotnet publish launcher/FireteamLauncher.WinUI/FireteamLauncher.WinUI.csproj -c Release -r win-x64 -p:Platform=x64 -o out/launcher-ci
+      - name: Verify launch resources
+        shell: pwsh
+        run: |
+          foreach ($file in @('FireteamLauncher.exe', 'FireteamLauncher.pri', 'FireteamLauncher.dll')) {
+            if (!(Test-Path "out/launcher-ci/$file")) { throw "Missing launcher output: $file" }
+          }

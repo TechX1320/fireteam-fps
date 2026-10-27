@@ -20,6 +20,8 @@ struct FTInfectedDef
     uint8 nAttackDamage;
     float fAttackRange;
     float fAttackCooldown;
+    float fAttackWindupSeconds;
+    float fAttackRecoverySeconds;
     float fUpdateSeconds;
     // Collision-aware movement substeps per AI decision. 1 = original 10 Hz.
     uint8 nMotionSubsteps;
@@ -157,6 +159,10 @@ inline void FT_ApplyInfectedValue(
         def.fAttackRange = (float)atof(pValue);
     else if(_stricmp(pKey, "attack_cooldown") == 0)
         def.fAttackCooldown = (float)atof(pValue);
+    else if(_stricmp(pKey, "attack_windup_seconds") == 0)
+        def.fAttackWindupSeconds = (float)atof(pValue);
+    else if(_stricmp(pKey, "attack_recovery_seconds") == 0)
+        def.fAttackRecoverySeconds = (float)atof(pValue);
     else if(_stricmp(pKey, "update_seconds") == 0)
         def.fUpdateSeconds = (float)atof(pValue);
     else if(_stricmp(pKey, "motion_substeps") == 0)

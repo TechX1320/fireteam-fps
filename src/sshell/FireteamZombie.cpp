@@ -1,5 +1,7 @@
 #include "FireteamZombie.h"
 #include "FireteamHitMath.h"
+#include "FireteamAnimationRules.h"
+#include "FireteamMeleeRules.h"
 #include "FireteamNavigation.h"
 #include "FireteamSpawner.h"
 #include "FireteamMutationBox.h"
@@ -40,6 +42,7 @@ void FT_ResetZombieNeighborCache()
 {
     s_aZombieNeighbors.clear();
     s_fLastNeighborSnapshot = -1.0f;
+    s_bDifficultyLoaded = false; // The next map may use another difficulty.
 }
 
 static const std::vector<FTZombieNeighborSample>& FT_GetZombieNeighborSnapshot()
@@ -83,6 +86,11 @@ static bool s_bZombieWallhackApplied = false;
 FireteamZombie::FireteamZombie() :
     m_nHealth(0),
     m_fAttackCooldown(0.0f),
+    m_hPendingAttackTarget(LTNULL),
+    m_nAttackTargetInstance(0),
+    m_nAttackTargetDeaths(0),
+    m_hChaseTarget(LTNULL),
+    m_nChaseTargetInstance(0),
     m_fAttackAnimationTime(0.0f),
     m_fJumpAnimationTime(0.0f),
     m_fRepathCooldown(0.0f),
@@ -411,6 +419,66 @@ static void FT_AuditSpecialInfectedVariant(
     }
 }
 
+
+// Last-resort attack discovery for legacy character profiles where all three
+// attack_anim keys were deliberately left blank. This is a runtime model
+// query, not a guessed animation index. Player melee uses UMFi in the current
+// codebase, but its presence on a particular infected skeleton is checked.
+// Candidate reports are generated locally from the user's own LTB files.
+struct FTInfectedAttackProbe
+{
+    bool bAudited;
+    char sResolved[64];
+};
+static FTInfectedAttackProbe s_AttackProbes[3] = {};
+
+static int FT_InfectedAttackProbeIndex(const char *pId)
+{
+    if(_stricmp(pId, "infected_assassin") == 0) return 1;
+    if(_stricmp(pId, "infected_tanker") == 0) return 2;
+    return 0;
+}
+
+static const char* FT_ResolveInfectedAttackClip(HOBJECT hZombie,
+    const FTInfectedDef &def)
+{
+    const int nType = FT_InfectedAttackProbeIndex(def.sId);
+    FTInfectedAttackProbe &probe = s_AttackProbes[nType];
+    if(probe.bAudited) return probe.sResolved[0] ? probe.sResolved : LTNULL;
+    probe.bAudited = true;
+    probe.sResolved[0] = '\0';
+
+    // This name is from the existing player melee implementation. Unlike an
+    // assumed zombie clip, it must resolve on the actual composed infected.
+    if(g_pLTServer->GetAnimIndex(hZombie, (char*)"UMFi") != INVALID_MODEL_ANIM)
+        FT_CopyInfectedString(probe.sResolved, sizeof(probe.sResolved), "UMFi");
+
+    const char *pReport = nType == 1
+        ? "rez/Fireteam/ANI_VI_ASSASSIN_CH-strings.txt"
+        : nType == 2 ? "rez/Fireteam/ANI_VI_TANKER_SH-strings.txt"
+            : "rez/Fireteam/ST_M_CHILD-strings.txt";
+    FILE *pFile = fopen(pReport, "rt");
+    if(pFile)
+    {
+        char sLine[128];
+        while(fgets(sLine, sizeof(sLine), pFile))
+        {
+            char *pName = FT_TrimInfectedLine(sLine);
+            if(!FTAnimationRules::IsAttackNamedCandidate(pName)) continue;
+            if(g_pLTServer->GetAnimIndex(hZombie, pName) == INVALID_MODEL_ANIM)
+                continue;
+            // Prefer a model-specific named strike over the generic UMFi.
+            FT_CopyInfectedString(probe.sResolved, sizeof(probe.sResolved), pName);
+            break;
+        }
+        fclose(pFile);
+    }
+    g_pLTServer->CPrint(
+        "Fireteam attack animation: %s automatic=%s (report=%s)",
+        def.sId, probe.sResolved[0] ? probe.sResolved : "NOT FOUND",
+        pReport);
+    return probe.sResolved[0] ? probe.sResolved : LTNULL;
+}
 
 static float FT_ZombieWallhackStackSeconds(
     float fBaseSeconds,
@@ -964,11 +1032,8 @@ void FireteamZombie::SetZombieAnimation(
     const char *pAnimation,
     bool bLooping)
 {
-    if(!pAnimation ||
-       !pAnimation[0] ||
-       strcmp(
-           m_sCurrentAnimation,
-           pAnimation) == 0)
+    if(FTAnimationRules::ShouldSkipAnimation(
+        m_sCurrentAnimation, pAnimation, bLooping))
     {
         return;
     }
@@ -1016,6 +1081,10 @@ void FireteamZombie::SetZombieAnimation(
         m_hObject,
         MAIN_TRACKER,
         bLooping ? LTTRUE : LTFALSE);
+    // A second strike often reuses the same one-shot clip. Resetting time
+    // prevents the previous swing's final/crouched frame from being held.
+    if(!bLooping)
+        g_pLTSModel->SetCurAnimTime(m_hObject, MAIN_TRACKER, 0);
 
     if(bKeepStridePhase)
     {
@@ -1351,7 +1420,10 @@ HOBJECT FireteamZombie::FindNearestPlayer()
     g_pLTServer->GetObjectPos(m_hObject, &vMyPos);
 
     HOBJECT hBest = LTNULL;
+    uint32 nBestInstance = 0;
     float fBestDist = FLT_MAX;
+    float fCurrentDist = FLT_MAX;
+    bool bCurrentValid = false;
 
     for(HOBJECT hObj = g_pLTServer->GetNextObject(LTNULL);
         hObj;
@@ -1374,13 +1446,23 @@ HOBJECT FireteamZombie::FindNearestPlayer()
         g_pLTServer->GetObjectPos(hObj, &vPlayerPos);
         float fDist = vMyPos.DistSqr(vPlayerPos);
 
+        if(hObj == m_hChaseTarget &&
+           pPlayer->GetCombatInstance() == m_nChaseTargetInstance)
+        {
+            bCurrentValid = true;
+            fCurrentDist = fDist;
+        }
         if(fDist < fBestDist)
         {
             fBestDist = fDist;
             hBest = hObj;
+            nBestInstance = pPlayer->GetCombatInstance();
         }
     }
-
+    if(bCurrentValid && FTMeleeRules::KeepTarget(fCurrentDist, fBestDist))
+        return m_hChaseTarget;
+    m_hChaseTarget = hBest;
+    m_nChaseTargetInstance = nBestInstance;
     return hBest;
 }
 
@@ -1602,6 +1684,43 @@ void FireteamZombie::AdvanceSmoothMotion()
     --m_nMotionStepsRemaining;
 }
 
+void FireteamZombie::ResolveMeleeStrike(
+    HOBJECT hTarget, uint32 nInstance, uint32 nDeaths)
+{
+    if(!hTarget || m_bDying || m_nHealth == 0) return;
+    // Do not dereference a cached HOBJECT after a disconnect. Match it against
+    // live objects first, then verify generation and life. A recycled handle
+    // must not transfer an old swing onto a new player or a respawned life.
+    HOBJECT hLive = LTNULL;
+    for(HOBJECT h = g_pLTServer->GetNextObject(LTNULL); h;
+        h = g_pLTServer->GetNextObject(h))
+        if(h == hTarget) { hLive = h; break; }
+    if(!hLive) return;
+    HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
+    HCLASS hTargetClass = g_pLTServer->GetObjectClass(hLive);
+    if(!hPlayerClass || !hTargetClass ||
+       !g_pLTServer->IsKindOf(hTargetClass, hPlayerClass)) return;
+    CPlayerSrvr *pPlayer = (CPlayerSrvr*)g_pLTServer->HandleToObject(hLive);
+    if(!pPlayer || !FTMeleeRules::SameLife(nInstance, nDeaths,
+       pPlayer->GetCombatInstance(), pPlayer->GetMatchDeaths(), pPlayer->IsTargetable())) return;
+
+    LTVector vZombie, vPlayer;
+    g_pLTServer->GetObjectPos(m_hObject, &vZombie);
+    g_pLTServer->GetObjectPos(hTarget, &vPlayer);
+    const LTVector vOffset = vPlayer - vZombie;
+    // Never hit a teammate on another floor based on X/Z distance alone.
+    // Validated collision half-height provides room for stairs and slopes.
+    if(!FTMeleeRules::CanConnect(
+        vOffset.x, vOffset.y, vOffset.z,
+        m_Def.fAttackRange, m_vCollisionDims.y + 18.0f))
+        return;
+
+    if(!CanSeeTarget(hTarget, vZombie, vPlayer))
+        return;
+
+    pPlayer->ApplyDamage(m_Def.nAttackDamage, &vZombie);
+}
+
 void FireteamZombie::UpdateZombie(float fDeltaSeconds)
 {
     FT_UpdateZombieWallhackState();
@@ -1639,6 +1758,28 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
         m_fVoiceCooldown -= kUpdate;
     if(m_fAttackVoiceCooldown > 0.0f)
         m_fAttackVoiceCooldown -= kUpdate;
+
+    const float fAttackNow = g_pLTServer->GetTime();
+    if(m_StrikeClock.TakeImpact(fAttackNow))
+    {
+        ResolveMeleeStrike(m_hPendingAttackTarget,
+            m_nAttackTargetInstance, m_nAttackTargetDeaths);
+        m_hPendingAttackTarget = LTNULL;
+    }
+    if(m_StrikeClock.Locked(fAttackNow))
+    {
+        // Never freeze on the last non-looping strike pose while recovery
+        // continues. The authoritative attack clock is not interrupted.
+        if(!m_hPendingAttackTarget && m_fAttackAnimationTime <= 0.0f)
+            SetZombieAnimation(m_Def.sIdleAnim, true);
+        // A committed swing cannot chase/turn with a dodging player. Recovery
+        // also applies to a missed swing, making a heavy attack punishable.
+        LTVector vStop(0.0f, 0.0f, 0.0f);
+        g_pLTSPhysics->SetVelocity(m_hObject, &vStop);
+        m_nMotionStepsRemaining = 0;
+        m_eBehaviorState = kBehaviorAttack;
+        return;
+    }
 
     const BehaviorState ePreviousBehavior =
         m_eBehaviorState;
@@ -1760,7 +1901,8 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
             kBehaviorSearch;
     }
 
-    if(fPlayerDistance <= kAttackRange &&
+    if(FTMeleeRules::CanConnect(vTarget.x - vPos.x, vTarget.y - vPos.y,
+           vTarget.z - vPos.z, kAttackRange, m_vCollisionDims.y + 18.0f) &&
        bCanSeePlayer)
     {
         m_eBehaviorState =
@@ -1824,14 +1966,17 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
                          nAttackTry) %
                         3];
 
-                if(pCandidate &&
-                   pCandidate[0])
+                if(pCandidate && pCandidate[0] &&
+                   g_pLTServer->GetAnimIndex(m_hObject, (char*)pCandidate) != INVALID_MODEL_ANIM)
                 {
                     pAttackAnimation =
                         pCandidate;
                     break;
                 }
             }
+
+            if(!pAttackAnimation)
+                pAttackAnimation = FT_ResolveInfectedAttackClip(m_hObject, m_Def);
 
             if(pAttackAnimation)
             {
@@ -1843,6 +1988,15 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
                     m_Def.fAttackAnimSeconds > 0.0f
                     ? m_Def.fAttackAnimSeconds
                     : 0.65f;
+                // A selected LTB one-shot may be shorter than the default
+                // config timing. Let its actual clip length determine when
+                // recovery returns to a looping idle instead of freezing on
+                // the crouched final frame.
+                uint32 nAttackLengthMs = 0;
+                if(g_pLTSModel->GetCurAnimLength(m_hObject, MAIN_TRACKER,
+                       nAttackLengthMs) == LT_OK &&
+                   nAttackLengthMs >= 100 && nAttackLengthMs <= 3500)
+                    m_fAttackAnimationTime = (float)nAttackLengthMs * 0.001f;
             }
             else
             {
@@ -1853,15 +2007,26 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
                     0.0f;
             }
 
-            CPlayerSrvr *pPlayer =
-                (CPlayerSrvr*)
-                g_pLTServer->HandleToObject(
-                    hTarget);
-
-            if(pPlayer)
+            const float fWindup = FTMeleeRules::WindupSeconds(
+                m_Def.fAttackWindupSeconds, m_Def.fAttackCooldown);
+            const float fRecovery = FTMeleeRules::RecoverySeconds(
+                m_Def.fAttackRecoverySeconds, m_Def.fAttackCooldown, fWindup);
+            CPlayerSrvr *pVictim = (CPlayerSrvr*)g_pLTServer->HandleToObject(hTarget);
+            if(!pVictim || !pVictim->IsTargetable())
             {
-                pPlayer->ApplyDamage(
-                    m_Def.nAttackDamage);
+                m_hPendingAttackTarget = LTNULL;
+                m_StrikeClock.Cancel();
+                m_nMotionStepsRemaining = 0;
+                return;
+            }
+            m_hPendingAttackTarget = hTarget;
+            m_nAttackTargetInstance = pVictim->GetCombatInstance();
+            m_nAttackTargetDeaths = pVictim->GetMatchDeaths();
+            m_StrikeClock.Begin(fAttackNow, fWindup, fRecovery);
+            if(m_StrikeClock.TakeImpact(fAttackNow))
+            {
+                ResolveMeleeStrike(hTarget, m_nAttackTargetInstance, m_nAttackTargetDeaths);
+                m_hPendingAttackTarget = LTNULL;
             }
 
             // Alert barks must not silence the first melee strike.
@@ -1871,7 +2036,8 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
                     (int)m_Def.nVoiceAttackChance)
             {
                 PlayAttackVoice();
-                m_fAttackVoiceCooldown = 1.10f;
+                m_fAttackVoiceCooldown = FTCombatRules::Clamp(
+                    m_Def.fAttackCooldown, 0.25f, 1.10f, 1.10f);
             }
 
             m_fAttackCooldown =
@@ -2579,8 +2745,9 @@ bool FireteamZombie::TraceTightBulletHit(
     };
     const FTHitMath::Vec3 radii[3] = {
         FTHitMath::Vec3(rx * 0.41f, ry * 0.18f, rz * 0.43f),
-        FTHitMath::Vec3(rx * 0.63f, ry * 0.51f, rz * 0.63f),
-        FTHitMath::Vec3(rx * 0.46f, ry * 0.39f, rz * 0.46f)
+        FTHitMath::Vec3(FTHitMath::TorsoRadius(rx),
+                         ry * 0.51f, FTHitMath::TorsoRadius(rz)),
+        FTHitMath::Vec3(rx * 0.52f, ry * 0.39f, rz * 0.52f)
     };
 
     bool bValid = false;
@@ -2947,15 +3114,23 @@ uint32 FireteamZombie::EngineMessageFn(uint32 messageID, void *pData, LTFLOAT fD
                         m_hObject, &vModel,
                         g_pLTServer->GetModelAnimation(m_hObject)) == LT_OK)
                     {
-                        // A suspiciously huge model is NOT permission to
-                        // make a huge bullet target. Small plausible bounds
-                        // can make collision tighter, never larger.
-                        if(vModel.x >= 8.0f && vModel.x < vHumanDims.x)
-                            vHumanDims.x = vModel.x;
-                        if(vModel.y >= 22.0f && vModel.y < vHumanDims.y)
-                            vHumanDims.y = vModel.y;
-                        if(vModel.z >= 8.0f && vModel.z < vHumanDims.z)
-                            vHumanDims.z = vModel.z;
+                        // Animation user dims are NOT a reliable silhouette:
+                        // a stock idle/crouch clip may report a tiny box.
+                        // The same physics box is the engine's initial bullet
+                        // broad phase, so aggressive shrinking discards real
+                        // shots before tight-hit validation even runs. Only
+                        // accept a modest reduction from the validated,
+                        // authored body dimensions (never an expansion).
+                        if(FTHitMath::SafeModelHalfExtent(
+                               vHumanDims.x, vModel.x)) vHumanDims.x = vModel.x;
+                        if(FTHitMath::SafeModelHalfExtent(
+                               vHumanDims.y, vModel.y)) vHumanDims.y = vModel.y;
+                        if(FTHitMath::SafeModelHalfExtent(
+                               vHumanDims.z, vModel.z)) vHumanDims.z = vModel.z;
+                        g_pLTServer->CPrint(
+                            "Fireteam hitbox audit: %s animation_dims=%.1f %.1f %.1f kept=%.1f %.1f %.1f",
+                            m_Def.sId, vModel.x, vModel.y, vModel.z,
+                            vHumanDims.x, vHumanDims.y, vHumanDims.z);
                     }
                 }
 
@@ -3102,6 +3277,8 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
         if(m_nHealth == 0)
         {
             m_bDying = true;
+            m_hPendingAttackTarget = LTNULL;
+            m_StrikeClock.Cancel();
             m_fDeathTimeRemaining =
                 m_Def.fDeathSeconds > 0.0f
                 ? m_Def.fDeathSeconds

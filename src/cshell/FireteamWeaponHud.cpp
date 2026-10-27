@@ -1,6 +1,8 @@
 #include "FireteamWeaponHud.h"
+#include "FireteamRoundHud.h"
 #include "clientinterfaces.h"
 #include "FireteamWeaponDefs.h"
+#include "FireteamCombatRules.h"
 
 #include <iltclient.h>
 #include <iltdrawprim.h>
@@ -14,10 +16,23 @@ static CUIFormattedPolyString *s_pWeaponName = LTNULL;
 static CUIFormattedPolyString *s_pQaMenuText = LTNULL;
 static FTWeaponDef s_WeaponDefs[6];
 
+static bool s_bReloading = false;
+static float s_fReloadRemaining = 0;
+void FT_WeaponHudSetReload(bool reloading, float remaining)
+{
+    s_bReloading = reloading;
+    s_fReloadRemaining = FTCombatRules::Clamp(remaining, 0, 30, 0);
+}
 static uint16 s_nPrimaryClip = 30;
 static uint16 s_nPrimaryReserve = 90;
 
 static float s_fCrosshairKick = 0.0f;
+static float s_fConfirmedHitUntil = 0.0f;
+void FT_WeaponHudConfirmedHit()
+{
+    // Only called after authoritative MSG_SC_COMBAT_FEEDBACK/HIT.
+    if(g_pLTClient) s_fConfirmedHitUntil = g_pLTClient->GetTime() + 0.12f;
+}
 static float s_fLastCrosshairTime = 0.0f;
 static uint8 s_nCrosshairSlot = 0;
 static uint32 s_nQaCurrent = 0;
@@ -350,6 +365,27 @@ void FT_RenderWeaponHud(
         }
     }
 
+    if((bShowCrosshair || bScoped) && pDef &&
+       fNow < s_fConfirmedHitUntil)
+    {
+        // Four tiny corner ticks: short enough not to obscure the target,
+        // never displayed on a speculative shot or rejected collision.
+        const float cx = (float)nScreenW * 0.5f;
+        const float cy = (float)nScreenH * 0.5f;
+        const uint8 alpha = (uint8)(225.0f *
+            FTCombatRules::Clamp((s_fConfirmedHitUntil - fNow)/0.12f,
+                0.0f, 1.0f, 0.0f));
+        LT_POLYF4 ticks[4];
+        FT_SetupQuad(ticks[0], cx-13, cy-8, 4, 2, 120,255,215,alpha);
+        FT_SetupQuad(ticks[1], cx+9, cy-8, 4, 2, 120,255,215,alpha);
+        FT_SetupQuad(ticks[2], cx-13, cy+6, 4, 2, 120,255,215,alpha);
+        FT_SetupQuad(ticks[3], cx+9, cy+6, 4, 2, 120,255,215,alpha);
+        FT_SetDrawState();
+        g_pLTCDrawPrim->BeginDrawPrim();
+        g_pLTCDrawPrim->DrawPrim(ticks, 4);
+        g_pLTCDrawPrim->EndDrawPrim();
+    }
+
     if(bShowCrosshair && pDef)
     {
         const float cx = (float)nScreenW * 0.5f;
@@ -460,7 +496,7 @@ void FT_RenderWeaponHud(
         else
         {
             s_pWeaponName->SetPosition(
-                (float)nScreenW - 210.0f,
+                (float)nScreenW - s_pWeaponName->GetWidth() - 28.0f,
                 (float)nScreenH - 102.0f);
         }
         s_pWeaponName->Render();
@@ -586,18 +622,23 @@ void FT_RenderWeaponHud(
 
     if(s_pAmmoText)
     {
-        char szAmmo[32];
+        char szAmmo[80];
 
-        // NOLF2 HUDAmmo convention: clip / reserve.
-        sprintf(
-            szAmmo,
-            "%u/%u",
-            (uint32)s_nPrimaryClip,
-            (uint32)s_nPrimaryReserve);
-
+        const bool bBottomless = FT_RoundHudIsBottomlessActive();
+        if(bBottomless)
+            sprintf(szAmmo, "BOTTOMLESS  %u/%u", (unsigned)s_nPrimaryClip, (unsigned)s_nPrimaryReserve);
+        else if(s_bReloading)
+            sprintf(szAmmo, "RELOADING %.1fs  %u/%u", s_fReloadRemaining,
+                (unsigned)s_nPrimaryClip, (unsigned)s_nPrimaryReserve);
+        else if(s_nPrimaryClip == 0 && s_nPrimaryReserve == 0)
+            sprintf(szAmmo, "EMPTY  0/0");
+        else if(s_nPrimaryClip == 0)
+            sprintf(szAmmo, "R: RELOAD  0/%u", (unsigned)s_nPrimaryReserve);
+        else sprintf(szAmmo, "%u/%u", (unsigned)s_nPrimaryClip, (unsigned)s_nPrimaryReserve);
         s_pAmmoText->SetText(szAmmo);
+        s_pAmmoText->SetColor(s_nPrimaryClip == 0 && !bBottomless ? 0xFFFFC070 : 0xFFFFFFFF);
         s_pAmmoText->SetPosition(
-            (float)nScreenW - 118.0f,
+            (float)nScreenW - s_pAmmoText->GetWidth() - 28.0f,
             (float)nScreenH - 72.0f);
         s_pAmmoText->Render();
     }

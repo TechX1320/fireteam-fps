@@ -139,13 +139,19 @@ if exist "%ASSET_REZ%" (
   if errorlevel 1 goto :copyfail
 )
 
-copy /y "config\autoexec.cfg" "%BUILT_DIR%\autoexec.cfg" >nul
-if errorlevel 1 goto :copyfail
+if not exist "%BUILT_DIR%\autoexec.cfg" (
+  copy /y "config\autoexec.cfg" "%BUILT_DIR%\autoexec.cfg" >nul
+  if errorlevel 1 goto :copyfail
+) else (
+  echo [KEEP] Local autoexec.cfg unchanged.
+)
 copy /y "config\run-normal.cmd" "%BUILT_DIR%\run-normal.cmd" >nul
 if errorlevel 1 goto :copyfail
 copy /y "config\run-cabinfever.cmd" "%BUILT_DIR%\run-cabinfever.cmd" >nul
 if errorlevel 1 goto :copyfail
 if not exist "%BUILT_DIR%\config" mkdir "%BUILT_DIR%\config" >nul
+powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\sync-gameplay-config.ps1" -SourceConfig "%CD%\config" -DestinationConfig "%BUILT_DIR%\config"
+if errorlevel 1 goto :fail
 if not exist "%BUILT_DIR%\config\hub-url.txt" (
   echo [SEED] Optional FIRETEAM Hub URL config ^(offline until set^).
   copy /y "config\hub-url.txt" "%BUILT_DIR%\config\hub-url.txt" >nul
@@ -160,8 +166,6 @@ if not exist "%BUILT_DIR%\config\weapons.cfg" (
 ) else (
   echo [KEEP] Local weapons.cfg unchanged; source sync is MANUAL.
 )
-copy /y "config\infected.cfg" "%BUILT_DIR%\config\infected.cfg" >nul
-if errorlevel 1 goto :copyfail
 if not exist "%BUILT_DIR%\config\player.cfg" (
   echo [SEED] Missing local player.cfg; copying template once.
   copy /y "config\player.cfg" "%BUILT_DIR%\config\player.cfg" >nul
@@ -169,10 +173,6 @@ if not exist "%BUILT_DIR%\config\player.cfg" (
 ) else (
   echo [KEEP] Local player.cfg unchanged; source sync is MANUAL.
 )
-copy /y "config\characters.cfg" "%BUILT_DIR%\config\characters.cfg" >nul
-if errorlevel 1 goto :copyfail
-copy /y "config\difficulties.cfg" "%BUILT_DIR%\config\difficulties.cfg" >nul
-if errorlevel 1 goto :copyfail
 if not exist "%BUILT_DIR%\config\session.cfg" (
   echo [SEED] Missing session.cfg; copying template once.
   copy /y "config\session.cfg" "%BUILT_DIR%\config\session.cfg" >nul
@@ -180,8 +180,6 @@ if not exist "%BUILT_DIR%\config\session.cfg" (
 ) else (
   echo [KEEP] Local session.cfg ^(difficulty and stats tracking^) unchanged.
 )
-copy /y "config\powerups.cfg" "%BUILT_DIR%\config\powerups.cfg" >nul
-if errorlevel 1 goto :copyfail
 if not exist "%BUILT_DIR%\config\loadouts.cfg" (
   echo [SEED] Missing local loadouts.cfg; copying template once.
   copy /y "config\loadouts.cfg" "%BUILT_DIR%\config\loadouts.cfg" >nul

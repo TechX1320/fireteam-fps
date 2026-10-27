@@ -7,6 +7,19 @@
 
 namespace FTHitMath
 {
+    // Model animation user dimensions are posture-specific. Never let a
+    // crouch/idle frame permanently shrink the authoritative bullet broad
+    // phase to a tiny target. Body caps come from the server, not the client.
+    inline bool SafeModelHalfExtent(float authored, float sampled)
+    {
+        return authored > 0.0f && sampled > 0.0f &&
+            sampled >= authored * 0.90f && sampled < authored;
+    }
+    inline float TorsoRadius(float collisionHalfExtent)
+    {
+        // Chest/shoulder shell stays inside the server-clamped physical box.
+        return collisionHalfExtent * 0.78f;
+    }
     struct Vec3
     {
         float x, y, z;
@@ -20,30 +33,35 @@ namespace FTHitMath
         if(!(radii.x > 0.0f && radii.y > 0.0f && radii.z > 0.0f) ||
            !(maxDistance > 0.0f))
             return false;
-        const float ox = (from.x - center.x) / radii.x;
-        const float oy = (from.y - center.y) / radii.y;
-        const float oz = (from.z - center.z) / radii.z;
-        const float dx = direction.x / radii.x;
-        const float dy = direction.y / radii.y;
-        const float dz = direction.z / radii.z;
+        // Float discriminants suffer catastrophic cancellation once the
+        // target is thousands of units away: an on-silhouette shot can be
+        // reported as a miss (or an off-target shot as a hit). Work in
+        // double precision for both local coordinates and quadratic math.
+        // The input ray remains the server-validated world ray.
+        const double ox = ((double)from.x - center.x) / radii.x;
+        const double oy = ((double)from.y - center.y) / radii.y;
+        const double oz = ((double)from.z - center.z) / radii.z;
+        const double dx = (double)direction.x / radii.x;
+        const double dy = (double)direction.y / radii.y;
+        const double dz = (double)direction.z / radii.z;
 
-        const float a = dx * dx + dy * dy + dz * dz;
-        const float halfB = ox * dx + oy * dy + oz * dz;
-        const float c = ox * ox + oy * oy + oz * oz - 1.0f;
-        if(!(a > 0.00000001f))
+        const double a = dx * dx + dy * dy + dz * dz;
+        const double halfB = ox * dx + oy * dy + oz * dz;
+        const double c = ox * ox + oy * oy + oz * oz - 1.0;
+        if(!(a > 0.00000001))
             return false;
-        const float discriminant = halfB * halfB - a * c;
-        if(!(discriminant >= 0.0f))
+        const double discriminant = halfB * halfB - a * c;
+        if(!(discriminant >= 0.0))
             return false;
 
-        const float root = sqrtf(discriminant);
+        const double root = sqrt(discriminant);
         // Beginning inside the body is a legitimate short-range collision.
-        const float t = c <= 0.0f ? 0.0f :
-            (-halfB - root >= 0.0f
+        const double t = c <= 0.0 ? 0.0 :
+            (-halfB - root >= 0.0
                 ? (-halfB - root) / a : (-halfB + root) / a);
-        if(!(t >= 0.0f && t <= maxDistance))
+        if(!(t >= 0.0 && t <= (double)maxDistance))
             return false;
-        outDistance = t;
+        outDistance = (float)t;
         return true;
     }
 }

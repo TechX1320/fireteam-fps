@@ -38,6 +38,8 @@
 #include "FireteamDifficultyDefs.h"
 #include "FireteamZombie.h"
 #include "FireteamSpawner.h"
+#include "FireteamAimRules.h"
+#include "FireteamCombatRules.h"
 
 
 //-----------------------------------------------------------------------------
@@ -150,68 +152,18 @@ static void FT_ApplyWeaponPerturb(
     bool bZoomed,
     LTVector &vDirection)
 {
-    if(def.nMaxPerturb <
-       def.nMinPerturb)
+    float fMove = 0.0f;
+    if(def.fZoomFovDegrees <= 0.0f && hPlayer)
     {
-        return;
-    }
-
-    uint32 nPerturb =
-        def.nMinPerturb;
-
-    // Existing curated configs predate CA MinPerturb/MaxPerturb import.
-    // Keep them playable, but make an unscoped shot from a scoped rifle
-    // meaningfully inaccurate until the next attribute import fills the
-    // real Combat Arms values.
-    if(def.nMaxPerturb == 0 &&
-       def.fZoomFovDegrees > 0.0f)
-    {
-        nPerturb =
-            bZoomed
-            ? 0
-            : 90;
-    }
-
-    if(def.fZoomFovDegrees > 0.0f)
-    {
-        // Scoped rifles are deliberately inaccurate from the hip/no-scope.
-        // A real scoped shot receives the CA MinPerturb value.
-        nPerturb =
-            bZoomed
-            ? def.nMinPerturb
-            : def.nMaxPerturb;
-    }
-    else if(hPlayer)
-    {
-        // NOLF2/CA interpolate between MinPerturb and MaxPerturb using a
-        // dynamic perturb factor. FIRETEAM currently derives that factor from
-        // player movement until recoil/bloom state is added.
         LTVector vVelocity;
-        g_pLTSPhysics->GetVelocity(
-            hPlayer,
-            &vVelocity);
-
-        vVelocity.y =
-            0.0f;
-
-        float fMove =
-            vVelocity.Mag() /
-            435.0f;
-
-        if(fMove < 0.0f)
-            fMove = 0.0f;
-        if(fMove > 1.0f)
-            fMove = 1.0f;
-
-        nPerturb =
-            def.nMinPerturb +
-            (uint32)(
-                ((float)(
-                    def.nMaxPerturb -
-                    def.nMinPerturb) *
-                 fMove) +
-                0.5f);
+        g_pLTSPhysics->GetVelocity(hPlayer, &vVelocity);
+        vVelocity.y = 0.0f;
+        fMove = vVelocity.Mag() / 435.0f;
     }
+
+    const uint32 nPerturb = FTAimRules::SelectPerturb(
+        def.nMinPerturb, def.nMaxPerturb,
+        def.fZoomFovDegrees > 0.0f, bZoomed, fMove);
 
     if(nPerturb == 0)
     {
@@ -236,10 +188,13 @@ static void FT_ApplyWeaponPerturb(
         vRight.Normalize();
     }
 
+    // Up is perpendicular to the actual aim, including steep pitches.
+    // World-up shifts upward-looking shots off the intended aim cone.
     LTVector vUp(
-        0.0f,
-        1.0f,
-        0.0f);
+        vRight.y * vDirection.z - vRight.z * vDirection.y,
+        vRight.z * vDirection.x - vRight.x * vDirection.z,
+        vRight.x * vDirection.y - vRight.y * vDirection.x);
+    vUp.Normalize();
 
     const float fUnitRight =
         ((float)rand() /
@@ -1521,7 +1476,7 @@ void CPlayerSrvr::ActivateForNextRound()
     Respawn();
 }
 
-void CPlayerSrvr::ApplyDamage(uint8 nDamage)
+void CPlayerSrvr::ApplyDamage(uint8 nDamage, const LTVector *pSource)
 {
     if(!m_bResumeVerified ||
        !m_bAlive ||
@@ -1552,6 +1507,20 @@ void CPlayerSrvr::ApplyDamage(uint8 nDamage)
         (uint32)m_nHealth,
         (uint32)m_nMaxHealth);
     SendHealth();
+    if(m_hClient && pSource && FTCombatRules::Finite(pSource->x) &&
+       FTCombatRules::Finite(pSource->y) && FTCombatRules::Finite(pSource->z))
+    {
+        ILTMessage_Write *pCue = LTNULL;
+        if(g_pLTSCommon->CreateMessage(pCue) == LT_OK && pCue)
+        {
+            pCue->IncRef();
+            pCue->Writeuint8(MSG_SC_DAMAGE_DIRECTION);
+            pCue->WriteLTVector(*pSource);
+            pCue->Writeuint8(nActuallyTaken);
+            g_pLTServer->SendToClient(pCue->Read(), m_hClient, MESSAGE_GUARANTEED);
+            pCue->DecRef();
+        }
+    }
 
     if(m_nHealth == 0)
     {
@@ -2182,10 +2151,9 @@ void CPlayerSrvr::FirePrimary(
         return;
 
     LTVector vDir = vDirection;
-    if(vDir.MagSqr() < 0.0001f)
-    {
+    const float fAimLengthSquared = vDir.MagSqr();
+    if(!FTCombatRules::Finite(fAimLengthSquared) || fAimLengthSquared < 0.0001f)
         return;
-    }
     vDir.Normalize();
 
     if(pDef->eType ==
@@ -2224,6 +2192,15 @@ void CPlayerSrvr::FirePrimary(
        fabsf(vReportedOffset.z) <= 24.0f && bValidEye)
     {
         vServerFrom = vFrom;
+    }
+    else if((m_nAcceptedShots % 32) == 0)
+    {
+        // The fallback can miss an apparently close target if the client
+        // camera has drifted relative to the server player object.
+        g_pLTServer->CPrint(
+            "Fireteam hit QA: camera origin rejected (%s), offset %.1f %.1f %.1f; using server eye",
+            pDef->sName, vReportedOffset.x,
+            vReportedOffset.y, vReportedOffset.z);
     }
 
     m_fNextWeaponShot[m_nWeaponSlot] =
@@ -2422,6 +2399,17 @@ void CPlayerSrvr::TracePrimaryPellet(
 
             if(!bTightHit)
             {
+                // Rate-limited visibility into the historic 'crosshair is
+                // on zombie but no damage' problem. No client authority.
+                static uint32 s_nRejectedZombieBroadHits = 0;
+                ++s_nRejectedZombieBroadHits;
+                if(bLogMiss && (s_nRejectedZombieBroadHits % 24) == 1)
+                {
+                    g_pLTServer->CPrint(
+                        "Fireteam hit QA: %u broad zombie intersections rejected by narrow/cover check (latest weapon=%s, ray_distance=%.1f)",
+                        s_nRejectedZombieBroadHits, pDef->sName,
+                        (info.m_Point - query.m_From).Mag());
+                }
                 // No damage, blood, hit counter, fake penetration or
                 // cross-floor "Doom" hit on a movement-box-only contact.
                 if(filterData.nRejected >=
@@ -2768,21 +2756,11 @@ void CPlayerSrvr::ReloadWeapon()
     m_bReloading = true;
     m_nReloadSlot = m_nWeaponSlot;
 
-    // CA-style reload policy: the player's usual animation and timing are
-    // presentation-side and remain weapon-specific. Authoritative ammo can
-    // never transfer sooner than 125 ms after a validated reload request.
-    // A modified client that fires before this time hits the server's
-    // m_bReloading guard in FirePrimary: the premature shot deals NO damage.
-    // Do not send invented blank bullets or award stats for rejected shots.
-    const float kMinimumReloadSeconds = 0.125f;
-    m_fReloadComplete =
-        g_pLTServer->GetTime() + kMinimumReloadSeconds;
-
+    const float fReloadSeconds = FTCombatRules::ReloadSeconds(pDef->fReloadSeconds);
+    m_fReloadComplete = g_pLTServer->GetTime() + fReloadSeconds;
     g_pLTServer->CPrint(
-        "Fireteam weapon: %s reload accepted; server minimum %.0fms (client animation %.2fs).",
-        pDef->sName,
-        kMinimumReloadSeconds * 1000.0f,
-        pDef->fReloadSeconds);
+        "Fireteam weapon: %s reload accepted; authoritative duration %.3fs.",
+        pDef->sName, fReloadSeconds);
 }
 
 void CPlayerSrvr::CompleteReloadIfReady()

@@ -344,6 +344,7 @@ LTRESULT CLTClientShell::OnEngineInitialized(RMode *pMode, LTGUID *pAppGuid)
     // server round messages from racing HUD initialization.
     FT_SettingsInit();
     FT_WeaponHudInit();
+    FT_HealthHudInit();
     FT_RoundHudInit();
     FT_CombatFeedbackInit();
     FT_LoadingScreenInit();
@@ -682,6 +683,8 @@ void CLTClientShell::OnEnterWorld()
 
     m_bInWorld = true;
     FT_RoundHudResetFirstRoundPreparation();
+    FT_HealthHudReset();
+    FT_RadarHudReset();
 
     // Low-volume Cabin Fever ambience loop supplied as a local mod asset.
     FT_AmbientAudioEnterWorld();
@@ -817,6 +820,20 @@ void CLTClientShell::OnMessage(ILTMessage_Read* pMessage)
             {
                 FT_RoundHudSetRespawnCountdown(5.0f);
             }
+        }
+        break;
+    case MSG_SC_DAMAGE_DIRECTION:
+        {
+            const LTVector source = pMessage->ReadLTVector();
+            const uint8 damage = pMessage->Readuint8();
+            FT_HealthHudDamage(source, damage);
+        }
+        break;
+    case MSG_SC_INTERMISSION:
+        {
+            const uint16 round = pMessage->Readuint16();
+            const float remaining = pMessage->Readfloat();
+            FT_RoundHudSetIntermission(round, remaining);
         }
         break;
     case MSG_SC_LIVES:
@@ -1225,14 +1242,7 @@ LTRESULT CLTClientShell::Render()
         }
 
         if(!bFreecam)
-        {
-            FT_RenderHealthHud();
             FT_RenderCombatFeedback(m_hCamera);
-        }
-
-        FT_RenderRoundHud();
-        if(!bFreecam && !FT_SettingsIsOpen())
-            FT_RenderRadarHud();
 
         if(m_pPlayer &&
            m_pCamera &&
@@ -1257,6 +1267,11 @@ LTRESULT CLTClientShell::Render()
                 m_pPlayer->IsMoving(),
                 m_pCamera->IsWeaponZoomed());
         }
+        // Scope masks belong underneath essential survival information.
+        // Otherwise the optic can hide health, damage direction and rounds.
+        if(!bFreecam) FT_RenderHealthHud(m_hCamera);
+        FT_RenderRoundHud();
+        if(!bFreecam && !FT_SettingsIsOpen()) FT_RenderRadarHud();
     }
 
 	// Render the gui.
@@ -2011,6 +2026,19 @@ LTRESULT CLTClientShell::PollInput()
            pWeaponDef->eType != FT_WEAPON_MELEE &&
            !m_pPlayer->IsDevWeaponQa())
         {
+            // PollInput runs BEFORE CPlayerClnt::Update and the normal
+            // camera update. Refresh the current input pose now, so the
+            // authoritative ray matches the crosshair rendered this frame.
+            // No client-provided hit result or target is introduced.
+            if(m_pCamera->IsFirstPerson() &&
+               m_pPlayer->GetPlayerObject())
+            {
+                m_pPlayer->SyncLookRotation();
+                m_pCamera->UpdatePosition(
+                    m_pPlayer->GetPlayerObject(),
+                    m_pPlayer->GetEyeHeight());
+            }
+
             HLOCALOBJ hFireCamera = m_pCamera->GetCamera();
             LTVector vFirePos;
             LTRotation rFireRot;
@@ -3055,6 +3083,7 @@ void CLTClientShell::OnEngineTerm()
     FT_LoadingScreenTerm();
     FT_CombatFeedbackTerm();
     FT_RoundHudTerm();
+    FT_HealthHudTerm();
     FT_WeaponHudTerm();
     FT_SettingsTerm();
     m_pChatGui->Term();
