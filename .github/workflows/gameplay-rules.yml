@@ -5,6 +5,7 @@ on:
     paths:
       - "src/**"
       - "config/**"
+      - "launcher/**"
       - "tests/**"
       - "scripts/**"
       - ".github/workflows/gameplay-rules.yml"
@@ -12,6 +13,7 @@ on:
     paths:
       - "src/**"
       - "config/**"
+      - "launcher/**"
       - "tests/**"
       - "scripts/**"
       - ".github/workflows/gameplay-rules.yml"
@@ -30,8 +32,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Configure portable tests (no proprietary SDK)
-        run: cmake -S tests -B out/portable -DCMAKE_BUILD_TYPE=Debug
+      - name: Configure portable tests (no proprietary SDK, native Win32 on Windows)
+        shell: pwsh
+        run: |
+          if ($IsWindows) { cmake -S tests -B out/portable -A Win32 }
+          else { cmake -S tests -B out/portable -DCMAKE_BUILD_TYPE=Debug }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compile
         run: cmake --build out/portable --config Debug
       - name: Run regression tests
@@ -49,3 +55,22 @@ jobs:
           path: out/review/
           retention-days: 14
           if-no-files-found: error
+
+  launcher:
+    name: Windows launcher and settings
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test actual settings service without UI
+        run: dotnet run --project tests/LauncherSettings.Tests/LauncherSettings.Tests.csproj -c Release
+      - name: Publish actual WinUI launcher (no proprietary game SDK)
+        run: dotnet publish launcher/FireteamLauncher.WinUI/FireteamLauncher.WinUI.csproj -c Release -r win-x64 -p:Platform=x64 -o out/launcher-ci
+      - name: Verify launch resources
+        shell: pwsh
+        run: |
+          foreach ($file in @('FireteamLauncher.exe', 'FireteamLauncher.pri', 'FireteamLauncher.dll')) {
+            if (!(Test-Path "out/launcher-ci/$file")) { throw "Missing launcher output: $file" }
+          }
