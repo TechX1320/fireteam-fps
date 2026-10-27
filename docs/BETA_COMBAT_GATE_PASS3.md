@@ -89,3 +89,12 @@ clean client+dedi builds and a genuine 2-player sync session. Do not claim
 
 Rollback: revert to `f44b73b` in the review branch and rebuild, retaining
 `BUILT/config` and user data. No save migration is required.
+
+## Feedback capture for first friends beta
+
+For each ten-foot weapon trial record: map, game/dedicated commit, single or co-op,
+weapon/zoom/movement, aimed attempts, **server-confirmed hits**, visible non-hit
+shots, and a short clip or server `Fireteam hit QA:` log. Recheck at a wall,
+on a stair landing and at the same distance with the previous build before
+interpreting results. For zombie melee, record animation report line plus type
+(normal/Assassin/Crusher) and whether the hit landed after a visible tell.
