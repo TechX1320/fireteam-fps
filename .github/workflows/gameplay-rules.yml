@@ -1,27 +1,51 @@
-name: Portable gameplay rules
+name: Gameplay validation
 
 on:
   push:
     paths:
-      - "src/sshell/**"
-      - "src/shared/FireteamInfectedDefs.h"
+      - "src/**"
+      - "config/**"
       - "tests/**"
+      - "scripts/**"
       - ".github/workflows/gameplay-rules.yml"
   pull_request:
     paths:
-      - "src/sshell/**"
-      - "src/shared/FireteamInfectedDefs.h"
+      - "src/**"
+      - "config/**"
       - "tests/**"
+      - "scripts/**"
       - ".github/workflows/gameplay-rules.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  gameplay-rules:
-    runs-on: ubuntu-latest
+  portable-rules:
+    name: Portable rules (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Build and run portable server math tests
+      - name: Configure portable tests (no proprietary SDK)
+        run: cmake -S tests -B out/portable -DCMAKE_BUILD_TYPE=Debug
+      - name: Compile
+        run: cmake --build out/portable --config Debug
+      - name: Run regression tests
+        run: ctest --test-dir out/portable -C Debug --output-on-failure
+      - name: Package exact tracked source snapshot
+        if: matrix.os == 'ubuntu-latest' && github.event_name != 'pull_request'
         run: |
-          g++ -std=c++11 -Wall -Wextra -Werror tests/test-hit-math.cpp -o /tmp/fireteam-hit-math-test
-          /tmp/fireteam-hit-math-test
-          g++ -std=c++11 -Wall -Wextra -Werror tests/test-combat-rules.cpp -o /tmp/fireteam-combat-rules-test
-          /tmp/fireteam-combat-rules-test
+          mkdir -p out/review
+          git archive --format=zip --output=out/review/fireteam-source.zip HEAD
+          git rev-parse HEAD > out/review/SOURCE_COMMIT.txt
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'ubuntu-latest' && github.event_name != 'pull_request'
+        with:
+          name: fireteam-source-${{ github.sha }}
+          path: out/review/
+          retention-days: 14
+          if-no-files-found: error
