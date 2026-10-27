@@ -1,0 +1,41 @@
+name: Apply FIRETEAM Pass 3 reviewed patch
+on:
+  push:
+    branches:
+      - gameplay/combat-feel-melee-aim-20261027
+    paths:
+      - .github/pass3-data-00.txt
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decode, verify, test and publish exact source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "f44b73bcd785cf2f66be857a1a4d11ba377e652d"
+          test "$(git rev-parse HEAD^{tree})" != "6b083748a6439991ba39b7cd13d1dca7c9cb47c6"
+          cat .github/pass3-data-0*.txt | base64 -d > /tmp/fireteam-pass3.patch.xz
+          printf '%s  %s\n' "63091edf5538af2e5702fb3fc3ce5b8e63c0ff212849b3231d01344734a2f611" "/tmp/fireteam-pass3.patch.xz" | sha256sum -c -
+          xz -d -c /tmp/fireteam-pass3.patch.xz > /tmp/fireteam-pass3.patch
+          printf '%s  %s\n' "87d34d32f34281515f297e86d076b3a7074f93919b9db8c9410105837ecef368" "/tmp/fireteam-pass3.patch" | sha256sum -c -
+          git rm .github/pass3-data-0*.txt .github/workflows/apply-pass3.yml
+          test "$(git write-tree)" = "6b083748a6439991ba39b7cd13d1dca7c9cb47c6"
+          git apply --check --index /tmp/fireteam-pass3.patch
+          git apply --index /tmp/fireteam-pass3.patch
+          git diff --cached --check
+          test "$(git write-tree)" = "99ccfb1041dce1db01a0f12c857f874a1dc78ef9"
+          test "$(git diff --cached --name-only | wc -l)" -eq 14
+          cmake -S tests -B /tmp/fireteam-pass3-tests -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/fireteam-pass3-tests --parallel 2
+          ctest --test-dir /tmp/fireteam-pass3-tests --output-on-failure
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "combat: improve short-range hit reliability, restore attack cues and polish gun feel"
+          test "$(git ls-remote origin refs/heads/gameplay/combat-feel-melee-aim-20261027 | cut -f1)" = "$GITHUB_SHA"
+          git push origin HEAD:refs/heads/gameplay/combat-feel-melee-aim-20261027
