@@ -38,6 +38,7 @@
 #include "FireteamDifficultyDefs.h"
 #include "FireteamZombie.h"
 #include "FireteamSpawner.h"
+#include "FireteamAimRules.h"
 
 
 //-----------------------------------------------------------------------------
@@ -150,68 +151,18 @@ static void FT_ApplyWeaponPerturb(
     bool bZoomed,
     LTVector &vDirection)
 {
-    if(def.nMaxPerturb <
-       def.nMinPerturb)
+    float fMove = 0.0f;
+    if(def.fZoomFovDegrees <= 0.0f && hPlayer)
     {
-        return;
-    }
-
-    uint32 nPerturb =
-        def.nMinPerturb;
-
-    // Existing curated configs predate CA MinPerturb/MaxPerturb import.
-    // Keep them playable, but make an unscoped shot from a scoped rifle
-    // meaningfully inaccurate until the next attribute import fills the
-    // real Combat Arms values.
-    if(def.nMaxPerturb == 0 &&
-       def.fZoomFovDegrees > 0.0f)
-    {
-        nPerturb =
-            bZoomed
-            ? 0
-            : 90;
-    }
-
-    if(def.fZoomFovDegrees > 0.0f)
-    {
-        // Scoped rifles are deliberately inaccurate from the hip/no-scope.
-        // A real scoped shot receives the CA MinPerturb value.
-        nPerturb =
-            bZoomed
-            ? def.nMinPerturb
-            : def.nMaxPerturb;
-    }
-    else if(hPlayer)
-    {
-        // NOLF2/CA interpolate between MinPerturb and MaxPerturb using a
-        // dynamic perturb factor. FIRETEAM currently derives that factor from
-        // player movement until recoil/bloom state is added.
         LTVector vVelocity;
-        g_pLTSPhysics->GetVelocity(
-            hPlayer,
-            &vVelocity);
-
-        vVelocity.y =
-            0.0f;
-
-        float fMove =
-            vVelocity.Mag() /
-            435.0f;
-
-        if(fMove < 0.0f)
-            fMove = 0.0f;
-        if(fMove > 1.0f)
-            fMove = 1.0f;
-
-        nPerturb =
-            def.nMinPerturb +
-            (uint32)(
-                ((float)(
-                    def.nMaxPerturb -
-                    def.nMinPerturb) *
-                 fMove) +
-                0.5f);
+        g_pLTSPhysics->GetVelocity(hPlayer, &vVelocity);
+        vVelocity.y = 0.0f;
+        fMove = vVelocity.Mag() / 435.0f;
     }
+
+    const uint32 nPerturb = FTAimRules::SelectPerturb(
+        def.nMinPerturb, def.nMaxPerturb,
+        def.fZoomFovDegrees > 0.0f, bZoomed, fMove);
 
     if(nPerturb == 0)
     {
@@ -236,10 +187,13 @@ static void FT_ApplyWeaponPerturb(
         vRight.Normalize();
     }
 
+    // Up is perpendicular to the actual aim, including steep pitches.
+    // World-up shifts upward-looking shots off the intended aim cone.
     LTVector vUp(
-        0.0f,
-        1.0f,
-        0.0f);
+        vRight.y * vDirection.z - vRight.z * vDirection.y,
+        vRight.z * vDirection.x - vRight.x * vDirection.z,
+        vRight.x * vDirection.y - vRight.y * vDirection.x);
+    vUp.Normalize();
 
     const float fUnitRight =
         ((float)rand() /

@@ -1,0 +1,27 @@
+name: Portable gameplay rules
+
+on:
+  push:
+    paths:
+      - "src/sshell/**"
+      - "src/shared/FireteamInfectedDefs.h"
+      - "tests/**"
+      - ".github/workflows/gameplay-rules.yml"
+  pull_request:
+    paths:
+      - "src/sshell/**"
+      - "src/shared/FireteamInfectedDefs.h"
+      - "tests/**"
+      - ".github/workflows/gameplay-rules.yml"
+
+jobs:
+  gameplay-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run portable server math tests
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror tests/test-hit-math.cpp -o /tmp/fireteam-hit-math-test
+          /tmp/fireteam-hit-math-test
+          g++ -std=c++11 -Wall -Wextra -Werror tests/test-combat-rules.cpp -o /tmp/fireteam-combat-rules-test
+          /tmp/fireteam-combat-rules-test

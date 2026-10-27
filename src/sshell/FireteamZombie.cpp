@@ -1,5 +1,6 @@
 #include "FireteamZombie.h"
 #include "FireteamHitMath.h"
+#include "FireteamMeleeRules.h"
 #include "FireteamNavigation.h"
 #include "FireteamSpawner.h"
 #include "FireteamMutationBox.h"
@@ -83,6 +84,8 @@ static bool s_bZombieWallhackApplied = false;
 FireteamZombie::FireteamZombie() :
     m_nHealth(0),
     m_fAttackCooldown(0.0f),
+    m_fAttackWindupRemaining(0.0f),
+    m_hPendingAttackTarget(LTNULL),
     m_fAttackAnimationTime(0.0f),
     m_fJumpAnimationTime(0.0f),
     m_fRepathCooldown(0.0f),
@@ -1602,6 +1605,40 @@ void FireteamZombie::AdvanceSmoothMotion()
     --m_nMotionStepsRemaining;
 }
 
+void FireteamZombie::ResolveMeleeStrike(HOBJECT hTarget)
+{
+    if(!hTarget || m_bDying || m_nHealth == 0 ||
+       !g_pLTServer->HandleToObject(hTarget))
+        return;
+
+    HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
+    HCLASS hTargetClass = g_pLTServer->GetObjectClass(hTarget);
+    if(!hPlayerClass || !hTargetClass ||
+       !g_pLTServer->IsKindOf(hTargetClass, hPlayerClass))
+        return;
+
+    CPlayerSrvr *pPlayer = (CPlayerSrvr*)
+        g_pLTServer->HandleToObject(hTarget);
+    if(!pPlayer || !pPlayer->IsTargetable())
+        return;
+
+    LTVector vZombie, vPlayer;
+    g_pLTServer->GetObjectPos(m_hObject, &vZombie);
+    g_pLTServer->GetObjectPos(hTarget, &vPlayer);
+    const LTVector vOffset = vPlayer - vZombie;
+    // Never hit a teammate on another floor based on X/Z distance alone.
+    // Validated collision half-height provides room for stairs and slopes.
+    if(!FTMeleeRules::CanConnect(
+        vOffset.x, vOffset.y, vOffset.z,
+        m_Def.fAttackRange, m_vCollisionDims.y + 18.0f))
+        return;
+
+    if(!CanSeeTarget(hTarget, vZombie, vPlayer))
+        return;
+
+    pPlayer->ApplyDamage(m_Def.nAttackDamage);
+}
+
 void FireteamZombie::UpdateZombie(float fDeltaSeconds)
 {
     FT_UpdateZombieWallhackState();
@@ -1639,6 +1676,25 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
         m_fVoiceCooldown -= kUpdate;
     if(m_fAttackVoiceCooldown > 0.0f)
         m_fAttackVoiceCooldown -= kUpdate;
+
+    // Hold position during the swing. Damage is resolved at contact time,
+    // and only if the original target is still alive, in reach and visible.
+    if(m_hPendingAttackTarget)
+    {
+        m_fAttackWindupRemaining -= kUpdate;
+        if(m_fAttackWindupRemaining > 0.0f)
+        {
+            LTVector vStop(0.0f, 0.0f, 0.0f);
+            g_pLTSPhysics->SetVelocity(m_hObject, &vStop);
+            m_nMotionStepsRemaining = 0;
+            m_eBehaviorState = kBehaviorAttack;
+            return;
+        }
+        HOBJECT hImpactTarget = m_hPendingAttackTarget;
+        m_hPendingAttackTarget = LTNULL;
+        m_fAttackWindupRemaining = 0.0f;
+        ResolveMeleeStrike(hImpactTarget);
+    }
 
     const BehaviorState ePreviousBehavior =
         m_eBehaviorState;
@@ -1853,15 +1909,20 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
                     0.0f;
             }
 
-            CPlayerSrvr *pPlayer =
-                (CPlayerSrvr*)
-                g_pLTServer->HandleToObject(
-                    hTarget);
-
-            if(pPlayer)
+            // The attack cue/animation begins now; the server waits until
+            // the configured contact point before checking the victim again.
+            const float fWindup = FTMeleeRules::WindupSeconds(
+                m_Def.fAttackWindupSeconds, m_Def.fAttackCooldown);
+            if(fWindup > 0.0f)
             {
-                pPlayer->ApplyDamage(
-                    m_Def.nAttackDamage);
+                m_hPendingAttackTarget = hTarget;
+                m_fAttackWindupRemaining = fWindup;
+            }
+            else
+            {
+                // Older custom infected definitions without the new field
+                // keep their previous immediate-hit timing.
+                ResolveMeleeStrike(hTarget);
             }
 
             // Alert barks must not silence the first melee strike.
@@ -3102,6 +3163,8 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
         if(m_nHealth == 0)
         {
             m_bDying = true;
+            m_hPendingAttackTarget = LTNULL;
+            m_fAttackWindupRemaining = 0.0f;
             m_fDeathTimeRemaining =
                 m_Def.fDeathSeconds > 0.0f
                 ? m_Def.fDeathSeconds
