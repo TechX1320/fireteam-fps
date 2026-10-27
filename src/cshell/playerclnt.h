@@ -39,6 +39,8 @@ public:
     void        		Update();
     void        		UpdateMoveFlags(uint8 flags)							{ m_dwInputFlags |= flags; }
     void        		UpdateRotation(float yaw, float pitch, float roll);
+    void                SyncLookRotation(); // Current input before weapon fire ray
+
     void                SetControllerMoveAxes(float fForward, float fRight);
     void                UpdateWeaponView(bool bFirstPerson);
     bool                AltAttack();

@@ -738,6 +738,18 @@ void CPlayerClnt::UpdateRotation(float yaw, float pitch, float roll)
     m_fRoll += roll;
 }
 
+// Mouse/controller input is gathered before the main Update() call. The
+// crosshair renders from the current camera, so firing must use the same
+// frame's look rotation rather than last frame's player transform.
+void CPlayerClnt::SyncLookRotation()
+{
+    if(!m_hObject)
+        return;
+    LTRotation rRot;
+    g_pLTCCommon->SetupEuler(rRot, m_fPitch, m_fYaw, m_fRoll);
+    g_pLTClient->SetObjectRotation(m_hObject, &rRot);
+}
+
 void CPlayerClnt::SetControllerMoveAxes(
     float fForward,
     float fRight)
@@ -844,9 +856,9 @@ void CPlayerClnt::Update()
 
     // Calculate rotation
     LTVector vUp, vRight, vForward;
+    SyncLookRotation();
     LTRotation rRot;
-	g_pLTCCommon->SetupEuler(rRot, m_fPitch, m_fYaw, m_fRoll);
-	g_pLTClient->SetObjectRotation(m_hObject, &rRot);
+    g_pLTClient->GetObjectRotation(m_hObject, &rRot);
 
     // Calulate movement
     LTVector vPos, vVel;

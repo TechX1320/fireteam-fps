@@ -2026,6 +2026,19 @@ LTRESULT CLTClientShell::PollInput()
            pWeaponDef->eType != FT_WEAPON_MELEE &&
            !m_pPlayer->IsDevWeaponQa())
         {
+            // PollInput runs BEFORE CPlayerClnt::Update and the normal
+            // camera update. Refresh the current input pose now, so the
+            // authoritative ray matches the crosshair rendered this frame.
+            // No client-provided hit result or target is introduced.
+            if(m_pCamera->IsFirstPerson() &&
+               m_pPlayer->GetPlayerObject())
+            {
+                m_pPlayer->SyncLookRotation();
+                m_pCamera->UpdatePosition(
+                    m_pPlayer->GetPlayerObject(),
+                    m_pPlayer->GetEyeHeight());
+            }
+
             HLOCALOBJ hFireCamera = m_pCamera->GetCamera();
             LTVector vFirePos;
             LTRotation rFireRot;

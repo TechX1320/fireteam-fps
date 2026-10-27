@@ -58,6 +58,16 @@ int main()
                 Vec3(bodyRadius, 27, bodyRadius)));
     assert(!Hits(Vec3(25, 0, -100), forward, center,
                  Vec3(bodyRadius, 27, bodyRadius)));
+    // Reproduced far-range regression (C++ float discriminant caused a
+    // real near-edge body shot at 5000 units to be rejected). Keep the
+    // rejection outside the true silhouette at the same distance.
+    assert(Hits(Vec3(-17.964933395f, 0.579521179f, -5000.0f),
+                forward, center, Vec3(18.0f, 27.0f, 18.0f), 5100.0f));
+    assert(!Hits(Vec3(-18.25f, 0.579521179f, -5000.0f),
+                 forward, center, Vec3(18.0f, 27.0f, 18.0f), 5100.0f));
+    // Long-range trace must still stop at authored weapon range.
+    assert(!Hits(Vec3(0, 0, -5000.0f), forward, center,
+                 Vec3(18.0f, 27.0f, 18.0f), 4500.0f));
     puts("PASS: 3D ray, missed head/cover and authored vs sampled hit extents");
     return 0;
 }
