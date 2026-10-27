@@ -1,6 +1,7 @@
 #ifndef __FIRETEAM_HEALTH_HUD_H__
 #define __FIRETEAM_HEALTH_HUD_H__
 #include <ltbasedefs.h>
+#include <ltvector.h>
 void FT_HealthHudInit();
 void FT_HealthHudTerm();
 void FT_HealthHudReset();
