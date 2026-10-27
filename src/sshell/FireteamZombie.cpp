@@ -41,6 +41,7 @@ void FT_ResetZombieNeighborCache()
 {
     s_aZombieNeighbors.clear();
     s_fLastNeighborSnapshot = -1.0f;
+    s_bDifficultyLoaded = false; // The next map may use another difficulty.
 }
 
 static const std::vector<FTZombieNeighborSample>& FT_GetZombieNeighborSnapshot()
@@ -84,8 +85,11 @@ static bool s_bZombieWallhackApplied = false;
 FireteamZombie::FireteamZombie() :
     m_nHealth(0),
     m_fAttackCooldown(0.0f),
-    m_fAttackWindupRemaining(0.0f),
     m_hPendingAttackTarget(LTNULL),
+    m_nAttackTargetInstance(0),
+    m_nAttackTargetDeaths(0),
+    m_hChaseTarget(LTNULL),
+    m_nChaseTargetInstance(0),
     m_fAttackAnimationTime(0.0f),
     m_fJumpAnimationTime(0.0f),
     m_fRepathCooldown(0.0f),
@@ -1354,7 +1358,10 @@ HOBJECT FireteamZombie::FindNearestPlayer()
     g_pLTServer->GetObjectPos(m_hObject, &vMyPos);
 
     HOBJECT hBest = LTNULL;
+    uint32 nBestInstance = 0;
     float fBestDist = FLT_MAX;
+    float fCurrentDist = FLT_MAX;
+    bool bCurrentValid = false;
 
     for(HOBJECT hObj = g_pLTServer->GetNextObject(LTNULL);
         hObj;
@@ -1377,13 +1384,23 @@ HOBJECT FireteamZombie::FindNearestPlayer()
         g_pLTServer->GetObjectPos(hObj, &vPlayerPos);
         float fDist = vMyPos.DistSqr(vPlayerPos);
 
+        if(hObj == m_hChaseTarget &&
+           pPlayer->GetCombatInstance() == m_nChaseTargetInstance)
+        {
+            bCurrentValid = true;
+            fCurrentDist = fDist;
+        }
         if(fDist < fBestDist)
         {
             fBestDist = fDist;
             hBest = hObj;
+            nBestInstance = pPlayer->GetCombatInstance();
         }
     }
-
+    if(bCurrentValid && FTMeleeRules::KeepTarget(fCurrentDist, fBestDist))
+        return m_hChaseTarget;
+    m_hChaseTarget = hBest;
+    m_nChaseTargetInstance = nBestInstance;
     return hBest;
 }
 
@@ -1605,22 +1622,25 @@ void FireteamZombie::AdvanceSmoothMotion()
     --m_nMotionStepsRemaining;
 }
 
-void FireteamZombie::ResolveMeleeStrike(HOBJECT hTarget)
+void FireteamZombie::ResolveMeleeStrike(
+    HOBJECT hTarget, uint32 nInstance, uint32 nDeaths)
 {
-    if(!hTarget || m_bDying || m_nHealth == 0 ||
-       !g_pLTServer->HandleToObject(hTarget))
-        return;
-
+    if(!hTarget || m_bDying || m_nHealth == 0) return;
+    // Do not dereference a cached HOBJECT after a disconnect. Match it against
+    // live objects first, then verify generation and life. A recycled handle
+    // must not transfer an old swing onto a new player or a respawned life.
+    HOBJECT hLive = LTNULL;
+    for(HOBJECT h = g_pLTServer->GetNextObject(LTNULL); h;
+        h = g_pLTServer->GetNextObject(h))
+        if(h == hTarget) { hLive = h; break; }
+    if(!hLive) return;
     HCLASS hPlayerClass = g_pLTServer->GetClass("CPlayerSrvr");
-    HCLASS hTargetClass = g_pLTServer->GetObjectClass(hTarget);
+    HCLASS hTargetClass = g_pLTServer->GetObjectClass(hLive);
     if(!hPlayerClass || !hTargetClass ||
-       !g_pLTServer->IsKindOf(hTargetClass, hPlayerClass))
-        return;
-
-    CPlayerSrvr *pPlayer = (CPlayerSrvr*)
-        g_pLTServer->HandleToObject(hTarget);
-    if(!pPlayer || !pPlayer->IsTargetable())
-        return;
+       !g_pLTServer->IsKindOf(hTargetClass, hPlayerClass)) return;
+    CPlayerSrvr *pPlayer = (CPlayerSrvr*)g_pLTServer->HandleToObject(hLive);
+    if(!pPlayer || !FTMeleeRules::SameLife(nInstance, nDeaths,
+       pPlayer->GetCombatInstance(), pPlayer->GetMatchDeaths(), pPlayer->IsTargetable())) return;
 
     LTVector vZombie, vPlayer;
     g_pLTServer->GetObjectPos(m_hObject, &vZombie);
@@ -1636,7 +1656,7 @@ void FireteamZombie::ResolveMeleeStrike(HOBJECT hTarget)
     if(!CanSeeTarget(hTarget, vZombie, vPlayer))
         return;
 
-    pPlayer->ApplyDamage(m_Def.nAttackDamage);
+    pPlayer->ApplyDamage(m_Def.nAttackDamage, &vZombie);
 }
 
 void FireteamZombie::UpdateZombie(float fDeltaSeconds)
@@ -1677,23 +1697,22 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
     if(m_fAttackVoiceCooldown > 0.0f)
         m_fAttackVoiceCooldown -= kUpdate;
 
-    // Hold position during the swing. Damage is resolved at contact time,
-    // and only if the original target is still alive, in reach and visible.
-    if(m_hPendingAttackTarget)
+    const float fAttackNow = g_pLTServer->GetTime();
+    if(m_StrikeClock.TakeImpact(fAttackNow))
     {
-        m_fAttackWindupRemaining -= kUpdate;
-        if(m_fAttackWindupRemaining > 0.0f)
-        {
-            LTVector vStop(0.0f, 0.0f, 0.0f);
-            g_pLTSPhysics->SetVelocity(m_hObject, &vStop);
-            m_nMotionStepsRemaining = 0;
-            m_eBehaviorState = kBehaviorAttack;
-            return;
-        }
-        HOBJECT hImpactTarget = m_hPendingAttackTarget;
+        ResolveMeleeStrike(m_hPendingAttackTarget,
+            m_nAttackTargetInstance, m_nAttackTargetDeaths);
         m_hPendingAttackTarget = LTNULL;
-        m_fAttackWindupRemaining = 0.0f;
-        ResolveMeleeStrike(hImpactTarget);
+    }
+    if(m_StrikeClock.Locked(fAttackNow))
+    {
+        // A committed swing cannot chase/turn with a dodging player. Recovery
+        // also applies to a missed swing, making a heavy attack punishable.
+        LTVector vStop(0.0f, 0.0f, 0.0f);
+        g_pLTSPhysics->SetVelocity(m_hObject, &vStop);
+        m_nMotionStepsRemaining = 0;
+        m_eBehaviorState = kBehaviorAttack;
+        return;
     }
 
     const BehaviorState ePreviousBehavior =
@@ -1816,7 +1835,8 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
             kBehaviorSearch;
     }
 
-    if(fPlayerDistance <= kAttackRange &&
+    if(FTMeleeRules::CanConnect(vTarget.x - vPos.x, vTarget.y - vPos.y,
+           vTarget.z - vPos.z, kAttackRange, m_vCollisionDims.y + 18.0f) &&
        bCanSeePlayer)
     {
         m_eBehaviorState =
@@ -1880,8 +1900,8 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
                          nAttackTry) %
                         3];
 
-                if(pCandidate &&
-                   pCandidate[0])
+                if(pCandidate && pCandidate[0] &&
+                   g_pLTServer->GetAnimIndex(m_hObject, (char*)pCandidate) != INVALID_MODEL_ANIM)
                 {
                     pAttackAnimation =
                         pCandidate;
@@ -1909,20 +1929,26 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
                     0.0f;
             }
 
-            // The attack cue/animation begins now; the server waits until
-            // the configured contact point before checking the victim again.
             const float fWindup = FTMeleeRules::WindupSeconds(
                 m_Def.fAttackWindupSeconds, m_Def.fAttackCooldown);
-            if(fWindup > 0.0f)
+            const float fRecovery = FTMeleeRules::RecoverySeconds(
+                m_Def.fAttackRecoverySeconds, m_Def.fAttackCooldown, fWindup);
+            CPlayerSrvr *pVictim = (CPlayerSrvr*)g_pLTServer->HandleToObject(hTarget);
+            if(!pVictim || !pVictim->IsTargetable())
             {
-                m_hPendingAttackTarget = hTarget;
-                m_fAttackWindupRemaining = fWindup;
+                m_hPendingAttackTarget = LTNULL;
+                m_StrikeClock.Cancel();
+                m_nMotionStepsRemaining = 0;
+                return;
             }
-            else
+            m_hPendingAttackTarget = hTarget;
+            m_nAttackTargetInstance = pVictim->GetCombatInstance();
+            m_nAttackTargetDeaths = pVictim->GetMatchDeaths();
+            m_StrikeClock.Begin(fAttackNow, fWindup, fRecovery);
+            if(m_StrikeClock.TakeImpact(fAttackNow))
             {
-                // Older custom infected definitions without the new field
-                // keep their previous immediate-hit timing.
-                ResolveMeleeStrike(hTarget);
+                ResolveMeleeStrike(hTarget, m_nAttackTargetInstance, m_nAttackTargetDeaths);
+                m_hPendingAttackTarget = LTNULL;
             }
 
             // Alert barks must not silence the first melee strike.
@@ -1932,7 +1958,8 @@ void FireteamZombie::UpdateZombie(float fDeltaSeconds)
                     (int)m_Def.nVoiceAttackChance)
             {
                 PlayAttackVoice();
-                m_fAttackVoiceCooldown = 1.10f;
+                m_fAttackVoiceCooldown = FTCombatRules::Clamp(
+                    m_Def.fAttackCooldown, 0.25f, 1.10f, 1.10f);
             }
 
             m_fAttackCooldown =
@@ -3164,7 +3191,7 @@ uint32 FireteamZombie::ObjectMessageFn(HOBJECT hSender, ILTMessage_Read *pMsg)
         {
             m_bDying = true;
             m_hPendingAttackTarget = LTNULL;
-            m_fAttackWindupRemaining = 0.0f;
+            m_StrikeClock.Cancel();
             m_fDeathTimeRemaining =
                 m_Def.fDeathSeconds > 0.0f
                 ? m_Def.fDeathSeconds

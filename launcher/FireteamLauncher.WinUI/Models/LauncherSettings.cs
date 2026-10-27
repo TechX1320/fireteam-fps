@@ -8,7 +8,10 @@ public sealed record LauncherSettings(
     double SensitivityYMultiplier,
     int Volume,
     double Gamma,
-    bool RadarEnabled = true);
+    bool RadarEnabled = true,
+    double RadarScale = 1.0,
+    bool DamageFeedback = true,
+    bool ReducedEffects = false);
 
 public sealed record LauncherProfile(
     string PlayerName,

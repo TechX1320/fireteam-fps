@@ -14,3 +14,9 @@ foreach(source IN LISTS FT_TEST_SOURCES)
     endif()
     add_test(NAME ${name} COMMAND ${name})
 endforeach()
+
+find_program(FT_POWERSHELL NAMES pwsh powershell)
+if(FT_POWERSHELL)
+    add_test(NAME config-preservation COMMAND "${FT_POWERSHELL}" -NoProfile
+        -ExecutionPolicy Bypass -File "${CMAKE_CURRENT_SOURCE_DIR}/test-config-preservation.ps1")
+endif()

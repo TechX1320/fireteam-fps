@@ -29,7 +29,9 @@ public sealed class SettingsService
            !double.TryParse(tokens[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var gamma) ||
            !int.TryParse(tokens[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out var width) ||
            !int.TryParse(tokens[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out var height) ||
-           !int.TryParse(tokens[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out var windowed))
+           !int.TryParse(tokens[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out var windowed) ||
+           !double.IsFinite(rawSensitivityX) || !double.IsFinite(rawSensitivityY) ||
+           !double.IsFinite(gamma) || width < 640 || height < 480)
         {
             return Defaults();
         }
@@ -42,7 +44,12 @@ public sealed class SettingsService
             Math.Clamp(rawSensitivityY / NativeSensitivityBase, 0.01, 4.0),
             Math.Clamp(volume, 0, 100),
             Math.Clamp(gamma, 0.50, 6.00),
-            tokens.Length < 8 || tokens[7] != "0");
+            tokens.Length < 8 || tokens[7] != "0",
+            tokens.Length > 8 && double.TryParse(tokens[8], NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var radarScale) && double.IsFinite(radarScale)
+                ? Math.Clamp(radarScale, 0.75, 1.75) : 1.0,
+            tokens.Length < 10 || tokens[9] != "0",
+            tokens.Length > 10 && tokens[10] == "1");
     }
 
     public void SaveSettings(LauncherSettings settings)
@@ -50,26 +57,44 @@ public sealed class SettingsService
         var game = LauncherPaths.FindGameDirectory()
             ?? throw new InvalidOperationException("FIRETEAM BUILT folder was not found.");
 
+        if(!double.IsFinite(settings.SensitivityXMultiplier) ||
+           !double.IsFinite(settings.SensitivityYMultiplier) || !double.IsFinite(settings.Gamma) ||
+           settings.Width < 640 || settings.Height < 480)
+            throw new ArgumentException("Settings require finite sensitivity/gamma and a valid resolution.", nameof(settings));
+
         var rawSensitivityX =
             NativeSensitivityBase *
-            settings.SensitivityXMultiplier;
+            Math.Clamp(settings.SensitivityXMultiplier, 0.01, 4.0);
         var rawSensitivityY =
             NativeSensitivityBase *
-            settings.SensitivityYMultiplier;
+            Math.Clamp(settings.SensitivityYMultiplier, 0.01, 4.0);
 
         var line = string.Format(
             CultureInfo.InvariantCulture,
-            "{0:F6} {1:F6} {2} {3:F3} {4} {5} {6} {7}\n",
+            "{0:F6} {1:F6} {2} {3:F3} {4} {5} {6} {7} {8:F3} {9} {10}\n",
             rawSensitivityX,
             rawSensitivityY,
-            settings.Volume,
-            settings.Gamma,
+            Math.Clamp(settings.Volume, 0, 100),
+            Math.Clamp(settings.Gamma, 0.50, 6.00),
             settings.Width,
             settings.Height,
             settings.Windowed ? 1 : 0,
-            settings.RadarEnabled ? 1 : 0);
+            settings.RadarEnabled ? 1 : 0,
+            double.IsFinite(settings.RadarScale) ? Math.Clamp(settings.RadarScale, 0.75, 1.75) : 1.0,
+            settings.DamageFeedback ? 1 : 0,
+            settings.ReducedEffects ? 1 : 0);
 
-        File.WriteAllText(Path.Combine(game, "fireteam-settings.cfg"), line);
+        var path = Path.Combine(game, "fireteam-settings.cfg");
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, line);
+            File.Move(temporary, path, overwrite: true);
+        }
+        finally
+        {
+            if(File.Exists(temporary)) File.Delete(temporary);
+        }
     }
 
     public LauncherProfile LoadProfile()

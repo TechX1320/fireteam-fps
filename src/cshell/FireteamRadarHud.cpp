@@ -1,5 +1,6 @@
 #include "FireteamRadarHud.h"
 #include "clientinterfaces.h"
+#include "FireteamPresentationRules.h"
 
 #include <iltclient.h>
 #include <iltmessage.h>
@@ -108,9 +109,9 @@ void FT_RenderRadarHud()
         g_pLTClient->GetScreenSurface(), &screenW, &screenH);
     if(screenW < 480 || screenH < 320) return;
 
-    float radius = (float)screenH * 0.090f;
-    if(radius < 54.0f) radius = 54.0f;
-    if(radius > 84.0f) radius = 84.0f;
+    HCONSOLEVAR hScale = g_pLTClient->GetConsoleVar("ftradarscale");
+    const float radius = FTPresentationRules::RadarRadius((float)screenH,
+        hScale ? g_pLTClient->GetVarValueFloat(hScale) : 1.0f);
     const float cx = (float)screenW - radius - 24.0f;
     const float cy = radius + 30.0f;
 
@@ -193,6 +194,16 @@ void FT_RenderRadarHud()
                 cy - dy - size * 0.5f,
                 size, size, red, green, blue, 238);
             g_pLTCDrawPrim->DrawPrim(&marker, 1);
+            if(dot.nType == 3)
+            {
+                LT_POLYF4 center = FT_RadarRect(cx+dx-1, cy-dy-1, 2, 2, 16, 25, 30, 255);
+                g_pLTCDrawPrim->DrawPrim(&center,1);
+            }
+            else if(dot.nType == 1)
+            {
+                LT_POLYF4 cross = FT_RadarRect(cx+dx-0.8f,cy-dy-4,1.6f,8,235,255,250,235);
+                g_pLTCDrawPrim->DrawPrim(&cross,1);
+            }
         }
     }
 

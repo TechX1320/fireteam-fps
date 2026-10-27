@@ -1,6 +1,7 @@
 #include "FireteamCombatFeedback.h"
 #include "clientinterfaces.h"
 #include "msgids.h"
+#include "FireteamFeedbackQueue.h"
 
 #include <iltclient.h>
 #include <iltdrawprim.h>
@@ -21,8 +22,7 @@ struct FTFeedbackImage
 
 enum
 {
-    FT_FEEDBACK_ROUNDSTART = 100,
-    FT_FEEDBACK_QUEUE_SIZE = 16
+    FT_FEEDBACK_ROUNDSTART = 100
 };
 
 static FTFeedbackImage s_Headshot = { LTNULL, 0, 0 };
@@ -38,9 +38,7 @@ static FTFeedbackImage s_RoundStart = { LTNULL, 0, 0 };
 static CUIFont *s_pFeedbackFont = LTNULL;
 static CUIFormattedPolyString *s_pFallback = LTNULL;
 
-static uint8 s_aQueue[FT_FEEDBACK_QUEUE_SIZE];
-static uint8 s_nQueueHead = 0;
-static uint8 s_nQueueCount = 0;
+static FTFeedbackRules::RecentQueue s_Queue;
 static uint8 s_nActiveFeedback = 0;
 static float s_fActiveStart = 0.0f;
 
@@ -50,6 +48,8 @@ enum { FT_BLOOD_BURST_CAPACITY = 12, FT_BLOOD_DROPLETS = 9 };
 struct FTBloodBurst
 {
     LTVector vPos;
+    LTVector vRight, vUp, vBack;
+    bool bBasisReady;
     float fStart;
     uint32 nSeed;
     bool bActive;
@@ -59,11 +59,13 @@ static uint32 s_nNextBloodBurst = 0;
 
 static void FT_SpawnBloodBurst(const LTVector &vImpact)
 {
-    if(!g_pLTClient)
+    if(!g_pLTClient || !FTCombatRules::Finite(vImpact.x) ||
+       !FTCombatRules::Finite(vImpact.y) || !FTCombatRules::Finite(vImpact.z))
         return;
     FTBloodBurst &burst =
         s_BloodBursts[s_nNextBloodBurst % FT_BLOOD_BURST_CAPACITY];
     burst.vPos = vImpact;
+    burst.bBasisReady = false;
     burst.fStart = g_pLTClient->GetTime();
     burst.nSeed = s_nNextBloodBurst++;
     burst.bActive = true;
@@ -83,6 +85,8 @@ static void FT_RenderBloodBursts(HOBJECT hCamera)
     const LTVector vUp = rCamera.Up();
     const LTVector vCameraForward = rCamera.Forward();
     const float fNow = g_pLTClient->GetTime();
+    HCONSOLEVAR hReduced = g_pLTClient->GetConsoleVar("ftreducedfx");
+    const bool bReduced = hReduced && g_pLTClient->GetVarValueFloat(hReduced) >= 0.5f;
     bool bAny = false;
     for(uint32 i = 0; i < FT_BLOOD_BURST_CAPACITY; ++i)
     {
@@ -118,9 +122,14 @@ static void FT_RenderBloodBursts(HOBJECT hCamera)
             burst.bActive = false;
             continue;
         }
+        if(!burst.bBasisReady)
+        {
+            burst.vRight = vRight; burst.vUp = vUp;
+            burst.vBack = vCameraForward * -1.0f; burst.bBasisReady = true;
+        }
         const float progress = age / 0.38f;
         const uint8 alpha = (uint8)(210.0f * (1.0f - progress));
-        for(uint32 j = 0; j < FT_BLOOD_DROPLETS; ++j)
+        for(uint32 j = 0; j < (bReduced ? 3u : (uint32)FT_BLOOD_DROPLETS); ++j)
         {
             const float angle = 6.2831853f *
                 ((float)j / (float)FT_BLOOD_DROPLETS) +
@@ -129,7 +138,7 @@ static void FT_RenderBloodBursts(HOBJECT hCamera)
             const float x = cosf(angle) * travel;
             const float y = sinf(angle) * travel - 17.0f * progress * progress;
             const LTVector center = burst.vPos +
-                vRight * x + vUp * y - vCameraForward * 3.0f;
+                burst.vRight * x + burst.vUp * y + burst.vBack * 3.0f;
             const float size = (j % 3 ? 4.0f : 5.8f) *
                 (1.0f - progress * 0.55f);
             const LTVector corners[4] = {
@@ -303,53 +312,22 @@ static void FT_StartFeedback(
         : 0.0f;
 }
 
-static void FT_QueueFeedback(
-    uint8 nFeedback)
+static void FT_QueueFeedback(uint8 nFeedback)
 {
-    if(!nFeedback)
-        return;
-
-    if(!s_nActiveFeedback)
+    if(!nFeedback) return;
+    if(nFeedback == FT_FEEDBACK_ROUNDSTART)
     {
-        FT_StartFeedback(nFeedback);
-        return;
+        // A new wave must not wait behind 30 seconds of old kill accolades.
+        s_Queue.Clear(); FT_StartFeedback(nFeedback); return;
     }
-
-    if(s_nQueueCount >=
-       FT_FEEDBACK_QUEUE_SIZE)
-    {
-        return;
-    }
-
-    const uint8 nTail =
-        (uint8)(
-            (s_nQueueHead +
-             s_nQueueCount) %
-            FT_FEEDBACK_QUEUE_SIZE);
-
-    s_aQueue[nTail] = nFeedback;
-    ++s_nQueueCount;
+    if(!s_nActiveFeedback) { FT_StartFeedback(nFeedback); return; }
+    s_Queue.Push(nFeedback, g_pLTClient->GetTime());
 }
-
 static void FT_AdvanceFeedback()
 {
-    if(!s_nQueueCount)
-    {
-        s_nActiveFeedback = 0;
-        s_fActiveStart = 0.0f;
-        return;
-    }
-
-    const uint8 nNext =
-        s_aQueue[s_nQueueHead];
-
-    s_nQueueHead =
-        (uint8)(
-            (s_nQueueHead + 1) %
-            FT_FEEDBACK_QUEUE_SIZE);
-    --s_nQueueCount;
-
-    FT_StartFeedback(nNext);
+    const uint8 next = s_Queue.Pop(g_pLTClient->GetTime());
+    if(next) FT_StartFeedback(next);
+    else { s_nActiveFeedback = 0; s_fActiveStart = 0; }
 }
 
 static float FT_BaseWidth(
@@ -572,8 +550,7 @@ void FT_CombatFeedbackInit()
         }
     }
 
-    s_nQueueHead = 0;
-    s_nQueueCount = 0;
+    s_Queue.Clear();
     s_nActiveFeedback = 0;
     s_fActiveStart = 0.0f;
     memset(s_BloodBursts, 0, sizeof(s_BloodBursts));
@@ -606,8 +583,7 @@ void FT_CombatFeedbackTerm()
         s_pFeedbackFont = LTNULL;
     }
 
-    s_nQueueHead = 0;
-    s_nQueueCount = 0;
+    s_Queue.Clear();
     s_nActiveFeedback = 0;
     s_fActiveStart = 0.0f;
     memset(s_BloodBursts, 0, sizeof(s_BloodBursts));
@@ -690,7 +666,9 @@ void FT_RenderCombatFeedback(HOBJECT hCamera)
 
     float fScale = 1.0f;
 
-    if(fAge < kZoomSeconds)
+    HCONSOLEVAR hReduced = g_pLTClient->GetConsoleVar("ftreducedfx");
+    const bool bReduced = hReduced && g_pLTClient->GetVarValueFloat(hReduced) >= 0.5f;
+    if(fAge < kZoomSeconds && !bReduced)
     {
         const float fProgress =
             fAge / kZoomSeconds;

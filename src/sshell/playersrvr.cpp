@@ -39,6 +39,7 @@
 #include "FireteamZombie.h"
 #include "FireteamSpawner.h"
 #include "FireteamAimRules.h"
+#include "FireteamCombatRules.h"
 
 
 //-----------------------------------------------------------------------------
@@ -1475,7 +1476,7 @@ void CPlayerSrvr::ActivateForNextRound()
     Respawn();
 }
 
-void CPlayerSrvr::ApplyDamage(uint8 nDamage)
+void CPlayerSrvr::ApplyDamage(uint8 nDamage, const LTVector *pSource)
 {
     if(!m_bResumeVerified ||
        !m_bAlive ||
@@ -1506,6 +1507,20 @@ void CPlayerSrvr::ApplyDamage(uint8 nDamage)
         (uint32)m_nHealth,
         (uint32)m_nMaxHealth);
     SendHealth();
+    if(m_hClient && pSource && FTCombatRules::Finite(pSource->x) &&
+       FTCombatRules::Finite(pSource->y) && FTCombatRules::Finite(pSource->z))
+    {
+        ILTMessage_Write *pCue = LTNULL;
+        if(g_pLTSCommon->CreateMessage(pCue) == LT_OK && pCue)
+        {
+            pCue->IncRef();
+            pCue->Writeuint8(MSG_SC_DAMAGE_DIRECTION);
+            pCue->WriteLTVector(*pSource);
+            pCue->Writeuint8(nActuallyTaken);
+            g_pLTServer->SendToClient(pCue->Read(), m_hClient, MESSAGE_GUARANTEED);
+            pCue->DecRef();
+        }
+    }
 
     if(m_nHealth == 0)
     {
@@ -2136,10 +2151,9 @@ void CPlayerSrvr::FirePrimary(
         return;
 
     LTVector vDir = vDirection;
-    if(vDir.MagSqr() < 0.0001f)
-    {
+    const float fAimLengthSquared = vDir.MagSqr();
+    if(!FTCombatRules::Finite(fAimLengthSquared) || fAimLengthSquared < 0.0001f)
         return;
-    }
     vDir.Normalize();
 
     if(pDef->eType ==
@@ -2722,21 +2736,11 @@ void CPlayerSrvr::ReloadWeapon()
     m_bReloading = true;
     m_nReloadSlot = m_nWeaponSlot;
 
-    // CA-style reload policy: the player's usual animation and timing are
-    // presentation-side and remain weapon-specific. Authoritative ammo can
-    // never transfer sooner than 125 ms after a validated reload request.
-    // A modified client that fires before this time hits the server's
-    // m_bReloading guard in FirePrimary: the premature shot deals NO damage.
-    // Do not send invented blank bullets or award stats for rejected shots.
-    const float kMinimumReloadSeconds = 0.125f;
-    m_fReloadComplete =
-        g_pLTServer->GetTime() + kMinimumReloadSeconds;
-
+    const float fReloadSeconds = FTCombatRules::ReloadSeconds(pDef->fReloadSeconds);
+    m_fReloadComplete = g_pLTServer->GetTime() + fReloadSeconds;
     g_pLTServer->CPrint(
-        "Fireteam weapon: %s reload accepted; server minimum %.0fms (client animation %.2fs).",
-        pDef->sName,
-        kMinimumReloadSeconds * 1000.0f,
-        pDef->fReloadSeconds);
+        "Fireteam weapon: %s reload accepted; authoritative duration %.3fs.",
+        pDef->sName, fReloadSeconds);
 }
 
 void CPlayerSrvr::CompleteReloadIfReady()

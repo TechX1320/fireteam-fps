@@ -1,6 +1,7 @@
 #include "FireteamRoundHud.h"
 #include "FireteamCombatFeedback.h"
 #include "clientinterfaces.h"
+#include "FireteamPresentationRules.h"
 
 #include <iltclient.h>
 #include <iltfontmanager.h>
@@ -23,6 +24,9 @@ static CUIFormattedPolyString *s_pSpectatorStatus = LTNULL;
 static CUIFormattedPolyString *s_pRespawnStatus = LTNULL;
 static CUIFormattedPolyString *s_pFirstRoundPrep = LTNULL;
 
+static CUIFormattedPolyString *s_pWaveDetail = LTNULL;
+static float s_fIntermissionUntil = 0.0f;
+static uint16 s_nIntermissionRound = 0;
 static uint16 s_nRound = 0;
 static uint16 s_nTarget = 0;
 static uint16 s_nKilled = 0;
@@ -153,6 +157,7 @@ void FT_RoundHudInit()
 
     if(s_pBuffFont)
     {
+        s_pWaveDetail = g_pLTCFontManager->CreateFormattedPolyString(s_pBuffFont, "");
         s_pBottomlessStatus =
             g_pLTCFontManager->CreateFormattedPolyString(
                 s_pBuffFont,
@@ -214,6 +219,10 @@ void FT_RoundHudInit()
 
 void FT_RoundHudTerm()
 {
+    if(s_pWaveDetail) g_pLTCFontManager->DestroyPolyString(s_pWaveDetail);
+    s_pWaveDetail = LTNULL;
+    s_fIntermissionUntil = 0.0f;
+    s_nIntermissionRound = 0;
     if(s_pFirstRoundPrep)
     {
         g_pLTCFontManager->DestroyPolyString(s_pFirstRoundPrep);
@@ -313,6 +322,14 @@ void FT_RoundHudTerm()
     s_fLastCombatHudSample = -1.0f;
 }
 
+void FT_RoundHudSetIntermission(uint16 round, float remaining)
+{
+    if(round < s_nRound || !g_pLTClient) return;
+    s_nIntermissionRound = round;
+    const float seconds = FTCombatRules::Clamp(remaining, 0, 120, 0);
+    s_fIntermissionUntil = seconds > 0 ? g_pLTClient->GetTime() + seconds : 0;
+}
+
 void FT_RoundHudHandleMessage(
     ILTMessage_Read *pMessage)
 {
@@ -329,6 +346,7 @@ void FT_RoundHudHandleMessage(
     const bool bCombatActive = pMessage->Readbool();
     FT_HudCombatTime(); // Account for the old state BEFORE switching.
     s_bCombatTimerActive = bCombatActive;
+    if(bCombatActive || nState == 3) s_fIntermissionUntil = 0.0f;
 
     if(!s_pRoundFont)
     {
@@ -451,6 +469,8 @@ void FT_RoundHudSetTimedPowerups(
 
 void FT_RoundHudResetFirstRoundPreparation()
 {
+    s_fIntermissionUntil = 0.0f;
+    s_nIntermissionRound = 0;
     // The client shell can enter a second world without a DLL reload.
     // Drop the previous world's round number before accepting its new
     // preparation countdown (which only displays while s_nRound == 0).
@@ -595,30 +615,41 @@ void FT_RenderRoundHud()
         &nScreenW,
         &nScreenH);
 
-    if(s_pRoundStatus &&
-       s_nRound > 0)
+    if(s_pRoundStatus && s_nRound > 0)
     {
-        char szStatus[96];
-        sprintf(
-            szStatus,
-            "ROUND %u     KILLS %u/%u     ALIVE %u     LIVES %u/%u",
-            (uint32)s_nRound,
-            (uint32)s_nKilled,
-            (uint32)s_nTarget,
-            (uint32)s_nAlive,
-            (uint32)s_nLives,
-            (uint32)s_nMaxLives);
-
-        s_pRoundStatus->SetText(szStatus);
-
-        const float fWidth =
-            s_pRoundStatus->GetWidth();
-
-        s_pRoundStatus->SetPosition(
-            ((float)nScreenW - fWidth) * 0.5f,
-            22.0f);
-
+        const unsigned left = s_nTarget > s_nKilled ? s_nTarget - s_nKilled : 0;
+        const unsigned incoming = FTCombatRules::PendingSpawns(s_nTarget, s_nKilled, s_nAlive);
+        HCONSOLEVAR hRadarScale = g_pLTClient->GetConsoleVar("ftradarscale");
+        const float radarScale = hRadarScale ? g_pLTClient->GetVarValueFloat(hRadarScale) : 1.0f;
+        const float safeWidth = (float)nScreenW -
+            2.0f * FTPresentationRules::RadarRadius((float)nScreenH, radarScale) - 72.0f;
+        char status[96];
+        sprintf(status, "ROUND %u   LEFT %u   ALIVE %u", (unsigned)s_nRound, left, (unsigned)s_nAlive);
+        s_pRoundStatus->SetText(status);
+        if(s_pRoundStatus->GetWidth() > safeWidth)
+        {
+            sprintf(status, "R%u   LEFT %u   UP %u", (unsigned)s_nRound, left, (unsigned)s_nAlive);
+            s_pRoundStatus->SetText(status);
+        }
+        const float statusX = 24.0f + (safeWidth - s_pRoundStatus->GetWidth()) * 0.5f;
+        s_pRoundStatus->SetPosition(statusX > 18.0f ? statusX : 18.0f, 22.0f);
         s_pRoundStatus->Render();
+        if(s_pWaveDetail && !s_bSpectating && !s_bGameOver)
+        {
+            if(!s_bCombatTimerActive && s_nIntermissionRound == s_nRound && s_fIntermissionUntil > 0)
+            {
+                const unsigned seconds = FTPresentationRules::Countdown(
+                    s_fIntermissionUntil, g_pLTClient->GetTime());
+                if(seconds) sprintf(status, "NEXT ROUND IN %us  |  RELOAD AND REGROUP", seconds);
+                else sprintf(status, "NEXT WAVE STARTING...");
+            }
+            else sprintf(status, "INCOMING %u   KILLS %u/%u   LIVES %u/%u", incoming,
+                (unsigned)s_nKilled, (unsigned)s_nTarget, (unsigned)s_nLives, (unsigned)s_nMaxLives);
+            s_pWaveDetail->SetText(status);
+            const float detailX = 24.0f + (safeWidth - s_pWaveDetail->GetWidth()) * 0.5f;
+            s_pWaveDetail->SetPosition(detailX > 18.0f ? detailX : 18.0f, 55.0f);
+            s_pWaveDetail->Render();
+        }
     }
 
     // Game Over is a real results state, not a permanent dead-end.

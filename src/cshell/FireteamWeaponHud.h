@@ -6,6 +6,7 @@ struct FTWeaponDef;
 #include <ltbasedefs.h>
 
 void FT_WeaponHudInit();
+void FT_WeaponHudSetReload(bool bReloading, float fRemaining);
 void FT_WeaponHudTerm();
 void FT_SetPrimaryAmmo(uint16 nClip, uint16 nReserve);
 void FT_WeaponHudOnShot(uint8 nWeaponSlot);

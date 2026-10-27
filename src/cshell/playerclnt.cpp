@@ -11,6 +11,7 @@
 //------------------------------------------------------------------------------//
 
 #include "playerclnt.h"
+#include "FireteamCombatRules.h"
 
 #include <iltclient.h>
 #include <ltobjectcreate.h>
@@ -816,6 +817,9 @@ void CPlayerClnt::Update()
             pAmmoSync->DecRef();
         }
     }
+
+    FT_WeaponHudSetReload(m_bReloading,
+        m_bReloading ? m_fReloadComplete - g_pLTClient->GetTime() : 0);
 
     if(bReloadAnimationDone && m_hViewWeaponObject)
     {
@@ -1768,9 +1772,7 @@ bool CPlayerClnt::ReloadWeapon()
     m_bReloading = true;
     m_fReloadComplete =
         g_pLTClient->GetTime() +
-        (pDef->fReloadSeconds > 0.0f
-            ? pDef->fReloadSeconds
-            : 0.10f);
+        FTCombatRules::ReloadSeconds(pDef->fReloadSeconds);
 
     ILTMessage_Write *pMessage = LTNULL;
     if(!m_bDevWeaponQa &&

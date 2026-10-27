@@ -1,6 +1,8 @@
 #include "FireteamWeaponHud.h"
+#include "FireteamRoundHud.h"
 #include "clientinterfaces.h"
 #include "FireteamWeaponDefs.h"
+#include "FireteamCombatRules.h"
 
 #include <iltclient.h>
 #include <iltdrawprim.h>
@@ -14,6 +16,13 @@ static CUIFormattedPolyString *s_pWeaponName = LTNULL;
 static CUIFormattedPolyString *s_pQaMenuText = LTNULL;
 static FTWeaponDef s_WeaponDefs[6];
 
+static bool s_bReloading = false;
+static float s_fReloadRemaining = 0;
+void FT_WeaponHudSetReload(bool reloading, float remaining)
+{
+    s_bReloading = reloading;
+    s_fReloadRemaining = FTCombatRules::Clamp(remaining, 0, 30, 0);
+}
 static uint16 s_nPrimaryClip = 30;
 static uint16 s_nPrimaryReserve = 90;
 
@@ -460,7 +469,7 @@ void FT_RenderWeaponHud(
         else
         {
             s_pWeaponName->SetPosition(
-                (float)nScreenW - 210.0f,
+                (float)nScreenW - s_pWeaponName->GetWidth() - 28.0f,
                 (float)nScreenH - 102.0f);
         }
         s_pWeaponName->Render();
@@ -586,18 +595,23 @@ void FT_RenderWeaponHud(
 
     if(s_pAmmoText)
     {
-        char szAmmo[32];
+        char szAmmo[80];
 
-        // NOLF2 HUDAmmo convention: clip / reserve.
-        sprintf(
-            szAmmo,
-            "%u/%u",
-            (uint32)s_nPrimaryClip,
-            (uint32)s_nPrimaryReserve);
-
+        const bool bBottomless = FT_RoundHudIsBottomlessActive();
+        if(bBottomless)
+            sprintf(szAmmo, "BOTTOMLESS  %u/%u", (unsigned)s_nPrimaryClip, (unsigned)s_nPrimaryReserve);
+        else if(s_bReloading)
+            sprintf(szAmmo, "RELOADING %.1fs  %u/%u", s_fReloadRemaining,
+                (unsigned)s_nPrimaryClip, (unsigned)s_nPrimaryReserve);
+        else if(s_nPrimaryClip == 0 && s_nPrimaryReserve == 0)
+            sprintf(szAmmo, "EMPTY  0/0");
+        else if(s_nPrimaryClip == 0)
+            sprintf(szAmmo, "R: RELOAD  0/%u", (unsigned)s_nPrimaryReserve);
+        else sprintf(szAmmo, "%u/%u", (unsigned)s_nPrimaryClip, (unsigned)s_nPrimaryReserve);
         s_pAmmoText->SetText(szAmmo);
+        s_pAmmoText->SetColor(s_nPrimaryClip == 0 && !bBottomless ? 0xFFFFC070 : 0xFFFFFFFF);
         s_pAmmoText->SetPosition(
-            (float)nScreenW - 118.0f,
+            (float)nScreenW - s_pAmmoText->GetWidth() - 28.0f,
             (float)nScreenH - 72.0f);
         s_pAmmoText->Render();
     }

@@ -1,5 +1,6 @@
 #include "FireteamSettingsMenu.h"
 #include "clientinterfaces.h"
+#include "FireteamCombatRules.h"
 
 #include <iltclient.h>
 #include <iltdrawprim.h>
@@ -125,7 +126,9 @@ static void FTApplyGamma()
 
 static void FTSaveSettings()
 {
-    FILE *pFile = fopen("fireteam-settings.cfg", "wt");
+    char szTemporary[96];
+    sprintf(szTemporary, "fireteam-settings.cfg.%lu.tmp", (unsigned long)GetCurrentProcessId());
+    FILE *pFile = fopen(szTemporary, "wt");
     if(!pFile)
     {
         return;
@@ -133,16 +136,25 @@ static void FTSaveSettings()
 
     fprintf(
         pFile,
-        "%.6f %.6f %u %.3f %u %u %u\n",
+        "%.6f %.6f %u %.3f %u %u %u %u %.3f %u %u\n",
         s_fSensitivityX,
         s_fSensitivityY,
         s_nSoundVolume,
         s_fGamma,
         s_aResolutions[s_nResolution].nWidth,
         s_aResolutions[s_nResolution].nHeight,
-        s_bWindowed ? 1 : 0);
+        s_bWindowed ? 1 : 0,
+        FTGetConsoleFloat("ftradarenabled", 1) >= 0.5f ? 1u : 0u,
+        FTCombatRules::Clamp(FTGetConsoleFloat("ftradarscale", 1), 0.75f, 1.75f, 1),
+        FTGetConsoleFloat("ftdamagefeedback", 1) >= 0.5f ? 1u : 0u,
+        FTGetConsoleFloat("ftreducedfx", 0) >= 0.5f ? 1u : 0u);
 
-    fclose(pFile);
+    const bool written = !ferror(pFile);
+    const int closed = fclose(pFile);
+    if(written && closed == 0)
+        MoveFileExA(szTemporary, "fireteam-settings.cfg",
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    DeleteFileA(szTemporary); // No-op after successful atomic rename.
 }
 
 static void FTLoadSettings()
@@ -167,19 +179,21 @@ static void FTLoadSettings()
     uint32 nWidth = 0;
     uint32 nHeight = 0;
     uint32 nWindowed = 1;
+    uint32 nRadar = 1, nDamage = 1, nReduced = 0;
+    float fRadarScale = 1.0f;
 
     int nRead = sscanf(
         szLine,
-        "%f %f %u %f %u %u %u",
+        "%f %f %u %f %u %u %u %u %f %u %u",
         &fSensitivityX,
         &fSensitivityY,
         &nSoundVolume,
         &fGamma,
         &nWidth,
         &nHeight,
-        &nWindowed);
+        &nWindowed, &nRadar, &fRadarScale, &nDamage, &nReduced);
 
-    if(nRead != 7)
+    if(nRead < 7)
     {
         // 2026-10 format before gamma was added.
         if(sscanf(
@@ -197,7 +211,7 @@ static void FTLoadSettings()
         }
     }
 
-    if(nRead != 7)
+    if(nRead < 7)
     {
         // Previous format: X sensitivity, Y sensitivity, width, height, windowed.
         if(sscanf(
@@ -215,7 +229,7 @@ static void FTLoadSettings()
         }
     }
 
-    if(nRead != 7)
+    if(nRead < 7)
     {
         // Original format: one sensitivity, width, height, windowed.
         float fLegacySensitivity = s_fSensitivityX;
@@ -235,7 +249,7 @@ static void FTLoadSettings()
         }
     }
 
-    if(nRead == 7)
+    if(nRead >= 7)
     {
         // Much finer low-end mouse range. The old 0.0005 floor/step was too
         // coarse for modern high-DPI mice.
@@ -264,6 +278,17 @@ static void FTLoadSettings()
         }
 
         s_bWindowed = (nWindowed != 0);
+        // Explicit launch-console overrides win. Direct EXE starts load the
+        // persisted fields without resetting the launcher's radar choices.
+        char option[80];
+        if(!g_pLTClient->GetConsoleVar("ftradarenabled"))
+        { sprintf(option,"ftradarenabled %u",nRadar ? 1u : 0u); g_pLTClient->RunConsoleString(option); }
+        if(!g_pLTClient->GetConsoleVar("ftradarscale"))
+        { sprintf(option,"ftradarscale %.3f",FTCombatRules::Clamp(fRadarScale,0.75f,1.75f,1)); g_pLTClient->RunConsoleString(option); }
+        if(!g_pLTClient->GetConsoleVar("ftdamagefeedback"))
+        { sprintf(option,"ftdamagefeedback %u",nDamage ? 1u : 0u); g_pLTClient->RunConsoleString(option); }
+        if(!g_pLTClient->GetConsoleVar("ftreducedfx"))
+        { sprintf(option,"ftreducedfx %u",nReduced ? 1u : 0u); g_pLTClient->RunConsoleString(option); }
     }
 
     fclose(pFile);

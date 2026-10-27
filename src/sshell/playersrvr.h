@@ -95,6 +95,7 @@ public:
           m_fLastKillFeedbackTime(0.0f),
           m_nKillFeedbackChain(0)
     {
+        m_nCombatInstance = NextCombatInstance();
         m_sResumeToken[0] = '\0';
         FT_LoadWeaponDefs("config/weapons.cfg", m_WeaponDefs);
         memset(m_aShotsBySlot, 0, sizeof(m_aShotsBySlot));
@@ -147,6 +148,7 @@ public:
     void                SetRespawnAnchor(const LTVector &vPos, const LTRotation &rRot)
                         { m_vSpawnPos = vPos; m_rSpawnRot = rRot; }
     uint32              GetClientID(){ return m_iClientID; }
+    uint32              GetCombatInstance() const { return m_nCombatInstance; }
     uint32              GetScore(){ return m_iScore; }
     uint32              GetAcceptedShots() const { return m_nAcceptedShots; }
     uint32              GetConfirmedHits() const { return m_nConfirmedHits; }
@@ -173,7 +175,7 @@ public:
                                         }
     float               GetMoney(){ return m_fMoney; }
     char*               GetName(){ return m_sName; }
-    void                ApplyDamage(uint8 nDamage);
+    void                ApplyDamage(uint8 nDamage, const LTVector *pSource = LTNULL);
     bool                IsAlive() const { return m_bAlive; }
     bool                IsTargetable() const { return m_bResumeVerified && m_bAlive && !m_bQaSpectating; }
     bool                CanControlPlayer() const { return m_bResumeVerified && m_bAlive && !m_bQaSpectating; }
@@ -192,6 +194,13 @@ public:
     void                SyncPowerupState(){ SendPowerupState(); }
 
 private:
+    static uint32 NextCombatInstance()
+    {
+        static uint32 serial = 0;
+        if(++serial == 0) ++serial;
+        return serial;
+    }
+    uint32 m_nCombatInstance;
 
 	uint32				PreCreate(void *pData, float fData);
 	uint32				InitialUpdate(void *pData, float fData);
