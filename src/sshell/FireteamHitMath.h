@@ -7,6 +7,19 @@
 
 namespace FTHitMath
 {
+    // Model animation user dimensions are posture-specific. Never let a
+    // crouch/idle frame permanently shrink the authoritative bullet broad
+    // phase to a tiny target. Body caps come from the server, not the client.
+    inline bool SafeModelHalfExtent(float authored, float sampled)
+    {
+        return authored > 0.0f && sampled > 0.0f &&
+            sampled >= authored * 0.90f && sampled < authored;
+    }
+    inline float TorsoRadius(float collisionHalfExtent)
+    {
+        // Chest/shoulder shell stays inside the server-clamped physical box.
+        return collisionHalfExtent * 0.78f;
+    }
     struct Vec3
     {
         float x, y, z;

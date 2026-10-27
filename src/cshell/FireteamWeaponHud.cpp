@@ -27,6 +27,12 @@ static uint16 s_nPrimaryClip = 30;
 static uint16 s_nPrimaryReserve = 90;
 
 static float s_fCrosshairKick = 0.0f;
+static float s_fConfirmedHitUntil = 0.0f;
+void FT_WeaponHudConfirmedHit()
+{
+    // Only called after authoritative MSG_SC_COMBAT_FEEDBACK/HIT.
+    if(g_pLTClient) s_fConfirmedHitUntil = g_pLTClient->GetTime() + 0.12f;
+}
 static float s_fLastCrosshairTime = 0.0f;
 static uint8 s_nCrosshairSlot = 0;
 static uint32 s_nQaCurrent = 0;
@@ -357,6 +363,27 @@ void FT_RenderWeaponHud(
         {
             s_fCrosshairKick = 0.0f;
         }
+    }
+
+    if((bShowCrosshair || bScoped) && pDef &&
+       fNow < s_fConfirmedHitUntil)
+    {
+        // Four tiny corner ticks: short enough not to obscure the target,
+        // never displayed on a speculative shot or rejected collision.
+        const float cx = (float)nScreenW * 0.5f;
+        const float cy = (float)nScreenH * 0.5f;
+        const uint8 alpha = (uint8)(225.0f *
+            FTCombatRules::Clamp((s_fConfirmedHitUntil - fNow)/0.12f,
+                0.0f, 1.0f, 0.0f));
+        LT_POLYF4 ticks[4];
+        FT_SetupQuad(ticks[0], cx-13, cy-8, 4, 2, 120,255,215,alpha);
+        FT_SetupQuad(ticks[1], cx+9, cy-8, 4, 2, 120,255,215,alpha);
+        FT_SetupQuad(ticks[2], cx-13, cy+6, 4, 2, 120,255,215,alpha);
+        FT_SetupQuad(ticks[3], cx+9, cy+6, 4, 2, 120,255,215,alpha);
+        FT_SetDrawState();
+        g_pLTCDrawPrim->BeginDrawPrim();
+        g_pLTCDrawPrim->DrawPrim(ticks, 4);
+        g_pLTCDrawPrim->EndDrawPrim();
     }
 
     if(bShowCrosshair && pDef)

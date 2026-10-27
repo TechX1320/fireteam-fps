@@ -2193,6 +2193,15 @@ void CPlayerSrvr::FirePrimary(
     {
         vServerFrom = vFrom;
     }
+    else if((m_nAcceptedShots % 32) == 0)
+    {
+        // The fallback can miss an apparently close target if the client
+        // camera has drifted relative to the server player object.
+        g_pLTServer->CPrint(
+            "Fireteam hit QA: camera origin rejected (%s), offset %.1f %.1f %.1f; using server eye",
+            pDef->sName, vReportedOffset.x,
+            vReportedOffset.y, vReportedOffset.z);
+    }
 
     m_fNextWeaponShot[m_nWeaponSlot] =
         fNow + pDef->fFireInterval;
@@ -2390,6 +2399,17 @@ void CPlayerSrvr::TracePrimaryPellet(
 
             if(!bTightHit)
             {
+                // Rate-limited visibility into the historic 'crosshair is
+                // on zombie but no damage' problem. No client authority.
+                static uint32 s_nRejectedZombieBroadHits = 0;
+                ++s_nRejectedZombieBroadHits;
+                if(bLogMiss && (s_nRejectedZombieBroadHits % 24) == 1)
+                {
+                    g_pLTServer->CPrint(
+                        "Fireteam hit QA: %u broad zombie intersections rejected by narrow/cover check (latest weapon=%s, ray_distance=%.1f)",
+                        s_nRejectedZombieBroadHits, pDef->sName,
+                        (info.m_Point - query.m_From).Mag());
+                }
                 // No damage, blood, hit counter, fake penetration or
                 // cross-floor "Doom" hit on a movement-box-only contact.
                 if(filterData.nRejected >=

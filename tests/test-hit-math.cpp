@@ -46,6 +46,18 @@ int main()
     assert(!Hits(Vec3(0, 0, -100), forward, center, torso, 75));
     assert(!Hits(Vec3(0, 0, -100), Vec3(0, 0, 0), center, torso));
     assert(!Hits(Vec3(0, 0, -100), forward, center, Vec3(0, 30, 15)));
-    puts("PASS: 3D ray/ellipsoid geometry, ranges, floors, head and misses");
+    // The current code used to shrink a 24-unit torso to the idle model's
+    // sampled 8-unit box: its 5-unit torso radius silently rejected shots.
+    assert(!FTHitMath::SafeModelHalfExtent(24, 8));
+    assert(!FTHitMath::SafeModelHalfExtent(24, 17));
+    assert(FTHitMath::SafeModelHalfExtent(24, 23));
+    assert(!FTHitMath::SafeModelHalfExtent(24, 26));
+    const float bodyRadius = FTHitMath::TorsoRadius(24);
+    assert(bodyRadius > 18 && bodyRadius < 24);
+    assert(Hits(Vec3(18, 0, -100), forward, center,
+                Vec3(bodyRadius, 27, bodyRadius)));
+    assert(!Hits(Vec3(25, 0, -100), forward, center,
+                 Vec3(bodyRadius, 27, bodyRadius)));
+    puts("PASS: 3D ray, missed head/cover and authored vs sampled hit extents");
     return 0;
 }

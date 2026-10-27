@@ -2,6 +2,7 @@
 #include "clientinterfaces.h"
 #include "msgids.h"
 #include "FireteamFeedbackQueue.h"
+#include "FireteamWeaponHud.h"
 
 #include <iltclient.h>
 #include <iltdrawprim.h>
@@ -603,6 +604,7 @@ void FT_CombatFeedbackHandleMessage(
     {
         const LTVector vWorldImpact = pMessage->ReadLTVector();
         FT_SpawnBloodBurst(vWorldImpact);
+        FT_WeaponHudConfirmedHit();
         return;
     }
     FT_QueueFeedback(nFeedback);

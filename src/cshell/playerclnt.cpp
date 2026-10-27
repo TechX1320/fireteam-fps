@@ -508,6 +508,8 @@ m_hClubObject(NULL),
 m_hViewWeaponObject(NULL),
 m_bViewWeaponAction(false),
 m_nViewAttackVariant(0),
+m_fViewWeaponKick(0.0f),
+m_fLastViewWeaponKickTime(0.0f),
 m_nWeaponSlot(1),
 m_fNextPrimaryClientShot(0.0f),
 m_bSemiAutoTriggerHeld(false),
@@ -1250,6 +1252,18 @@ bool CPlayerClnt::Attack()
                         : "fire"),
                 false);
         PlayViewWeaponSound("FIRE.WAV");
+        // Viewmodel recoil is local presentation ONLY. Do not move the camera
+        // or alter the validated direction sent to the authoritative server.
+        HCONSOLEVAR hReduced = g_pLTClient->GetConsoleVar("ftreducedfx");
+        const bool bReduced = hReduced && g_pLTClient->GetVarValueFloat(hReduced) >= 0.5f;
+        if(!bReduced)
+        {
+            const float fImpulse = FTCombatRules::Clamp(
+                0.05f + pDef->fCrosshairShotKick * 0.007f,
+                0.035f, 0.13f, 0.06f);
+            m_fViewWeaponKick = FTCombatRules::Clamp(
+                m_fViewWeaponKick + fImpulse, 0.0f, 0.24f, 0.0f);
+        }
         FT_WeaponHudOnShot(m_nWeaponSlot);
         return true;
     }
@@ -1342,6 +1356,8 @@ bool CPlayerClnt::SelectWeaponSlot(uint8 nSlot)
     m_bReloadAwaitingAmmo = false;
     m_fReloadAckDeadline = 0.0f;
     m_fNextPrimaryClientShot = 0.0f;
+    m_fViewWeaponKick = 0.0f;
+    m_fLastViewWeaponKickTime = 0.0f;
 
     CreateViewWeapon();
 
@@ -1474,6 +1490,8 @@ void CPlayerClnt::CycleDevWeapon(int nDirection)
     m_bReloadAwaitingAmmo = false;
     m_fReloadAckDeadline = 0.0f;
     m_fNextPrimaryClientShot = 0.0f;
+    m_fViewWeaponKick = 0.0f;
+    m_fLastViewWeaponKickTime = 0.0f;
 
     CreateViewWeapon();
 
@@ -2334,6 +2352,29 @@ void CPlayerClnt::UpdateWeaponView(bool bFirstPerson)
                     pDef->fViewZ);
             }
 
+            const float fNow = g_pLTClient->GetTime();
+            float fDt = m_fLastViewWeaponKickTime > 0.0f
+                ? fNow - m_fLastViewWeaponKickTime : 0.0f;
+            m_fLastViewWeaponKickTime = fNow;
+            fDt = FTCombatRules::Clamp(fDt, 0.0f, 0.10f, 0.0f);
+            m_fViewWeaponKick -= fDt * 1.05f;
+            if(m_fViewWeaponKick < 0.0f) m_fViewWeaponKick = 0.0f;
+            HCONSOLEVAR hReduced = g_pLTClient->GetConsoleVar("ftreducedfx");
+            if(hReduced && g_pLTClient->GetVarValueFloat(hReduced) >= 0.5f)
+                m_fViewWeaponKick = 0.0f;
+            // Recoverable positional recoil: distinct initial impulse and
+            // smooth settle, with unchanged reticle, actual aim and damage.
+            vViewPos.y -= m_fViewWeaponKick * 0.44f;
+            vViewPos.z -= m_fViewWeaponKick * 0.83f;
+            // Small breathing/movement sway, with no aim drift. Skip in
+            // weapon QA so authored view offsets remain easy to calibrate.
+            if(!m_bDevWeaponQa && !(
+                hReduced && g_pLTClient->GetVarValueFloat(hReduced) >= 0.5f)
+                && IsMoving())
+            {
+                vViewPos.x += sinf(fNow * 5.5f) * 0.010f;
+                vViewPos.y += cosf(fNow * 11.0f) * 0.008f;
+            }
             g_pLTClient->SetObjectPos(m_hViewWeaponObject, &vViewPos);
             UpdateViewWeaponAnimation();
         }

@@ -123,6 +123,8 @@ private:
     HLOCALOBJ           m_hViewWeaponObject;
     bool                m_bViewWeaponAction;
     uint32              m_nViewAttackVariant;
+    float               m_fViewWeaponKick;
+    float               m_fLastViewWeaponKickTime;
     uint8               m_nWeaponSlot;
     float               m_fNextPrimaryClientShot;
     bool                m_bSemiAutoTriggerHeld;
